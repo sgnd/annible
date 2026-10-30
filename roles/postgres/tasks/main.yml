@@ -1,0 +1,41 @@
+# PostgreSQL. Apps connect to <server ip>:5432 as user "postgres".
+
+# The app in the container runs as user 999, so it must own its data folder.
+- name: Create PostgreSQL folders
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "0700"
+  loop:
+    - { path: "{{ postgres_dir }}", owner: root }
+    - { path: "{{ postgres_dir }}/data", owner: "999" }
+
+- name: Write PostgreSQL password
+  ansible.builtin.copy:
+    dest: "{{ postgres_dir }}/.env"
+    content: |
+      POSTGRES_PASSWORD={{ postgres_password }}
+    mode: "0600"
+  no_log: true
+
+- name: Mirror PostgreSQL image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [postgres]
+
+- name: Write PostgreSQL compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ postgres_dir }}/compose.yml"
+    mode: "0600"
+
+- name: Start PostgreSQL
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: postgres

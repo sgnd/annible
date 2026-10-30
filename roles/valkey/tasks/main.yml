@@ -1,0 +1,42 @@
+# Valkey. Apps connect to <server ip>:6379 with the password.
+
+# The app in the container runs as user 999, so it must own its data folder.
+- name: Create Valkey folders
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "0700"
+  loop:
+    - { path: "{{ valkey_dir }}", owner: root }
+    - { path: "{{ valkey_dir }}/data", owner: "999" }
+
+- name: Write Valkey config
+  ansible.builtin.template:
+    src: valkey.conf.j2
+    dest: "{{ valkey_dir }}/valkey.conf"
+    mode: "0644"
+  diff: false  # has a password
+  register: valkey_config
+
+- name: Mirror Valkey image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [valkey]
+
+- name: Write Valkey compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ valkey_dir }}/compose.yml"
+    mode: "0600"
+
+- name: Start Valkey
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: valkey
+    docker_compose_restart: "{{ valkey_config.changed }}"

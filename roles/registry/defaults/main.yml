@@ -1,2 +1,2 @@
-registry_dir: /opt/registry
+registry_dir: "{{ apps_dir }}/registry"
 registry_cert_days: 3650

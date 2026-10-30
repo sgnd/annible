@@ -26,6 +26,7 @@
     src: stack.yml.j2
     dest: "{{ portainer_dir }}/stack.yml"
     mode: "0600"
+  diff: false  # has a password
   register: portainer_stack
 
 - name: Deploy Portainer

@@ -1,14 +1,9 @@
-- name: Preflight
+# Main playbook. install.sh runs it. Settings come from config.yml through inventory.py.
+
+- name: Check servers
   hosts: all
   gather_facts: true
-  vars_files: versions.yml
   tasks:
-    - name: Check cluster layout
-      ansible.builtin.assert:
-        that: groups['managers'] | length is odd
-        fail_msg: Managers must be an odd number (1, 3, 5).
-      run_once: true
-
     - name: Check operating system
       ansible.builtin.assert:
         that:
@@ -23,26 +18,33 @@
 
 - name: Base system
   hosts: all
-  vars_files: versions.yml
   roles:
     - common
     - docker
 
 - name: Registry
   hosts: all
-  vars_files: versions.yml
   roles:
     - registry
 
 - name: Swarm
   hosts: swarm
-  vars_files: versions.yml
   roles:
     - swarm
 
+# Apps that run on one server with Docker Compose, like databases.
+- name: Server apps
+  hosts: all
+  tasks:
+    - name: Deploy server apps
+      ansible.builtin.include_role:
+        name: "{{ app }}"
+      loop: "{{ node_apps }}"
+      loop_control:
+        loop_var: app
+
 - name: Swarm apps
   hosts: managers[0]
-  vars_files: versions.yml
   tasks:
     - name: Deploy swarm apps
       ansible.builtin.include_role:
@@ -55,9 +57,16 @@
   hosts: managers[0]
   gather_facts: false
   tasks:
-    - name: Show access details
+    - name: Show DNS setting
       ansible.builtin.debug:
-        msg:
-          - "Point DNS *.{{ domain }} to {{ node_ip }} ({{ inventory_hostname }})."
-          - "Passwords are in {{ secrets_dir }}"
-          - "Apps: {% for app in swarm_apps %}https://{{ app }}.{{ domain }} {% endfor %}"
+        msg: "Point DNS for *.{{ domain }} to the public IP of {{ inventory_hostname }}. Passwords are in {{ secrets_dir }}, back it up."
+
+    - name: Show how to reach each app
+      ansible.builtin.debug:
+        msg: "{{ app }}: {{ catalog[app].info | replace('<domain>', domain) | replace('<ip>', hostvars[target].node_ip | default('')) }}"
+      vars:
+        app: "{{ item.key }}"
+        target: "{{ item.value }}"
+      loop: "{{ apps | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"

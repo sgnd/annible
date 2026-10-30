@@ -1,0 +1,19 @@
+services:
+  redis:
+    image: {{ registry_addr }}/redis:{{ images.redis.tag }}
+    container_name: redis
+    restart: always
+    # Host network: the firewall decides who can connect.
+    network_mode: host
+    command: ["redis-server", "/etc/redis.conf"]
+    environment:
+      # redis-cli reads the password from REDISCLI_AUTH, so it is not visible in the process list.
+      REDISCLI_AUTH: "{{ redis_password }}"
+    volumes:
+      - ./redis.conf:/etc/redis.conf:ro
+      - ./data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

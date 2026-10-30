@@ -6,7 +6,8 @@ http:
     admin-ip:
       ipAllowList:
         sourceRange:
-{% for cidr in admin_allow_from | default([], true) or ['0.0.0.0/0', '::/0'] %}
+{# Empty admin_allow_from = allow everyone. #}
+{% for cidr in (admin_allow_from | default([])) or ['0.0.0.0/0', '::/0'] %}
           - "{{ cidr }}"
 {% endfor %}
     admin-auth:

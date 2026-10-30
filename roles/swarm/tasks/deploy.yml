@@ -1,6 +1,6 @@
 # Deploy one stack and wait until it is running.
 # Used by app roles. Input:
-#   swarm_stack:         stack name, file is {{ stack_dir }}/<name>/stack.yml
+#   swarm_stack:         stack name, file is {{ apps_dir }}/<name>/stack.yml
 #   swarm_stack_changed: true if the stack file changed
 
 - name: Get deployed stacks
@@ -11,7 +11,7 @@
 - name: Deploy stack {{ swarm_stack }}
   ansible.builtin.command: >-
     docker stack deploy --prune
-    -c {{ stack_dir }}/{{ swarm_stack }}/stack.yml {{ swarm_stack }}
+    -c {{ apps_dir }}/{{ swarm_stack }}/stack.yml {{ swarm_stack }}
   when: swarm_stack_changed | bool or swarm_stack not in swarm_stack_list.stdout_lines
   changed_when: true
 

@@ -15,3 +15,9 @@ common_sysctl:
   fs.inotify.max_user_instances: 1024
 
 common_journald_max_use: 1G
+
+# Firewall inputs (see tasks/firewall.yml).
+common_ssh_allow_from: "{{ (ssh.allow_from | default([])) or ['any'] }}"
+common_cluster_ips: "{{ groups['all'] | difference([inventory_hostname]) | map('extract', hostvars, 'node_ip') | sort }}"
+# docker0: default bridge. docker_gwbridge: how swarm containers reach the host.
+common_docker_interfaces: [docker0, docker_gwbridge]

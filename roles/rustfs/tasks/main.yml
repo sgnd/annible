@@ -1,0 +1,51 @@
+# RustFS: S3-compatible storage. Apps use http://<server ip>:9000 with the access and secret key.
+# Web console: https://rustfs.<domain>/rustfs/console/
+
+# The app in the container runs as user 10001, so it must own its data folder.
+- name: Create RustFS folders
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "0700"
+  loop:
+    - { path: "{{ rustfs_dir }}", owner: root }
+    - { path: "{{ rustfs_dir }}/data", owner: "10001" }
+
+- name: Write RustFS keys
+  ansible.builtin.copy:
+    dest: "{{ rustfs_dir }}/.env"
+    content: |
+      RUSTFS_ACCESS_KEY={{ rustfs_access_key }}
+      RUSTFS_SECRET_KEY={{ rustfs_secret_key }}
+    mode: "0600"
+  no_log: true
+
+- name: Mirror RustFS image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [rustfs]
+
+- name: Write RustFS compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ rustfs_dir }}/compose.yml"
+    mode: "0600"
+
+- name: Start RustFS
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: rustfs
+
+- name: Add RustFS console to Traefik
+  ansible.builtin.include_role:
+    name: traefik
+    tasks_from: route
+  vars:
+    traefik_route_name: rustfs
+    traefik_route_port: 9001

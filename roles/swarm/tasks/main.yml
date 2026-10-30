@@ -1,4 +1,5 @@
 # Create the swarm on the first manager, then join the other nodes.
+# Note: {% raw %}...{% endraw %} keeps Docker's own {{ }} format text away from Ansible.
 
 - name: Check if this node is in a swarm
   ansible.builtin.command: docker info --format '{% raw %}{{ .Swarm.LocalNodeState }}{% endraw %}'
@@ -15,10 +16,16 @@
     - swarm_state.stdout != 'active'
   changed_when: true
 
-- name: Get join tokens
-  ansible.builtin.command: docker swarm join-token -q {{ item }}
-  loop: [manager, worker]
-  register: swarm_tokens
+- name: Get manager join token
+  ansible.builtin.command: docker swarm join-token -q manager
+  register: swarm_manager_token
+  delegate_to: "{{ swarm_leader }}"
+  run_once: true
+  changed_when: false
+
+- name: Get worker join token
+  ansible.builtin.command: docker swarm join-token -q worker
+  register: swarm_worker_token
   delegate_to: "{{ swarm_leader }}"
   run_once: true
   changed_when: false
@@ -32,7 +39,7 @@
     --listen-addr {{ node_ip }}:2377
     {{ hostvars[swarm_leader].node_ip }}:2377
   vars:
-    join_token: "{{ swarm_tokens.results[0].stdout if node_role == 'manager' else swarm_tokens.results[1].stdout }}"
+    join_token: "{{ swarm_manager_token.stdout if node_role == 'manager' else swarm_worker_token.stdout }}"
   when:
     - inventory_hostname != swarm_leader
     - swarm_state.stdout != 'active'
@@ -52,6 +59,7 @@
   delegate_to: "{{ swarm_leader }}"
   changed_when: false
 
+# Labels only get added. Remove old ones by hand: docker node update --label-rm <key> <node>
 - name: Add node labels from config.yml
   ansible.builtin.command: >-
     docker node update

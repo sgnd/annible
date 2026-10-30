@@ -1,0 +1,12 @@
+# Start one Docker Compose app and wait until it is running (and healthy, if it has a healthcheck).
+# Used by app roles. Input:
+#   docker_compose_app:     app name, file is {{ apps_dir }}/<name>/compose.yml
+#   docker_compose_restart: true to restart the app, for example after a config file changed
+
+- name: Start {{ docker_compose_app }}
+  ansible.builtin.command:
+    cmd: docker compose up -d --wait {{ '--force-recreate' if docker_compose_restart | default(false) | bool else '' }}
+    chdir: "{{ apps_dir }}/{{ docker_compose_app }}"
+  register: docker_compose_up
+  # Compose prints "Started" or "Recreated" only when it changed something.
+  changed_when: "'Started' in docker_compose_up.stderr or 'Recreated' in docker_compose_up.stderr"

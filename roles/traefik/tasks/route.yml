@@ -1,0 +1,33 @@
+# Make an app that runs outside the swarm reachable at https://<name>.<domain>.
+# Used by app roles. Does nothing if traefik is not installed. Input:
+#   traefik_route_name:       app name, also the subdomain
+#   traefik_route_port:       port of the app on this server
+#   traefik_route_middleware: admin-ip (default) or admin (adds the dashboard password)
+
+- name: Create Traefik route folder
+  ansible.builtin.file:
+    path: "{{ traefik_dir }}/dynamic"
+    state: directory
+    mode: "0700"
+  delegate_to: "{{ swarm_leader }}"
+  when: "'traefik' in apps"
+
+- name: Add Traefik route for {{ traefik_route_name }}
+  ansible.builtin.copy:
+    dest: "{{ traefik_dir }}/dynamic/{{ traefik_route_name }}.yml"
+    content: |
+      http:
+        routers:
+          {{ traefik_route_name }}:
+            rule: Host(`{{ traefik_route_name }}.{{ domain }}`)
+            service: {{ traefik_route_name }}
+            middlewares:
+              - {{ traefik_route_middleware | default('admin-ip') }}
+        services:
+          {{ traefik_route_name }}:
+            loadBalancer:
+              servers:
+                - url: http://{{ node_ip }}:{{ traefik_route_port }}
+    mode: "0600"
+  delegate_to: "{{ swarm_leader }}"
+  when: "'traefik' in apps"

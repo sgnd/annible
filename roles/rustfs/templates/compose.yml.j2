@@ -1,0 +1,15 @@
+services:
+  rustfs:
+    image: {{ registry_addr }}/rustfs:{{ images.rustfs.tag }}
+    container_name: rustfs
+    restart: always
+    # Host network: the firewall decides who can connect.
+    network_mode: host
+    env_file: .env
+    environment:
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+    volumes:
+      - ./data:/data

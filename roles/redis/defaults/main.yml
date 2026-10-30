@@ -1,0 +1,4 @@
+redis_dir: "{{ apps_dir }}/redis"
+
+# Generated once and saved in state/secrets/ on the installer machine.
+redis_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/redis', chars=['ascii_letters', 'digits'], length=24) }}"

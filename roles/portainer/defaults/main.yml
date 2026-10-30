@@ -1,4 +1,4 @@
-portainer_dir: "{{ stack_dir }}/portainer"
+portainer_dir: "{{ apps_dir }}/portainer"
 portainer_host: "portainer.{{ domain }}"
 
 # Generated once and saved in state/secrets/ on the installer machine.

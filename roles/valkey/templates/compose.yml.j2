@@ -1,0 +1,19 @@
+services:
+  valkey:
+    image: {{ registry_addr }}/valkey:{{ images.valkey.tag }}
+    container_name: valkey
+    restart: always
+    # Host network: the firewall decides who can connect.
+    network_mode: host
+    command: ["valkey-server", "/etc/valkey.conf"]
+    environment:
+      # valkey-cli reads the password from REDISCLI_AUTH, so it is not visible in the process list.
+      REDISCLI_AUTH: "{{ valkey_password }}"
+    volumes:
+      - ./valkey.conf:/etc/valkey.conf:ro
+      - ./data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

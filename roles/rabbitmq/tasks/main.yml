@@ -1,0 +1,51 @@
+# RabbitMQ. Apps connect to <server ip>:5672 as user "admin".
+# Web UI: https://rabbitmq.<domain>
+
+# The app in the container runs as user 999, so it must own its data folder.
+- name: Create RabbitMQ folders
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "0700"
+  loop:
+    - { path: "{{ rabbitmq_dir }}", owner: root }
+    - { path: "{{ rabbitmq_dir }}/data", owner: "999" }
+
+- name: Write RabbitMQ login
+  ansible.builtin.copy:
+    dest: "{{ rabbitmq_dir }}/.env"
+    content: |
+      RABBITMQ_DEFAULT_USER=admin
+      RABBITMQ_DEFAULT_PASS={{ rabbitmq_password }}
+    mode: "0600"
+  no_log: true
+
+- name: Mirror RabbitMQ image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [rabbitmq]
+
+- name: Write RabbitMQ compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ rabbitmq_dir }}/compose.yml"
+    mode: "0600"
+
+- name: Start RabbitMQ
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: rabbitmq
+
+- name: Add RabbitMQ UI to Traefik
+  ansible.builtin.include_role:
+    name: traefik
+    tasks_from: route
+  vars:
+    traefik_route_name: rabbitmq
+    traefik_route_port: 15672

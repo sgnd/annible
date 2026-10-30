@@ -1,4 +1,25 @@
 # Firewall: deny everything, then open only what we need.
+#
+# The wanted rules are saved in a file. When that file changes (for example a new
+# ssh.allow_from or a removed node), the firewall is reset and rebuilt, so old rules go away.
+
+- name: Save wanted firewall rules
+  ansible.builtin.copy:
+    dest: /etc/ufw/swarm-rules.txt
+    content: |
+      # Managed by the swarm installer. Change config.yml instead of this file.
+      ssh {{ ansible_port }} from {{ common_ssh_allow_from | join(', ') }}
+      web 80, 443: {{ inventory_hostname in groups['swarm'] }}
+      cluster nodes: {{ common_cluster_ips | join(', ') }}
+      docker interfaces: {{ common_docker_interfaces | join(', ') }}
+    mode: "0644"
+  register: common_firewall_rules
+
+# Not a handler: the reset must happen now, before the rules below are added again.
+- name: Reset firewall because the rules changed
+  ansible.builtin.command: ufw --force reset
+  when: common_firewall_rules.changed  # noqa: no-handler
+  changed_when: true
 
 - name: Allow SSH
   community.general.ufw:
@@ -6,7 +27,7 @@
     port: "{{ ansible_port | string }}"
     proto: tcp
     from_ip: "{{ item }}"
-  loop: "{{ ssh.allow_from | default([], true) or ['any'] }}"
+  loop: "{{ common_ssh_allow_from }}"
 
 - name: Allow HTTP and HTTPS on swarm nodes
   community.general.ufw:
@@ -20,8 +41,16 @@
 - name: Allow all traffic from other cluster nodes
   community.general.ufw:
     rule: allow
-    from_ip: "{{ hostvars[item].node_ip }}"
-  loop: "{{ groups['all'] | difference([inventory_hostname]) }}"
+    from_ip: "{{ item }}"
+  loop: "{{ common_cluster_ips }}"
+
+# Containers on this server can reach apps that use the host network.
+- name: Allow traffic from local Docker networks
+  community.general.ufw:
+    rule: allow
+    direction: in
+    interface: "{{ item }}"
+  loop: "{{ common_docker_interfaces }}"
 
 - name: Enable firewall
   community.general.ufw:

@@ -3,14 +3,17 @@
 ## Done
 
 - Base setup: OS, firewall, Docker, local registry, swarm
-- `apps:` config: choose apps and where they run
-- traefik, portainer
+- `apps:` config: choose apps and the server they run on
+- Swarm apps: traefik, portainer
+- Server apps: postgres, mariadb, redis, valkey, rustfs, garage, rabbitmq, nats
 
 ## Next
 
-1. Standalone apps with Docker Compose: postgres/mariadb, redis/valkey, rustfs/garage, rabbitmq/nats
-2. Offline install: `build-bundle.sh` makes one file with all packages and images for the target `arch`
-3. Swarm apps: kong, swarmpit, keycloak/authelia, uptimekuma/beszel
+1. Offline install: `build-bundle.sh` makes one file with all packages, images and Ansible
+   for the target `arch`. Then servers need no internet.
+2. Swarm apps: kong, swarmpit, keycloak/authelia, uptimekuma/beszel
+3. Remove apps and nodes automatically (today: by hand, see README)
+4. Optional WireGuard for servers that only have public IPs
 
 ## Rules
 
@@ -18,4 +21,4 @@
 - Simple English.
 - Open-source apps only. Two choices per category, the popular one first.
 - Pin every version. No `latest`.
-- Swarm runs stateless apps. Data lives on standalone servers.
+- Swarm apps are stateless. Apps with data run on one server with Docker Compose.

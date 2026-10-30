@@ -1,12 +1,5 @@
 # Traefik: the HTTPS entry point for all apps. Runs on the first manager.
 
-- name: Check TLS settings
-  ansible.builtin.assert:
-    that:
-      - tls | default('letsencrypt') in ['letsencrypt', 'selfsigned', 'custom']
-      - tls | default('letsencrypt') != 'custom' or (tls_cert is defined and tls_key is defined)
-    fail_msg: "tls must be letsencrypt, selfsigned or custom (custom needs tls_cert and tls_key)."
-
 - name: Create Traefik directories
   ansible.builtin.file:
     path: "{{ traefik_dir }}/{{ item }}"
@@ -39,6 +32,12 @@
     label: "{{ item.dest }}"
   when: tls | default('letsencrypt') == 'custom'
 
+- name: Remove custom certificate config
+  ansible.builtin.file:
+    path: "{{ traefik_dir }}/dynamic/tls.yml"
+    state: absent
+  when: tls | default('letsencrypt') != 'custom'
+
 - name: Write custom certificate config
   ansible.builtin.copy:
     dest: "{{ traefik_dir }}/dynamic/tls.yml"
@@ -64,6 +63,7 @@
     dest: "{{ traefik_dir }}/users"
     content: "admin:{{ traefik_password_hash.stdout }}\n"
     mode: "0600"
+  diff: false
   no_log: true
 
 - name: Mirror Traefik image

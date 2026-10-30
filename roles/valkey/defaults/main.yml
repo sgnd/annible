@@ -1,0 +1,4 @@
+valkey_dir: "{{ apps_dir }}/valkey"
+
+# Generated once and saved in state/secrets/ on the installer machine.
+valkey_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/valkey', chars=['ascii_letters', 'digits'], length=24) }}"

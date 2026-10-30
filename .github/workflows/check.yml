@@ -1,0 +1,30 @@
+# Checks every push and pull request: lint, syntax, and config.example.yml is valid.
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -r requirements.txt ansible-lint
+          .venv/bin/ansible-galaxy collection install -r requirements.yml
+
+      - name: Check config.example.yml
+        run: SWARM_CONFIG=config.example.yml .venv/bin/python inventory.py --list > /dev/null
+
+      - name: Check playbook syntax
+        run: SWARM_CONFIG=config.example.yml .venv/bin/ansible-playbook site.yml --syntax-check
+
+      - name: Lint Ansible
+        run: SWARM_CONFIG=config.example.yml PATH="$PWD/.venv/bin:$PATH" ansible-lint --profile production
+
+      - name: Lint install.sh
+        run: shellcheck install.sh

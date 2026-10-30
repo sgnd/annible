@@ -3,15 +3,17 @@
 Set up a production-ready Docker Swarm with one command.
 
 - Works on 1 server or many.
-- You pick the apps and where they run.
-- All versions are pinned in [`versions.yml`](versions.yml). Nothing uses `latest`.
+- You pick the apps and the server each app runs on.
+- Every version is pinned in [`versions.yml`](versions.yml). Nothing uses `latest`.
 - Only open-source apps.
+- amd64 (Intel/AMD) and arm64.
 
 ## Requirements
 
-- Ubuntu 24.04 or newer on every server, amd64 (Intel/AMD) or arm64
+- Ubuntu 24.04 or newer on every server
 - SSH key login with passwordless sudo
 - Python 3 on the machine that runs the installer (a server or your laptop)
+- Internet on the servers for now (offline install is planned, see [PLAN.md](PLAN.md))
 
 ## Quick start
 
@@ -22,65 +24,148 @@ cp config.example.yml config.yml   # edit: servers, ssh key, domain, apps
 ./install.sh
 ```
 
-At the end it prints the app URLs. Passwords are saved in `state/secrets/`.
+At the end it prints how to reach each app. Then point DNS for `*.<domain>` to the
+public IP of the first manager.
 
-Run `./install.sh` again any time. It only changes what is different.
-To add a server, add it to `config.yml` and run it again.
+Run `./install.sh` again any time. It only changes what is different in `config.yml`.
 
-## Config
+> **Back up the `state/` folder.** It holds all generated passwords. If you lose it,
+> the next run makes new passwords that do not match your running databases.
+> Always run the installer from the same machine, or copy `state/` with it.
 
-Everything is in [`config.yml`](config.example.yml).
+## Examples
 
-**Servers** have one of three roles:
-
-| Role | What it does |
-|------|--------------|
-| `manager` | Runs the swarm. Use 1, 3 or 5. |
-| `worker` | Runs swarm apps. |
-| `standalone` | Not in the swarm. Runs apps like databases with Docker Compose. |
-
-**Apps** say where each app runs. Apps not listed are not installed.
+**One server.** Everything on one machine:
 
 ```yaml
+nodes:
+  - { name: server1, ip: 10.0.0.10, role: manager }
 apps:
-  traefik: swarm       # run as a swarm service
+  traefik: swarm
   portainer: swarm
-  # postgres: data1    # run on the server named data1 (coming soon)
+  postgres: server1
+  redis: server1
 ```
+
+**Swarm plus a data server:**
+
+```yaml
+nodes:
+  - { name: app1,  ip: 10.0.0.11, role: manager }
+  - { name: app2,  ip: 10.0.0.12, role: worker }
+  - { name: data1, ip: 10.0.0.21, role: standalone }
+apps:
+  traefik: swarm
+  portainer: swarm
+  postgres: data1
+  rustfs: data1
+```
+
+See [`config.example.yml`](config.example.yml) for every setting.
 
 ## Apps
 
-| App | Category | Status |
-|-----|----------|--------|
-| traefik | gateway (HTTPS, routing) | ready |
-| portainer | management UI | ready |
-| kong, swarmpit, postgres, mariadb, redis, valkey, rustfs, garage, rabbitmq, nats, keycloak, authelia, uptimekuma, beszel | | coming soon |
+Pick one per category. Server apps run with Docker Compose on the server you name.
 
-Only one app per category. The list lives in [`catalog.yml`](catalog.yml).
+| Category | App | Runs on | Port | Web page |
+|----------|-----|---------|------|----------|
+| gateway | traefik | swarm | 80, 443 | `traefik.<domain>` |
+| management | portainer | swarm | | `portainer.<domain>` |
+| database | postgres / mariadb | server | 5432 / 3306 | |
+| cache | redis / valkey | server | 6379 | |
+| storage (S3) | rustfs / garage | server | 9000 / 3900 | `rustfs.<domain>/rustfs/console/` |
+| queue | rabbitmq / nats | server | 5672 / 4222 | `rabbitmq.<domain>` / `nats.<domain>` |
+
+Users and password files are listed in [`catalog.yml`](catalog.yml) and printed at the end of the install.
+Passwords are in `state/secrets/<app>`.
+
+Coming next: kong, swarmpit, keycloak, authelia, uptimekuma, beszel.
 
 ## How it works
 
-`install.sh` reads `config.yml` and runs [`site.yml`](site.yml), in this order:
+`install.sh` installs Ansible into `.venv/`, reads `config.yml` through
+[`inventory.py`](inventory.py) (which also checks it), and runs [`site.yml`](site.yml):
 
 1. **common**: hostname, packages, time sync, firewall
 2. **docker**: installs Docker
-3. **registry**: local image registry on the first manager
+3. **registry**: a private image registry on the first manager. All servers pull from it.
 4. **swarm**: creates the swarm and joins the servers
-5. **apps**: one role per app, in `roles/<app>/`
+5. **server apps**: `roles/<app>/`, Docker Compose in `/opt/swarm/<app>/`
+6. **swarm apps**: `roles/<app>/`, swarm stacks in `/opt/swarm/<app>/`
 
-Firewall: SSH is open (or only `ssh.allow_from`), 80 and 443 are open on swarm servers,
-and servers in the cluster can reach each other. Everything else is blocked.
+### Firewall
 
-## Add a new app
+| Open | To |
+|------|----|
+| SSH | `ssh.allow_from`, or anyone |
+| 80, 443 | anyone, on swarm servers |
+| everything | other servers in `config.yml` |
 
-1. Add it to `catalog.yml`.
-2. Add its image to `versions.yml` (tag + multi-arch digest).
-3. Copy `roles/portainer/` to `roles/<app>/` and edit:
-   - `defaults/main.yml`: settings and passwords
-   - `templates/stack.yml.j2`: the Docker stack file
-   - `tasks/main.yml`: create folders, mirror the image, deploy
-4. Add it to `apps:` in your `config.yml` and run `./install.sh`.
+Everything else is blocked. Server apps use the host network, so the firewall controls them.
+
+### Good to know
+
+- **The first manager is special.** The registry, Traefik and Portainer run there.
+  3 managers keep the swarm itself alive, but not those apps.
+- **Use a private network between servers.** Traffic between servers is not encrypted.
+- **The `ip` of a node is its private IP.** DNS must point to the public IP of the first manager.
+- **Let's Encrypt** needs ports 80 and 443 reachable from the internet. Without internet use `tls: selfsigned`.
+
+## How to
+
+**Upgrade an app.** Change its tag and digest in `versions.yml`, then run `./install.sh`.
+Major database upgrades (for example Postgres 18 to 19) need a manual dump and restore.
+
+**Back up.** Copy `state/` (passwords) and `/opt/swarm/<app>/data` on each server.
+For databases, use `pg_dump` / `mariadb-dump` while they run.
+
+**Remove an app.** Remove it from `config.yml`, then on its server:
+
+```bash
+docker stack rm <app>                           # swarm app
+cd /opt/swarm/<app> && docker compose down      # server app
+```
+
+Delete `/opt/swarm/<app>` too if you do not need the data.
+Also delete `/opt/swarm/traefik/dynamic/<app>.yml` on the first manager if it exists.
+
+**Remove a server.** Move its apps first. Then run `docker swarm leave` on it,
+`docker node rm <name>` on a manager, remove it from `config.yml`, and run `./install.sh`.
+
+**Add an app to the catalog.** See [Contributing](#contributing).
+
+## Troubleshooting
+
+| Problem | Try |
+|---------|-----|
+| `config error: ...` | The message says what to fix in `config.yml`. |
+| Locked out of SSH | Check `ssh.allow_from`. Use your provider's console to run `ufw disable`. |
+| No HTTPS certificate | DNS must point to the first manager, and 80/443 must be open. Let's Encrypt has rate limits. |
+| App not starting | Swarm apps: `docker service ls`, `docker service logs <stack>_<service>`. Server apps: `docker ps`, `docker logs <app>`. |
+| `toomanyrequests` from Docker Hub | Docker Hub limits pulls. Wait, or run `docker login` on the first manager. |
+
+## Contributing
+
+Rules: keep it simple, a beginner must be able to read every file. Use simple English.
+Only open-source apps, every version pinned.
+
+**Add an app:**
+
+1. Add it to [`catalog.yml`](catalog.yml) with its license and how to reach it.
+2. Add its image to [`versions.yml`](versions.yml): tag and multi-arch digest
+   (`docker buildx imagetools inspect <image>:<tag>`).
+3. Copy a similar role: `roles/postgres/` for a server app, `roles/portainer/` for a swarm app.
+   Do not use `ports:` in server apps. Published ports skip the firewall. Use `network_mode: host`.
+4. Test on a fresh VM, then run `./install.sh` a second time: it must report `changed=0`.
+
+**Checks** (also run in CI):
+
+```bash
+ansible-lint --profile production
+shellcheck install.sh
+```
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). The apps it installs have their own licenses, see [THIRD_PARTY.md](THIRD_PARTY.md).
+Security issues: see [SECURITY.md](SECURITY.md).

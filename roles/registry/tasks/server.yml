@@ -39,8 +39,8 @@
     mode: "0644"
 
 - name: Start registry
-  ansible.builtin.command:
-    cmd: docker compose up -d --wait
-    chdir: "{{ registry_dir }}"
-  register: registry_up
-  changed_when: "'Started' in registry_up.stderr or 'Recreated' in registry_up.stderr"
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: registry

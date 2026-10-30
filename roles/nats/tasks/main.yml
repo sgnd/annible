@@ -1,0 +1,51 @@
+# NATS with JetStream. Apps connect to nats://<server ip>:4222 as user "admin".
+# Monitoring: https://nats.<domain> (uses the Traefik dashboard password)
+
+- name: Create NATS folders
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "0700"
+  loop:
+    - { path: "{{ nats_dir }}", owner: root }
+    - { path: "{{ nats_dir }}/data", owner: "root" }
+
+- name: Write NATS config
+  ansible.builtin.template:
+    src: nats.conf.j2
+    dest: "{{ nats_dir }}/nats.conf"
+    mode: "0600"
+  diff: false  # has a password
+  register: nats_config
+
+- name: Mirror NATS image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [nats]
+
+- name: Write NATS compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ nats_dir }}/compose.yml"
+    mode: "0600"
+
+- name: Start NATS
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: nats
+    docker_compose_restart: "{{ nats_config.changed }}"
+
+- name: Add NATS monitoring to Traefik
+  ansible.builtin.include_role:
+    name: traefik
+    tasks_from: route
+  vars:
+    traefik_route_name: nats
+    traefik_route_port: 8222
+    traefik_route_middleware: admin

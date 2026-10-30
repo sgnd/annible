@@ -1,0 +1,5 @@
+rustfs_dir: "{{ apps_dir }}/rustfs"
+
+# Generated once and saved in state/secrets/ on the installer machine.
+rustfs_access_key: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/rustfs_access_key', chars=['ascii_letters', 'digits'], length=20) }}"
+rustfs_secret_key: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/rustfs_secret_key', chars=['ascii_letters', 'digits'], length=40) }}"

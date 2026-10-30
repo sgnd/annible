@@ -1,0 +1,4 @@
+rabbitmq_dir: "{{ apps_dir }}/rabbitmq"
+
+# Generated once and saved in state/secrets/ on the installer machine.
+rabbitmq_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/rabbitmq', chars=['ascii_letters', 'digits'], length=24) }}"

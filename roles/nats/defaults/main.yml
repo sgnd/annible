@@ -1,0 +1,4 @@
+nats_dir: "{{ apps_dir }}/nats"
+
+# Generated once and saved in state/secrets/ on the installer machine.
+nats_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/nats', chars=['ascii_letters', 'digits'], length=24) }}"

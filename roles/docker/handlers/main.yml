@@ -2,3 +2,5 @@
   ansible.builtin.service:
     name: docker
     state: restarted
+  # One server at a time, so the swarm keeps running.
+  throttle: 1

@@ -1,4 +1,9 @@
 config.yml
+config.*.yml
+!config.example.yml
+*.pem
+*.key
+certs/
 state/
 bundle/
 dist/

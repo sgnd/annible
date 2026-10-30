@@ -1,0 +1,42 @@
+# Redis. Apps connect to <server ip>:6379 with the password.
+
+# The app in the container runs as user 999, so it must own its data folder.
+- name: Create Redis folders
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "0700"
+  loop:
+    - { path: "{{ redis_dir }}", owner: root }
+    - { path: "{{ redis_dir }}/data", owner: "999" }
+
+- name: Write Redis config
+  ansible.builtin.template:
+    src: redis.conf.j2
+    dest: "{{ redis_dir }}/redis.conf"
+    mode: "0644"
+  diff: false  # has a password
+  register: redis_config
+
+- name: Mirror Redis image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [redis]
+
+- name: Write Redis compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ redis_dir }}/compose.yml"
+    mode: "0600"
+
+- name: Start Redis
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: redis
+    docker_compose_restart: "{{ redis_config.changed }}"

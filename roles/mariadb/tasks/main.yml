@@ -1,0 +1,42 @@
+# MariaDB. Apps connect to <server ip>:3306 as user "root".
+
+# The app in the container runs as user 999, so it must own its data folder.
+- name: Create MariaDB folders
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "0700"
+  loop:
+    - { path: "{{ mariadb_dir }}", owner: root }
+    - { path: "{{ mariadb_dir }}/data", owner: "999" }
+
+- name: Write MariaDB password
+  ansible.builtin.copy:
+    dest: "{{ mariadb_dir }}/.env"
+    content: |
+      MARIADB_ROOT_PASSWORD={{ mariadb_password }}
+      MARIADB_AUTO_UPGRADE=1
+    mode: "0600"
+  no_log: true
+
+- name: Mirror MariaDB image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [mariadb]
+
+- name: Write MariaDB compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ mariadb_dir }}/compose.yml"
+    mode: "0600"
+
+- name: Start MariaDB
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: mariadb

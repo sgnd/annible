@@ -1,0 +1,8 @@
+garage_dir: "{{ apps_dir }}/garage"
+garage_capacity: 100G  # disk space Garage may use on this server
+
+# Generated once and saved in state/secrets/ on the installer machine.
+garage_rpc_secret: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/garage_rpc_secret', chars=['0123456789abcdef'], length=64) }}"
+garage_admin_token: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/garage_admin_token', chars=['ascii_letters', 'digits'], length=32) }}"
+garage_access_key: "GK{{ lookup('ansible.builtin.password', secrets_dir ~ '/garage_access_key', chars=['0123456789abcdef'], length=24) }}"
+garage_secret_key: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/garage_secret_key', chars=['0123456789abcdef'], length=64) }}"

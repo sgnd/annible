@@ -1,23 +1,31 @@
-# Copy to config.yml and adjust.
+# Copy to config.yml and change it. Every setting is explained here.
 
-domain: example.com        # apps get <app>.example.com, point DNS to the first manager
+domain: example.com        # apps get <app>.example.com
 acme_email: admin@example.com
-tls: letsencrypt           # letsencrypt | selfsigned | custom
-# tls_cert: ./certs/fullchain.pem   # for tls: custom (wildcard for the domain)
-# tls_key: ./certs/privkey.pem
+tls: letsencrypt           # letsencrypt | selfsigned (no internet) | custom
+# tls_cert: ./certs/fullchain.pem   # for tls: custom, a wildcard cert for *.example.com
+# tls_key: ./certs/privkey.pem      # paths are relative to this file
 timezone: Asia/Jakarta
-arch: amd64                # target servers, not your laptop: amd64 (Intel/AMD) | arm64
+arch: amd64                # CPU of your servers (not your laptop): amd64 (Intel/AMD) | arm64
 
 ssh:
-  user: ubuntu
-  key: ~/.ssh/id_ed25519   # relative paths are resolved from this file's directory
+  user: ubuntu             # needs passwordless sudo
+  key: ~/.ssh/id_ed25519   # paths are relative to this file
   port: 22
-  allow_from: []           # CIDRs allowed to SSH; empty = anywhere
+  allow_from: []           # IPs or ranges that may SSH in, e.g. [203.0.113.0/24]. Empty = anyone
 
-admin_allow_from: []       # CIDRs allowed to open admin UIs; empty = anywhere (password protected)
+# Who may open admin web pages (Portainer, RabbitMQ, RustFS, NATS, Traefik dashboard).
+# Empty = anyone, protected only by each app's login. Example: [203.0.113.0/24]
+admin_allow_from: []
 
-# role: manager | worker | standalone (outside swarm, runs docker compose apps)
-# Managers must be an odd number (1, 3, 5).
+# Your servers.
+#   name: lowercase letters, numbers and -
+#   ip:   the private IPv4 the servers use to talk to each other.
+#         The installer also connects to it over SSH.
+#   role: manager    runs the swarm (use 1, 3 or 5)
+#         worker     runs swarm apps
+#         standalone not in the swarm, runs server apps like databases
+#   labels: optional tags for swarm placement rules, e.g. node.labels.tier == app
 nodes:
   - name: swarm1
     ip: 10.0.0.11
@@ -31,8 +39,14 @@ nodes:
     ip: 10.0.0.21
     role: standalone
 
-# App to install and where: swarm, or a node name. Apps not listed are not installed.
-# See catalog.yml for what is available.
+# Apps to install and where they run. Apps not listed are not installed.
+#   swarm       = swarm service (traefik, portainer)
+#   <node name> = runs on that server (databases, storage, queues)
+# All apps are listed in catalog.yml. One app per category.
 apps:
   traefik: swarm
   portainer: swarm
+  postgres: data1          # or mariadb
+  redis: data1             # or valkey
+  rustfs: data1            # or garage
+  rabbitmq: data1          # or nats

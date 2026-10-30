@@ -1,0 +1,4 @@
+postgres_dir: "{{ apps_dir }}/postgres"
+
+# Generated once and saved in state/secrets/ on the installer machine.
+postgres_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/postgres', chars=['ascii_letters', 'digits'], length=24) }}"

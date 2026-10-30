@@ -1,0 +1,11 @@
+services:
+  nats:
+    image: {{ registry_addr }}/nats:{{ images.nats.tag }}
+    container_name: nats
+    restart: always
+    # Host network: the firewall decides who can connect.
+    network_mode: host
+    command: ["--config", "/etc/nats.conf"]
+    volumes:
+      - ./nats.conf:/etc/nats.conf:ro
+      - ./data:/data

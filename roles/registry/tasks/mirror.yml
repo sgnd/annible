@@ -1,4 +1,5 @@
 # Copy pinned upstream images into the local registry as <registry>/<name>:<tag>.
+# Runs on the first manager, where the registry is.
 # Input: registry_mirror_images (list of keys in versions.yml images).
 
 - name: Check images in registry
@@ -12,6 +13,7 @@
     ca_path: "/etc/docker/certs.d/{{ registry_addr }}/ca.crt"
     status_code: [200, 404]
   loop: "{{ registry_mirror_images }}"
+  delegate_to: "{{ swarm_leader }}"
   register: registry_mirror_check
 
 - name: Push missing images to registry
@@ -29,4 +31,5 @@
   loop: "{{ registry_mirror_check.results | selectattr('status', 'eq', 404) }}"
   loop_control:
     label: "{{ item.item }}"
+  delegate_to: "{{ swarm_leader }}"
   changed_when: true

@@ -1,0 +1,75 @@
+# Garage: S3-compatible storage. Apps use http://<server ip>:3900 with the access and secret key.
+
+- name: Create Garage folders
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "0700"
+  loop:
+    - { path: "{{ garage_dir }}", owner: root }
+    - { path: "{{ garage_dir }}/meta", owner: "root" }
+    - { path: "{{ garage_dir }}/data", owner: "root" }
+
+- name: Write Garage config
+  ansible.builtin.template:
+    src: garage.toml.j2
+    dest: "{{ garage_dir }}/garage.toml"
+    mode: "0600"
+  diff: false  # has a password
+  register: garage_config
+
+- name: Mirror Garage image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [garage]
+
+- name: Write Garage compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ garage_dir }}/compose.yml"
+    mode: "0600"
+
+- name: Start Garage
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: garage
+    docker_compose_restart: "{{ garage_config.changed }}"
+
+# A new Garage server stores nothing until it gets a place in the layout.
+- name: Get Garage layout
+  ansible.builtin.command: docker exec garage /garage layout show
+  register: garage_layout
+  changed_when: false
+  retries: 10
+  delay: 3
+  until: garage_layout.rc == 0
+
+- name: Add this server to the Garage layout
+  ansible.builtin.shell:
+    cmd: |
+      set -eo pipefail
+      node_id=$(docker exec garage /garage node id -q | cut -d@ -f1)
+      docker exec garage /garage layout assign -z dc1 -c {{ garage_capacity }} "$node_id"
+      docker exec garage /garage layout apply --version 1
+    executable: /bin/bash
+  when: "'No nodes currently have a role' in garage_layout.stdout"
+  changed_when: true
+
+- name: Get Garage keys
+  ansible.builtin.command: docker exec garage /garage key list
+  register: garage_keys
+  changed_when: false
+
+- name: Add Garage access key
+  ansible.builtin.command: >-
+    docker exec garage /garage key import --yes -n default
+    {{ garage_access_key }} {{ garage_secret_key }}
+  when: garage_access_key not in garage_keys.stdout
+  changed_when: true
+  no_log: true

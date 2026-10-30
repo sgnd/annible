@@ -1,4 +1,4 @@
-traefik_dir: "{{ stack_dir }}/traefik"
+traefik_dir: "{{ apps_dir }}/traefik"
 traefik_host: "traefik.{{ domain }}"
 traefik_log_level: INFO
 
