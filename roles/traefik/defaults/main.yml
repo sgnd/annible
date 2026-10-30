@@ -1,0 +1,7 @@
+traefik_dir: "{{ stack_dir }}/traefik"
+traefik_host: "traefik.{{ domain }}"
+traefik_log_level: INFO
+
+# Generated once and saved in state/secrets/ on the installer machine.
+traefik_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/traefik_admin', chars=['ascii_letters', 'digits'], length=24) }}"
+traefik_password_salt: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/traefik_salt', chars=['ascii_letters', 'digits'], length=8) }}"

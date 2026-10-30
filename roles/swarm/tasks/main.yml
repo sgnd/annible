@@ -1,9 +1,11 @@
-- name: Read swarm state
+# Create the swarm on the first manager, then join the other nodes.
+
+- name: Check if this node is in a swarm
   ansible.builtin.command: docker info --format '{% raw %}{{ .Swarm.LocalNodeState }}{% endraw %}'
   register: swarm_state
   changed_when: false
 
-- name: Initialize swarm
+- name: Create swarm on the first manager
   ansible.builtin.command: >-
     docker swarm init
     --advertise-addr {{ node_ip }}
@@ -13,7 +15,7 @@
     - swarm_state.stdout != 'active'
   changed_when: true
 
-- name: Read join tokens
+- name: Get join tokens
   ansible.builtin.command: docker swarm join-token -q {{ item }}
   loop: [manager, worker]
   register: swarm_tokens
@@ -21,25 +23,28 @@
   run_once: true
   changed_when: false
 
+# Managers join one by one, so the swarm keeps a working majority.
 - name: Join swarm
   ansible.builtin.command: >-
     docker swarm join
-    --token {{ swarm_tokens.results[0 if node_role == 'manager' else 1].stdout }}
+    --token {{ join_token }}
     --advertise-addr {{ node_ip }}
     --listen-addr {{ node_ip }}:2377
     {{ hostvars[swarm_leader].node_ip }}:2377
+  vars:
+    join_token: "{{ swarm_tokens.results[0].stdout if node_role == 'manager' else swarm_tokens.results[1].stdout }}"
   when:
     - inventory_hostname != swarm_leader
     - swarm_state.stdout != 'active'
   throttle: 1
   changed_when: true
 
-- name: Read node ID
+- name: Get node ID
   ansible.builtin.command: docker info --format '{% raw %}{{ .Swarm.NodeID }}{% endraw %}'
   register: swarm_node_id
   changed_when: false
 
-- name: Read node labels
+- name: Get current node labels
   ansible.builtin.command: >-
     docker node inspect {{ swarm_node_id.stdout }}
     --format '{% raw %}{{ json .Spec.Labels }}{% endraw %}'
@@ -47,16 +52,18 @@
   delegate_to: "{{ swarm_leader }}"
   changed_when: false
 
-- name: Apply node labels
+- name: Add node labels from config.yml
   ansible.builtin.command: >-
     docker node update
     {% for key, value in node_labels.items() %}--label-add {{ key }}={{ value }} {% endfor %}
     {{ swarm_node_id.stdout }}
+  vars:
+    current_labels: "{{ swarm_node_labels.stdout | from_json or {} }}"
+  when: current_labels | combine(node_labels) != current_labels
   delegate_to: "{{ swarm_leader }}"
-  when: (swarm_node_labels.stdout | from_json | default({}, true)) | combine(node_labels) != (swarm_node_labels.stdout | from_json | default({}, true))
   changed_when: true
 
-- name: Read existing networks
+- name: Get overlay networks
   ansible.builtin.command: docker network ls --filter driver=overlay --format '{% raw %}{{ .Name }}{% endraw %}'
   register: swarm_existing_networks
   run_once: true

@@ -15,14 +15,3 @@ common_sysctl:
   fs.inotify.max_user_instances: 1024
 
 common_journald_max_use: 1G
-
-# Swarm control plane and overlay ports, opened only between swarm nodes.
-common_swarm_ports:
-  - { port: 2377, proto: tcp }
-  - { port: 7946, proto: tcp }
-  - { port: 7946, proto: udp }
-  - { port: 4789, proto: udp }
-
-common_public_ports:
-  - { port: 80, proto: tcp }
-  - { port: 443, proto: tcp }

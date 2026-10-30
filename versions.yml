@@ -1,12 +1,28 @@
 # Pinned versions. Change here, test, release. Never use "latest".
 # Image digests must point to the multi-arch index (amd64 + arm64).
 
+# apt "package=version". The * matches the Ubuntu release suffix, e.g. ~ubuntu.24.04~noble.
 docker_packages:
-  docker-ce: "5:29.9.2-1"
-  docker-ce-cli: "5:29.9.2-1"
-  containerd.io: "2.4.2-3"
-  docker-buildx-plugin: "0.38.1-1"
-  docker-compose-plugin: "5.6.1-1"
+  - docker-ce=5:29.9.2-1*
+  - docker-ce-cli=5:29.9.2-1*
+  - containerd.io=2.4.2-3*
+  - docker-buildx-plugin=0.38.1-1*
+  - docker-compose-plugin=5.6.1-1*
 
 images:
-  registry: docker.io/library/registry:3.1.2@sha256:d4032d4cc323c1731c707931ecada07a53076eac38e3b61ae57533f170f2c6c3
+  registry:
+    repo: docker.io/library/registry
+    tag: 3.1.2
+    digest: sha256:d4032d4cc323c1731c707931ecada07a53076eac38e3b61ae57533f170f2c6c3
+  traefik:
+    repo: docker.io/library/traefik
+    tag: v3.7.16
+    digest: sha256:1336e85aaed293bd63d005086e0dd013b04078b26aaeb1c18b26a2f928af7e65
+  portainer:
+    repo: docker.io/portainer/portainer-ce
+    tag: 2.45.3
+    digest: sha256:3609c307943bca8e5c492f69ddd6965df177208b50678a4cff28391c8dd4e96e
+  portainer-agent:
+    repo: docker.io/portainer/agent
+    tag: 2.45.3
+    digest: sha256:6e6d2d5d8967da5b4d45eab32b7268af170395395d753d3f34ecb4d6ca5bd388

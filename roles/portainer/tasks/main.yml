@@ -1,0 +1,37 @@
+# Portainer: web UI to manage the swarm. Agent runs on every swarm node.
+
+- name: Create Portainer directories
+  ansible.builtin.file:
+    path: "{{ portainer_dir }}/data"
+    state: directory
+    mode: "0700"
+
+# Only read on first start; change the password in the UI afterwards.
+- name: Write initial admin password
+  ansible.builtin.copy:
+    dest: "{{ portainer_dir }}/admin_password"
+    content: "{{ portainer_password }}"
+    mode: "0600"
+  no_log: true
+
+- name: Mirror Portainer images
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [portainer, portainer-agent]
+
+- name: Write Portainer stack
+  ansible.builtin.template:
+    src: stack.yml.j2
+    dest: "{{ portainer_dir }}/stack.yml"
+    mode: "0600"
+  register: portainer_stack
+
+- name: Deploy Portainer
+  ansible.builtin.include_role:
+    name: swarm
+    tasks_from: deploy
+  vars:
+    swarm_stack: portainer
+    swarm_stack_changed: "{{ portainer_stack.changed }}"

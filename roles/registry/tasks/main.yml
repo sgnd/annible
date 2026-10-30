@@ -1,3 +1,6 @@
+# Local image registry on the first manager. Every node trusts its certificate.
+# Apps pull images from here, so the cluster also works without internet.
+
 - name: Run registry on leader
   ansible.builtin.include_tasks: server.yml
   when: inventory_hostname == swarm_leader

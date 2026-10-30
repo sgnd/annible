@@ -2,7 +2,7 @@ name: registry
 
 services:
   registry:
-    image: {{ images.registry }}
+    image: {{ images.registry.repo }}:{{ images.registry.tag }}@{{ images.registry.digest }}
     restart: always
     # Host network so the port is filtered by UFW (published ports bypass it).
     network_mode: host

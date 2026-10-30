@@ -1,3 +1,5 @@
+# Base OS setup for every node: hostname, packages, time, kernel settings, firewall.
+
 - name: Set hostname
   ansible.builtin.hostname:
     name: "{{ inventory_hostname }}"

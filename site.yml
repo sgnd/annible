@@ -5,10 +5,8 @@
   tasks:
     - name: Check cluster layout
       ansible.builtin.assert:
-        that:
-          - groups['managers'] | length is odd
-          - groups['data'] | length <= 1
-        fail_msg: Managers must be an odd number and there can be at most one data server.
+        that: groups['managers'] | length is odd
+        fail_msg: Managers must be an odd number (1, 3, 5).
       run_once: true
 
     - name: Check operating system
@@ -41,3 +39,25 @@
   vars_files: versions.yml
   roles:
     - swarm
+
+- name: Swarm apps
+  hosts: managers[0]
+  vars_files: versions.yml
+  tasks:
+    - name: Deploy swarm apps
+      ansible.builtin.include_role:
+        name: "{{ app }}"
+      loop: "{{ swarm_apps }}"
+      loop_control:
+        loop_var: app
+
+- name: Summary
+  hosts: managers[0]
+  gather_facts: false
+  tasks:
+    - name: Show access details
+      ansible.builtin.debug:
+        msg:
+          - "Point DNS *.{{ domain }} to {{ node_ip }} ({{ inventory_hostname }})."
+          - "Passwords are in {{ secrets_dir }}"
+          - "Apps: {% for app in swarm_apps %}https://{{ app }}.{{ domain }} {% endfor %}"

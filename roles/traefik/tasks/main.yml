@@ -1,0 +1,89 @@
+# Traefik: the HTTPS entry point for all apps. Runs on the first manager.
+
+- name: Check TLS settings
+  ansible.builtin.assert:
+    that:
+      - tls | default('letsencrypt') in ['letsencrypt', 'selfsigned', 'custom']
+      - tls | default('letsencrypt') != 'custom' or (tls_cert is defined and tls_key is defined)
+    fail_msg: "tls must be letsencrypt, selfsigned or custom (custom needs tls_cert and tls_key)."
+
+- name: Create Traefik directories
+  ansible.builtin.file:
+    path: "{{ traefik_dir }}/{{ item }}"
+    state: directory
+    mode: "0700"
+  loop: [dynamic, acme, certs]
+
+- name: Write Traefik static config
+  ansible.builtin.template:
+    src: traefik.yml.j2
+    dest: "{{ traefik_dir }}/traefik.yml"
+    mode: "0600"
+  notify: Restart traefik
+
+- name: Write Traefik middlewares
+  ansible.builtin.template:
+    src: middlewares.yml.j2
+    dest: "{{ traefik_dir }}/dynamic/middlewares.yml"
+    mode: "0600"
+
+- name: Copy custom certificate
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ traefik_dir }}/certs/{{ item.dest }}"
+    mode: "0600"
+  loop:
+    - { src: "{{ tls_cert | default('') }}", dest: cert.pem }
+    - { src: "{{ tls_key | default('') }}", dest: key.pem }
+  loop_control:
+    label: "{{ item.dest }}"
+  when: tls | default('letsencrypt') == 'custom'
+
+- name: Write custom certificate config
+  ansible.builtin.copy:
+    dest: "{{ traefik_dir }}/dynamic/tls.yml"
+    content: |
+      tls:
+        stores:
+          default:
+            defaultCertificate:
+              certFile: /etc/traefik/certs/cert.pem
+              keyFile: /etc/traefik/certs/key.pem
+    mode: "0600"
+  when: tls | default('letsencrypt') == 'custom'
+
+# A fixed salt gives the same hash every run, so nothing changes on rerun.
+- name: Hash dashboard password
+  ansible.builtin.command: openssl passwd -apr1 -salt {{ traefik_password_salt }} {{ traefik_password }}
+  register: traefik_password_hash
+  changed_when: false
+  no_log: true
+
+- name: Write dashboard users
+  ansible.builtin.copy:
+    dest: "{{ traefik_dir }}/users"
+    content: "admin:{{ traefik_password_hash.stdout }}\n"
+    mode: "0600"
+  no_log: true
+
+- name: Mirror Traefik image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [traefik]
+
+- name: Write Traefik stack
+  ansible.builtin.template:
+    src: stack.yml.j2
+    dest: "{{ traefik_dir }}/stack.yml"
+    mode: "0600"
+  register: traefik_stack
+
+- name: Deploy Traefik
+  ansible.builtin.include_role:
+    name: swarm
+    tasks_from: deploy
+  vars:
+    swarm_stack: traefik
+    swarm_stack_changed: "{{ traefik_stack.changed }}"

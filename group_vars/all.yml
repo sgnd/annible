@@ -2,3 +2,9 @@ node_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_architecture] | d
 swarm_leader: "{{ groups['managers'][0] }}"
 registry_port: 5000
 registry_addr: "{{ hostvars[swarm_leader].node_ip }}:{{ registry_port }}"
+
+# App files on the leader: /opt/swarm/<app>/stack.yml plus its config and data.
+stack_dir: /opt/swarm
+
+# Generated passwords, kept on the machine running the installer.
+secrets_dir: "{{ playbook_dir }}/state/secrets"

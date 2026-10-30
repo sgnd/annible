@@ -1,7 +1,10 @@
 # Copy to config.yml and adjust.
 
-domain: example.com
+domain: example.com        # apps get <app>.example.com, point DNS to the first manager
 acme_email: admin@example.com
+tls: letsencrypt           # letsencrypt | selfsigned | custom
+# tls_cert: ./certs/fullchain.pem   # for tls: custom (wildcard for the domain)
+# tls_key: ./certs/privkey.pem
 timezone: Asia/Jakarta
 arch: amd64                # target servers, not your laptop: amd64 (Intel/AMD) | arm64
 
@@ -11,8 +14,10 @@ ssh:
   port: 22
   allow_from: []           # CIDRs allowed to SSH; empty = anywhere
 
-# role: manager | worker | data
-# Managers must be an odd number (1, 3, 5). At most one data server.
+admin_allow_from: []       # CIDRs allowed to open admin UIs; empty = anywhere (password protected)
+
+# role: manager | worker | standalone (outside swarm, runs docker compose apps)
+# Managers must be an odd number (1, 3, 5).
 nodes:
   - name: swarm1
     ip: 10.0.0.11
@@ -24,15 +29,10 @@ nodes:
       tier: app
   - name: data1
     ip: 10.0.0.21
-    role: data
+    role: standalone
 
-# Pick one per category, or none.
-stack:
-  gateway: traefik         # traefik | kong
-  management: portainer    # portainer | swarmpit
-  database: postgres       # postgres | mariadb
-  cache: redis             # redis | valkey
-  storage: rustfs          # rustfs | garage
-  queue: rabbitmq          # rabbitmq | nats
-  auth: keycloak           # keycloak | authelia
-  monitoring: uptimekuma   # uptimekuma | beszel
+# App to install and where: swarm, or a node name. Apps not listed are not installed.
+# See catalog.yml for what is available.
+apps:
+  traefik: swarm
+  portainer: swarm

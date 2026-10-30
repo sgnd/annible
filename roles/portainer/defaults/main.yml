@@ -1,0 +1,6 @@
+portainer_dir: "{{ stack_dir }}/portainer"
+portainer_host: "portainer.{{ domain }}"
+
+# Generated once and saved in state/secrets/ on the installer machine.
+portainer_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/portainer_admin', chars=['ascii_letters', 'digits'], length=24) }}"
+portainer_agent_secret: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/portainer_agent_secret', chars=['ascii_letters', 'digits'], length=32) }}"

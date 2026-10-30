@@ -1,0 +1,12 @@
+# Available apps, in deploy order.
+#   category: only one app per category can be installed
+#   runs_on:  swarm (swarm service) | node (docker compose on a named node)
+#   requires: apps that must also be installed
+
+traefik:
+  category: gateway
+  runs_on: swarm
+
+portainer:
+  category: management
+  runs_on: swarm

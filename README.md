@@ -1,52 +1,85 @@
 # swarm
 
-Ansible installer for a production-ready Docker Swarm. Single or multi node, one command.
+Set up a production-ready Docker Swarm with one command.
 
-- **Swarm (1+N nodes)** — stateless services: gateway, management, auth, your apps.
-- **Data server (optional)** — stateful services with Docker Compose.
-- **Local registry** — every node pulls images from it.
-- **Pinned versions** — see [`versions.yml`](versions.yml). Nothing uses `latest`.
+- Works on 1 server or many.
+- You pick the apps and where they run.
+- All versions are pinned in [`versions.yml`](versions.yml). Nothing uses `latest`.
+- Only open-source apps.
 
 ## Requirements
 
-- Ubuntu 24.04 or newer on every node, amd64 (Intel/AMD) or arm64 (Apple silicon VMs, Graviton, Ampere)
-- SSH key access with passwordless sudo
-- Python 3 on the machine running the installer (first manager, or a Linux/macOS workstation)
+- Ubuntu 24.04 or newer on every server, amd64 (Intel/AMD) or arm64
+- SSH key login with passwordless sudo
+- Python 3 on the machine that runs the installer (a server or your laptop)
 
-## Usage
+## Quick start
 
 ```bash
-cp config.example.yml config.yml   # set nodes, ssh key, apps
-./install.sh                       # or: ./install.sh path/to/config.yml
+git clone https://github.com/sgnd/swarm.git
+cd swarm
+cp config.example.yml config.yml   # edit: servers, ssh key, domain, apps
+./install.sh
 ```
 
-Run it again any time: it is idempotent. Add a node to `config.yml` and rerun to join it.
+At the end it prints the app URLs. Passwords are saved in `state/secrets/`.
 
-Extra arguments go to `ansible-playbook`, e.g. `./install.sh config.yml --check`.
+Run `./install.sh` again any time. It only changes what is different.
+To add a server, add it to `config.yml` and run it again.
 
-## Firewall
+## Config
 
-| Port | Open to |
-|------|---------|
-| SSH | `ssh.allow_from`, or anywhere |
-| 80, 443 | anywhere (swarm nodes) |
-| 2377, 7946, 4789 | other swarm nodes |
-| 5000 (registry) | all nodes |
+Everything is in [`config.yml`](config.example.yml).
 
-## Catalog
+**Servers** have one of three roles:
 
-| Category   | Default    | Alternative |
-|------------|------------|-------------|
-| gateway    | traefik    | kong        |
-| management | portainer  | swarmpit    |
-| database   | postgres   | mariadb     |
-| cache      | redis      | valkey      |
-| storage    | rustfs     | garage      |
-| queue      | rabbitmq   | nats        |
-| auth       | keycloak   | authelia    |
-| monitoring | uptimekuma | beszel      |
+| Role | What it does |
+|------|--------------|
+| `manager` | Runs the swarm. Use 1, 3 or 5. |
+| `worker` | Runs swarm apps. |
+| `standalone` | Not in the swarm. Runs apps like databases with Docker Compose. |
 
-Work in progress, see [PLAN.md](PLAN.md). Currently implemented: base system, Docker, registry, swarm.
+**Apps** say where each app runs. Apps not listed are not installed.
+
+```yaml
+apps:
+  traefik: swarm       # run as a swarm service
+  portainer: swarm
+  # postgres: data1    # run on the server named data1 (coming soon)
+```
+
+## Apps
+
+| App | Category | Status |
+|-----|----------|--------|
+| traefik | gateway (HTTPS, routing) | ready |
+| portainer | management UI | ready |
+| kong, swarmpit, postgres, mariadb, redis, valkey, rustfs, garage, rabbitmq, nats, keycloak, authelia, uptimekuma, beszel | | coming soon |
+
+Only one app per category. The list lives in [`catalog.yml`](catalog.yml).
+
+## How it works
+
+`install.sh` reads `config.yml` and runs [`site.yml`](site.yml), in this order:
+
+1. **common**: hostname, packages, time sync, firewall
+2. **docker**: installs Docker
+3. **registry**: local image registry on the first manager
+4. **swarm**: creates the swarm and joins the servers
+5. **apps**: one role per app, in `roles/<app>/`
+
+Firewall: SSH is open (or only `ssh.allow_from`), 80 and 443 are open on swarm servers,
+and servers in the cluster can reach each other. Everything else is blocked.
+
+## Add a new app
+
+1. Add it to `catalog.yml`.
+2. Add its image to `versions.yml` (tag + multi-arch digest).
+3. Copy `roles/portainer/` to `roles/<app>/` and edit:
+   - `defaults/main.yml`: settings and passwords
+   - `templates/stack.yml.j2`: the Docker stack file
+   - `tasks/main.yml`: create folders, mirror the image, deploy
+4. Add it to `apps:` in your `config.yml` and run `./install.sh`.
 
 ## License
 

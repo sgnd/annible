@@ -1,3 +1,5 @@
+# Firewall: deny everything, then open only what we need.
+
 - name: Allow SSH
   community.general.ufw:
     rule: allow
@@ -6,33 +8,22 @@
     from_ip: "{{ item }}"
   loop: "{{ ssh.allow_from | default([], true) or ['any'] }}"
 
-- name: Allow HTTP/HTTPS on swarm nodes
+- name: Allow HTTP and HTTPS on swarm nodes
   community.general.ufw:
     rule: allow
-    port: "{{ item.port | string }}"
-    proto: "{{ item.proto }}"
-  loop: "{{ common_public_ports }}"
-  when: inventory_hostname in groups['swarm']
-
-- name: Allow swarm traffic between swarm nodes
-  community.general.ufw:
-    rule: allow
-    port: "{{ item.1.port | string }}"
-    proto: "{{ item.1.proto }}"
-    from_ip: "{{ hostvars[item.0].node_ip }}"
-  loop: "{{ groups['swarm'] | difference([inventory_hostname]) | product(common_swarm_ports) | list }}"
-  when: inventory_hostname in groups['swarm']
-
-- name: Allow registry access from all nodes
-  community.general.ufw:
-    rule: allow
-    port: "{{ registry_port | string }}"
+    port: "{{ item }}"
     proto: tcp
-    from_ip: "{{ hostvars[item].node_ip }}"
-  loop: "{{ groups['all'] }}"
-  when: inventory_hostname == swarm_leader
+  loop: ["80", "443"]
+  when: inventory_hostname in groups['swarm']
 
-- name: Enable firewall with default deny
+# Cluster nodes trust each other: swarm, registry, databases, etc.
+- name: Allow all traffic from other cluster nodes
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ hostvars[item].node_ip }}"
+  loop: "{{ groups['all'] | difference([inventory_hostname]) }}"
+
+- name: Enable firewall
   community.general.ufw:
     state: enabled
     direction: incoming

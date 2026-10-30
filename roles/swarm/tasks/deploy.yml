@@ -1,0 +1,31 @@
+# Deploy one stack and wait until it is running.
+# Used by app roles. Input:
+#   swarm_stack:         stack name, file is {{ stack_dir }}/<name>/stack.yml
+#   swarm_stack_changed: true if the stack file changed
+
+- name: Get deployed stacks
+  ansible.builtin.command: docker stack ls --format '{% raw %}{{ .Name }}{% endraw %}'
+  register: swarm_stack_list
+  changed_when: false
+
+- name: Deploy stack {{ swarm_stack }}
+  ansible.builtin.command: >-
+    docker stack deploy --prune
+    -c {{ stack_dir }}/{{ swarm_stack }}/stack.yml {{ swarm_stack }}
+  when: swarm_stack_changed | bool or swarm_stack not in swarm_stack_list.stdout_lines
+  changed_when: true
+
+# Replicas look like "1/1" (running/wanted).
+# awk prints the services where running is not equal to wanted, so empty output = all up.
+- name: Wait for stack {{ swarm_stack }}
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail &&
+      docker stack services {{ swarm_stack }} --format '{% raw %}{{ .Replicas }}{% endraw %}'
+      | awk -F'[/ ]' '$1 != $2'
+    executable: /bin/bash
+  register: swarm_stack_waiting
+  changed_when: false
+  retries: 40
+  delay: 5
+  until: swarm_stack_waiting.stdout == ""

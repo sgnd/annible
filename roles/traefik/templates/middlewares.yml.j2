@@ -1,0 +1,19 @@
+# Use in app labels:
+#   admin-ip@file  only allow admin_allow_from
+#   admin@file     admin-ip plus the dashboard password
+http:
+  middlewares:
+    admin-ip:
+      ipAllowList:
+        sourceRange:
+{% for cidr in admin_allow_from | default([], true) or ['0.0.0.0/0', '::/0'] %}
+          - "{{ cidr }}"
+{% endfor %}
+    admin-auth:
+      basicAuth:
+        usersFile: /etc/traefik/users
+    admin:
+      chain:
+        middlewares:
+          - admin-ip
+          - admin-auth

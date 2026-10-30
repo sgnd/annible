@@ -1,0 +1,32 @@
+# Copy pinned upstream images into the local registry as <registry>/<name>:<tag>.
+# Input: registry_mirror_images (list of keys in versions.yml images).
+
+- name: Check images in registry
+  ansible.builtin.uri:
+    url: "https://{{ registry_addr }}/v2/{{ item }}/manifests/{{ images[item].tag }}"
+    method: HEAD
+    headers:
+      Accept: >-
+        application/vnd.oci.image.manifest.v1+json,
+        application/vnd.docker.distribution.manifest.v2+json
+    ca_path: "/etc/docker/certs.d/{{ registry_addr }}/ca.crt"
+    status_code: [200, 404]
+  loop: "{{ registry_mirror_images }}"
+  register: registry_mirror_check
+
+- name: Push missing images to registry
+  ansible.builtin.shell:
+    cmd: |
+      set -e
+      docker pull -q {{ src }}
+      docker tag {{ src }} {{ dst }}
+      docker push -q {{ dst }}
+    executable: /bin/bash
+  vars:
+    image: "{{ images[item.item] }}"
+    src: "{{ image.repo }}:{{ image.tag }}@{{ image.digest }}"
+    dst: "{{ registry_addr }}/{{ item.item }}:{{ image.tag }}"
+  loop: "{{ registry_mirror_check.results | selectattr('status', 'eq', 404) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  changed_when: true
