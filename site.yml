@@ -1,0 +1,43 @@
+- name: Preflight
+  hosts: all
+  gather_facts: true
+  vars_files: versions.yml
+  tasks:
+    - name: Check cluster layout
+      ansible.builtin.assert:
+        that:
+          - groups['managers'] | length is odd
+          - groups['data'] | length <= 1
+        fail_msg: Managers must be an odd number and there can be at most one data server.
+      run_once: true
+
+    - name: Check operating system
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == 'Ubuntu'
+          - ansible_distribution_version is version('24.04', '>=')
+        fail_msg: "Ubuntu 24.04 or newer is required, found {{ ansible_distribution }} {{ ansible_distribution_version }}."
+
+    - name: Check CPU architecture
+      ansible.builtin.assert:
+        that: node_arch == arch | default('amd64')
+        fail_msg: "config.yml arch is {{ arch | default('amd64') }} but this node is {{ node_arch }}. All nodes must match it (amd64 or arm64)."
+
+- name: Base system
+  hosts: all
+  vars_files: versions.yml
+  roles:
+    - common
+    - docker
+
+- name: Registry
+  hosts: all
+  vars_files: versions.yml
+  roles:
+    - registry
+
+- name: Swarm
+  hosts: swarm
+  vars_files: versions.yml
+  roles:
+    - swarm

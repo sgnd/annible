@@ -1,0 +1,10 @@
+{
+{% if inventory_hostname not in groups['swarm'] %}
+  "live-restore": true,
+{% endif %}
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "{{ docker_log_max_size }}",
+    "max-file": "{{ docker_log_max_file }}"
+  }
+}

@@ -1,0 +1,46 @@
+- name: Create registry directories
+  ansible.builtin.file:
+    path: "{{ registry_dir }}/{{ item }}"
+    state: directory
+    mode: "0700"
+  loop: [ca, certs, data]
+
+- name: Write certificate extensions
+  ansible.builtin.copy:
+    dest: "{{ registry_dir }}/ca/san.cnf"
+    content: |
+      subjectAltName = IP:{{ node_ip }}, DNS:{{ inventory_hostname }}
+      extendedKeyUsage = serverAuth
+    mode: "0600"
+
+- name: Create registry CA
+  ansible.builtin.command:
+    cmd: >-
+      openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes
+      -days {{ registry_cert_days }} -subj /CN=swarm-registry-ca
+      -keyout ca.key -out ca.crt
+    chdir: "{{ registry_dir }}/ca"
+    creates: "{{ registry_dir }}/ca/ca.crt"
+
+- name: Create registry certificate
+  ansible.builtin.shell:
+    cmd: >-
+      openssl req -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes
+      -subj /CN={{ node_ip }} -keyout ../certs/registry.key -out registry.csr &&
+      openssl x509 -req -in registry.csr -CA ca.crt -CAkey ca.key -CAcreateserial
+      -days {{ registry_cert_days }} -extfile san.cnf -out ../certs/registry.crt
+    chdir: "{{ registry_dir }}/ca"
+    creates: "{{ registry_dir }}/certs/registry.crt"
+
+- name: Write registry compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ registry_dir }}/compose.yml"
+    mode: "0644"
+
+- name: Start registry
+  ansible.builtin.command:
+    cmd: docker compose up -d --wait
+    chdir: "{{ registry_dir }}"
+  register: registry_up
+  changed_when: "'Started' in registry_up.stderr or 'Recreated' in registry_up.stderr"

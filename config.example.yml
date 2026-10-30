@@ -1,0 +1,38 @@
+# Copy to config.yml and adjust.
+
+domain: example.com
+acme_email: admin@example.com
+timezone: Asia/Jakarta
+arch: amd64                # target servers, not your laptop: amd64 (Intel/AMD) | arm64
+
+ssh:
+  user: ubuntu
+  key: ~/.ssh/id_ed25519   # relative paths are resolved from this file's directory
+  port: 22
+  allow_from: []           # CIDRs allowed to SSH; empty = anywhere
+
+# role: manager | worker | data
+# Managers must be an odd number (1, 3, 5). At most one data server.
+nodes:
+  - name: swarm1
+    ip: 10.0.0.11
+    role: manager
+  - name: swarm2
+    ip: 10.0.0.12
+    role: worker
+    labels:
+      tier: app
+  - name: data1
+    ip: 10.0.0.21
+    role: data
+
+# Pick one per category, or none.
+stack:
+  gateway: traefik         # traefik | kong
+  management: portainer    # portainer | swarmpit
+  database: postgres       # postgres | mariadb
+  cache: redis             # redis | valkey
+  storage: rustfs          # rustfs | garage
+  queue: rabbitmq          # rabbitmq | nats
+  auth: keycloak           # keycloak | authelia
+  monitoring: uptimekuma   # uptimekuma | beszel

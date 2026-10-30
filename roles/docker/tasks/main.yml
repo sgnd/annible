@@ -1,0 +1,45 @@
+- name: Add Docker apt key
+  ansible.builtin.get_url:
+    url: "{{ docker_apt_url }}/gpg"
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: Add Docker apt repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/docker.list
+    content: >
+      deb [arch={{ node_arch }}
+      signed-by=/etc/apt/keyrings/docker.asc]
+      {{ docker_apt_url }} {{ ansible_distribution_release }} stable
+    mode: "0644"
+  register: docker_repo
+
+- name: Install Docker packages
+  ansible.builtin.apt:
+    name: >-
+      {{ docker_packages.keys() | zip(docker_packages.values())
+         | map('join', '=') | map('regex_replace', '$', docker_apt_suffix) | list }}
+    update_cache: "{{ docker_repo.changed }}"
+    allow_change_held_packages: true
+    allow_downgrade: true
+  vars:
+    docker_apt_suffix: "~ubuntu.{{ ansible_distribution_version }}~{{ ansible_distribution_release }}"
+
+- name: Hold Docker packages
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ docker_packages.keys() }}"
+
+- name: Configure Docker daemon
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+  notify: Restart docker
+
+- name: Enable Docker
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true

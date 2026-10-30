@@ -1,0 +1,16 @@
+name: registry
+
+services:
+  registry:
+    image: {{ images.registry }}
+    restart: always
+    # Host network so the port is filtered by UFW (published ports bypass it).
+    network_mode: host
+    environment:
+      REGISTRY_HTTP_ADDR: "{{ node_ip }}:{{ registry_port }}"
+      REGISTRY_HTTP_TLS_CERTIFICATE: /certs/registry.crt
+      REGISTRY_HTTP_TLS_KEY: /certs/registry.key
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    volumes:
+      - ./certs:/certs:ro
+      - ./data:/var/lib/registry

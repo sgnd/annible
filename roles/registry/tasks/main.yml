@@ -1,0 +1,31 @@
+- name: Run registry on leader
+  ansible.builtin.include_tasks: server.yml
+  when: inventory_hostname == swarm_leader
+
+- name: Read registry CA
+  ansible.builtin.slurp:
+    src: "{{ registry_dir }}/ca/ca.crt"
+  delegate_to: "{{ swarm_leader }}"
+  run_once: true
+  register: registry_ca
+
+- name: Create Docker certs directory for registry
+  ansible.builtin.file:
+    path: "/etc/docker/certs.d/{{ registry_addr }}"
+    state: directory
+    mode: "0755"
+
+- name: Trust registry CA in Docker
+  ansible.builtin.copy:
+    dest: "/etc/docker/certs.d/{{ registry_addr }}/ca.crt"
+    content: "{{ registry_ca.content | b64decode }}"
+    mode: "0644"
+
+- name: Check registry is reachable
+  ansible.builtin.uri:
+    url: "https://{{ registry_addr }}/v2/"
+    ca_path: "/etc/docker/certs.d/{{ registry_addr }}/ca.crt"
+  register: registry_check
+  retries: 10
+  delay: 3
+  until: registry_check.status == 200

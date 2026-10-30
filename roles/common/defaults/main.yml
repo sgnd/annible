@@ -1,0 +1,28 @@
+common_packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - chrony
+  - ufw
+  - jq
+
+common_sysctl:
+  net.ipv4.ip_forward: 1
+  net.core.somaxconn: 4096
+  vm.max_map_count: 262144
+  vm.swappiness: 10
+  fs.inotify.max_user_watches: 524288
+  fs.inotify.max_user_instances: 1024
+
+common_journald_max_use: 1G
+
+# Swarm control plane and overlay ports, opened only between swarm nodes.
+common_swarm_ports:
+  - { port: 2377, proto: tcp }
+  - { port: 7946, proto: tcp }
+  - { port: 7946, proto: udp }
+  - { port: 4789, proto: udp }
+
+common_public_ports:
+  - { port: 80, proto: tcp }
+  - { port: 443, proto: tcp }

@@ -1,0 +1,12 @@
+# Pinned versions. Change here, test, release. Never use "latest".
+# Image digests must point to the multi-arch index (amd64 + arm64).
+
+docker_packages:
+  docker-ce: "5:29.9.2-1"
+  docker-ce-cli: "5:29.9.2-1"
+  containerd.io: "2.4.2-3"
+  docker-buildx-plugin: "0.38.1-1"
+  docker-compose-plugin: "5.6.1-1"
+
+images:
+  registry: docker.io/library/registry:3.1.2@sha256:d4032d4cc323c1731c707931ecada07a53076eac38e3b61ae57533f170f2c6c3

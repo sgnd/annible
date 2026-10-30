@@ -1,0 +1,39 @@
+- name: Allow SSH
+  community.general.ufw:
+    rule: allow
+    port: "{{ ansible_port | string }}"
+    proto: tcp
+    from_ip: "{{ item }}"
+  loop: "{{ ssh.allow_from | default([], true) or ['any'] }}"
+
+- name: Allow HTTP/HTTPS on swarm nodes
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port | string }}"
+    proto: "{{ item.proto }}"
+  loop: "{{ common_public_ports }}"
+  when: inventory_hostname in groups['swarm']
+
+- name: Allow swarm traffic between swarm nodes
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.1.port | string }}"
+    proto: "{{ item.1.proto }}"
+    from_ip: "{{ hostvars[item.0].node_ip }}"
+  loop: "{{ groups['swarm'] | difference([inventory_hostname]) | product(common_swarm_ports) | list }}"
+  when: inventory_hostname in groups['swarm']
+
+- name: Allow registry access from all nodes
+  community.general.ufw:
+    rule: allow
+    port: "{{ registry_port | string }}"
+    proto: tcp
+    from_ip: "{{ hostvars[item].node_ip }}"
+  loop: "{{ groups['all'] }}"
+  when: inventory_hostname == swarm_leader
+
+- name: Enable firewall with default deny
+  community.general.ufw:
+    state: enabled
+    direction: incoming
+    policy: deny
