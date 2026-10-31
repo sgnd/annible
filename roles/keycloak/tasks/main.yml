@@ -1,0 +1,41 @@
+# Keycloak: single sign-on (OIDC, SAML). Stores its data in PostgreSQL or MariaDB.
+# Admin console: https://keycloak.<domain>
+
+- name: Create Keycloak database
+  ansible.builtin.include_role:
+    name: "{{ database_app }}"
+    tasks_from: database
+  vars:
+    postgres_db_name: keycloak
+    postgres_db_password: "{{ keycloak_db_password }}"
+    mariadb_db_name: keycloak
+    mariadb_db_password: "{{ keycloak_db_password }}"
+
+- name: Create Keycloak folder
+  ansible.builtin.file:
+    path: "{{ keycloak_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Mirror Keycloak image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [keycloak]
+
+- name: Write Keycloak stack
+  ansible.builtin.template:
+    src: stack.yml.j2
+    dest: "{{ keycloak_dir }}/stack.yml"
+    mode: "0600"
+  diff: false  # has a password
+  register: keycloak_stack
+
+- name: Deploy Keycloak
+  ansible.builtin.include_role:
+    name: swarm
+    tasks_from: deploy
+  vars:
+    swarm_stack: keycloak
+    swarm_stack_changed: "{{ keycloak_stack.changed }}"

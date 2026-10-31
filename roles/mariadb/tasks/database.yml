@@ -1,0 +1,23 @@
+# Create a database and a user with the same name, for another app.
+# Used by app roles. Input: mariadb_db_name, mariadb_db_password
+# Runs on the server where MariaDB is.
+
+- name: Check database {{ mariadb_db_name }}
+  ansible.builtin.command: >-
+    docker exec -e MYSQL_PWD={{ mariadb_password }} mariadb mariadb -uroot -N -e
+    "SHOW DATABASES LIKE '{{ mariadb_db_name }}'"
+  delegate_to: "{{ apps.mariadb }}"
+  register: mariadb_db_check
+  changed_when: false
+  no_log: true
+
+- name: Create database {{ mariadb_db_name }}
+  ansible.builtin.command: >-
+    docker exec -e MYSQL_PWD={{ mariadb_password }} mariadb mariadb -uroot -e
+    "CREATE DATABASE {{ mariadb_db_name }};
+    CREATE USER '{{ mariadb_db_name }}'@'%' IDENTIFIED BY '{{ mariadb_db_password }}';
+    GRANT ALL ON {{ mariadb_db_name }}.* TO '{{ mariadb_db_name }}'@'%';"
+  delegate_to: "{{ apps.mariadb }}"
+  when: mariadb_db_check.stdout != mariadb_db_name
+  changed_when: true
+  no_log: true

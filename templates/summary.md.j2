@@ -1,0 +1,36 @@
+# Annible install summary
+
+Updated: {{ now(fmt='%Y-%m-%d %H:%M') }}
+Config: {{ lookup('env', 'ANNIBLE_CONFIG') }}
+
+Keep this file private. It has passwords.
+
+## DNS
+
+Point `*.{{ domain }}` to the public IP of {{ swarm_leader }} ({{ hostvars[swarm_leader].node_ip }}).
+
+## Servers
+
+| Name | IP | Role |
+|------|----|------|
+{% for host in groups['all'] %}
+| {{ host }} | {{ hostvars[host].node_ip }} | {{ hostvars[host].node_role }} |
+{% endfor %}
+
+## Apps
+
+| App | Runs on | How to reach it |
+|-----|---------|-----------------|
+{% for app, target in apps.items() %}
+| {{ app }} | {{ target }} | {{ catalog[app].info | replace('<domain>', domain) | replace('<ip>', hostvars[target].node_ip | default('')) }} |
+{% endfor %}
+
+## Passwords
+
+From `state/secrets/`. Change them in the app, then update the file too.
+
+| File | Password |
+|------|----------|
+{% for file in query('ansible.builtin.fileglob', secrets_dir ~ '/*') | sort %}
+| {{ file | basename }} | `{{ lookup('ansible.builtin.file', file) }}` |
+{% endfor %}

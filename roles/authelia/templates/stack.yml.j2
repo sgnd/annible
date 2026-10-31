@@ -1,0 +1,23 @@
+services:
+  authelia:
+    image: {{ registry_addr }}/authelia:{{ images.authelia.tag }}
+    # Changes when the config changes, so Authelia restarts and reads it.
+    labels:
+      annible.config: "{{ authelia_config.checksum }}"
+    volumes:
+      - {{ authelia_dir }}/config:/config
+    networks:
+      - public
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.hostname == {{ swarm_leader }}
+      labels:
+        traefik.enable: "true"
+        traefik.http.routers.authelia.rule: Host(`{{ authelia_host }}`)
+        traefik.http.services.authelia.loadbalancer.server.port: "9091"
+
+networks:
+  public:
+    external: true

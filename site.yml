@@ -54,6 +54,15 @@
       loop_control:
         loop_var: app
 
+- name: Beszel agents
+  hosts: all
+  tasks:
+    - name: Deploy Beszel agent on every server
+      ansible.builtin.include_role:
+        name: beszel
+        tasks_from: agent
+      when: "'beszel' in apps"
+
 - name: Swarm apps
   hosts: managers[0]
   tasks:
@@ -68,9 +77,27 @@
   hosts: managers[0]
   gather_facts: false
   tasks:
+    - name: Create state folder
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/state"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      become: false
+
+    - name: Save summary to state/summary.md
+      ansible.builtin.template:
+        src: templates/summary.md.j2
+        dest: "{{ playbook_dir }}/state/summary.md"
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+      diff: false  # has passwords
+      changed_when: false  # the date in it changes every run
+
     - name: Show DNS setting
       ansible.builtin.debug:
-        msg: "Point DNS for *.{{ domain }} to the public IP of {{ inventory_hostname }}. Passwords are in {{ secrets_dir }}, back it up."
+        msg: "Point DNS for *.{{ domain }} to the public IP of {{ inventory_hostname }}."
 
     - name: Show how to reach each app
       ansible.builtin.debug:
@@ -81,3 +108,7 @@
       loop: "{{ apps | dict2items }}"
       loop_control:
         label: "{{ item.key }}"
+
+    - name: Show where the summary is
+      ansible.builtin.debug:
+        msg: "All of this, plus the passwords, is saved in {{ playbook_dir }}/state/summary.md. Back up state/."

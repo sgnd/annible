@@ -1,0 +1,12 @@
+services:
+  beszel-agent:
+    image: {{ registry_addr }}/beszel-agent:{{ images['beszel-agent'].tag }}
+    container_name: beszel-agent
+    restart: always
+    # Host network: it reports this server's real network stats.
+    network_mode: host
+    environment:
+      LISTEN: "{{ beszel_agent_port }}"
+      KEY: "{{ beszel_hub_key.content | b64decode | trim }}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro

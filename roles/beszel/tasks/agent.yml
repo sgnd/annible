@@ -1,0 +1,76 @@
+# Beszel agent: runs on every server and sends stats to the hub.
+# site.yml runs this on all servers after the hub is up.
+
+- name: Read the hub's public key
+  ansible.builtin.slurp:
+    src: "{{ beszel_dir }}/data/id_ed25519.pub"
+  delegate_to: "{{ apps.beszel }}"
+  run_once: true
+  register: beszel_hub_key
+
+- name: Mirror Beszel agent image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+    apply:
+      run_once: true
+  vars:
+    registry_mirror_images: [beszel-agent]
+
+- name: Create Beszel agent folder
+  ansible.builtin.file:
+    path: "{{ beszel_agent_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Write Beszel agent compose file
+  ansible.builtin.template:
+    src: agent-compose.yml.j2
+    dest: "{{ beszel_agent_dir }}/compose.yml"
+    mode: "0600"
+
+- name: Start Beszel agent
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: beszel-agent
+
+# Add every server to the hub, through its API, so you do not have to do it by hand.
+- name: Log in to the Beszel hub
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8090/api/collections/users/auth-with-password
+    method: POST
+    body_format: json
+    body:
+      identity: admin@{{ domain }}
+      password: "{{ beszel_password }}"
+  delegate_to: "{{ apps.beszel }}"
+  run_once: true
+  register: beszel_login
+  no_log: true
+
+- name: Get servers known by the hub
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8090/api/collections/systems/records?perPage=500
+    headers:
+      Authorization: "{{ beszel_login.json.token }}"
+  delegate_to: "{{ apps.beszel }}"
+  run_once: true
+  register: beszel_systems
+
+- name: Add this server to the hub
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8090/api/collections/systems/records
+    method: POST
+    headers:
+      Authorization: "{{ beszel_login.json.token }}"
+    body_format: json
+    body:
+      name: "{{ inventory_hostname }}"
+      host: "{{ node_ip }}"
+      port: "{{ beszel_agent_port | string }}"
+      users: ["{{ beszel_login.json.record.id }}"]
+  delegate_to: "{{ apps.beszel }}"
+  when: inventory_hostname not in beszel_systems.json['items'] | map(attribute='name')
+  changed_when: true

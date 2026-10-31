@@ -125,8 +125,10 @@ def build_apps(apps, catalog, hostvars):
         if category in seen:
             fail(f"{seen[category]} and {name} are both {category}, pick one")
         seen[category] = name
+    categories = {catalog[name]["category"] for name in apps}
+    for name in apps:
         for dep in catalog[name].get("requires", []):
-            if dep not in apps:
+            if dep not in apps and dep not in categories:
                 fail(f"{name} needs {dep}, add it to apps")
 
     ordered = {name: apps[name] for name in catalog if name in apps}

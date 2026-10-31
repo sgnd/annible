@@ -1,0 +1,24 @@
+# Create a database and a user with the same name, for another app.
+# Used by app roles. Input: postgres_db_name, postgres_db_password
+# Runs on the server where PostgreSQL is.
+
+- name: Check database {{ postgres_db_name }}
+  ansible.builtin.command: >-
+    docker exec postgres psql -U postgres -tAc
+    "SELECT 1 FROM pg_database WHERE datname = '{{ postgres_db_name }}'"
+  delegate_to: "{{ apps.postgres }}"
+  register: postgres_db_check
+  changed_when: false
+
+- name: Create database {{ postgres_db_name }}
+  ansible.builtin.shell:
+    cmd: |
+      set -e
+      docker exec postgres psql -U postgres -v ON_ERROR_STOP=1 \
+        -c "CREATE ROLE {{ postgres_db_name }} LOGIN PASSWORD '{{ postgres_db_password }}'" \
+        -c "CREATE DATABASE {{ postgres_db_name }} OWNER {{ postgres_db_name }}"
+    executable: /bin/bash
+  delegate_to: "{{ apps.postgres }}"
+  when: postgres_db_check.stdout != '1'
+  changed_when: true
+  no_log: true

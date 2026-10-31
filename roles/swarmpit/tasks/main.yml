@@ -1,0 +1,38 @@
+# Swarmpit: web UI to manage the swarm. Its databases (CouchDB, InfluxDB) run on the first manager.
+# Open https://swarmpit.<domain> right after install to create the admin user.
+
+# CouchDB sets its own data folder to user 5984 and mode 0755 when it starts, so we do the same.
+# The swarmpit folder above it stays private (0700).
+- name: Create Swarmpit folders
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ swarmpit_dir }}", owner: root, mode: "0700" }
+    - { path: "{{ swarmpit_dir }}/couchdb", owner: "5984", mode: "0755" }
+    - { path: "{{ swarmpit_dir }}/influxdb", owner: root, mode: "0700" }
+
+- name: Mirror Swarmpit images
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [swarmpit, swarmpit-agent, couchdb, influxdb]
+
+- name: Write Swarmpit stack
+  ansible.builtin.template:
+    src: stack.yml.j2
+    dest: "{{ swarmpit_dir }}/stack.yml"
+    mode: "0600"
+  register: swarmpit_stack
+
+- name: Deploy Swarmpit
+  ansible.builtin.include_role:
+    name: swarm
+    tasks_from: deploy
+  vars:
+    swarm_stack: swarmpit
+    swarm_stack_changed: "{{ swarmpit_stack.changed }}"

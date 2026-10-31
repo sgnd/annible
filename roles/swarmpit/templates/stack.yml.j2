@@ -1,0 +1,62 @@
+services:
+  app:
+    image: {{ registry_addr }}/swarmpit:{{ images.swarmpit.tag }}
+    environment:
+      SWARMPIT_DB: http://db:5984
+      SWARMPIT_INFLUXDB: http://influxdb:8086
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - swarmpit
+      - public
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        traefik.enable: "true"
+        traefik.http.routers.swarmpit.rule: Host(`{{ swarmpit_host }}`)
+        traefik.http.routers.swarmpit.middlewares: admin-ip@file
+        traefik.http.services.swarmpit.loadbalancer.server.port: "8080"
+
+  db:
+    image: {{ registry_addr }}/couchdb:{{ images.couchdb.tag }}
+    volumes:
+      - {{ swarmpit_dir }}/couchdb:/opt/couchdb/data
+    networks:
+      - swarmpit
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == {{ swarm_leader }}
+
+  influxdb:
+    image: {{ registry_addr }}/influxdb:{{ images.influxdb.tag }}
+    volumes:
+      - {{ swarmpit_dir }}/influxdb:/var/lib/influxdb
+    networks:
+      - swarmpit
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == {{ swarm_leader }}
+
+  agent:
+    image: {{ registry_addr }}/swarmpit-agent:{{ images['swarmpit-agent'].tag }}
+    environment:
+      DOCKER_API_VERSION: "1.44"  # Docker 29 needs at least this API version
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - swarmpit
+    deploy:
+      mode: global
+      labels:
+        swarmpit.agent: "true"
+
+networks:
+  swarmpit:
+    driver: overlay
+  public:
+    external: true

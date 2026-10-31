@@ -1,0 +1,2 @@
+swarmpit_dir: "{{ apps_dir }}/swarmpit"
+swarmpit_host: "swarmpit.{{ domain }}"

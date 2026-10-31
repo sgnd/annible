@@ -1,0 +1,7 @@
+kong_dir: "{{ apps_dir }}/kong"
+kong_host: "kong.{{ domain }}"
+kong_manager_host: "kong-manager.{{ domain }}"
+kong_replicas: 2
+
+# Generated once and saved in state/secrets/ on the installer machine.
+kong_db_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/kong_db', chars=['ascii_letters', 'digits'], length=24) }}"

@@ -1,7 +1,8 @@
 # Available apps, in deploy order.
 #   category: only one app per category can be installed
 #   runs_on:  swarm (swarm service) | node (docker compose on one server)
-#   requires: apps that must also be installed (optional)
+#   requires: apps or categories that must also be installed (optional),
+#             e.g. "database" = postgres or mariadb
 #   license:  the app's open-source license
 #   info:     how to reach it, shown at the end of the install
 #             <ip> = the server it runs on, <domain> = domain in config.yml
@@ -12,12 +13,40 @@ traefik:
   license: MIT
   info: "https://traefik.<domain> (user admin, password state/secrets/traefik_admin)"
 
+kong:
+  category: api-gateway
+  runs_on: swarm
+  requires: [postgres, traefik]
+  license: Apache-2.0
+  info: "APIs at https://kong.<domain>, Kong Manager https://kong-manager.<domain> (Traefik dashboard password)"
+
 portainer:
   category: management
   runs_on: swarm
   requires: [traefik]
   license: zlib
   info: "https://portainer.<domain> (user admin, password state/secrets/portainer_admin)"
+
+swarmpit:
+  category: management
+  runs_on: swarm
+  requires: [traefik]
+  license: EPL-1.0
+  info: "https://swarmpit.<domain> (create the admin user on first visit)"
+
+keycloak:
+  category: auth
+  runs_on: swarm
+  requires: [database, traefik]
+  license: Apache-2.0
+  info: "https://keycloak.<domain> (user admin, password state/secrets/keycloak_admin)"
+
+authelia:
+  category: auth
+  runs_on: swarm
+  requires: [database, cache, traefik]
+  license: Apache-2.0
+  info: "https://authelia.<domain> (user admin, password state/secrets/authelia_admin). Protect an app with the Traefik middleware authelia@file"
 
 postgres:
   category: database
@@ -66,3 +95,15 @@ nats:
   runs_on: node
   license: Apache-2.0
   info: "nats://<ip>:4222 (user admin, password state/secrets/nats), monitoring https://nats.<domain>"
+
+uptimekuma:
+  category: monitoring
+  runs_on: node
+  license: MIT
+  info: "https://uptimekuma.<domain> (create the admin user on first visit)"
+
+beszel:
+  category: monitoring
+  runs_on: node
+  license: MIT
+  info: "https://beszel.<domain> (user admin@<domain>, password state/secrets/beszel_admin). Agents run on every server"

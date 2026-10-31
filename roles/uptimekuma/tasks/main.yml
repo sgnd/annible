@@ -1,0 +1,39 @@
+# Uptime Kuma: checks that your sites and services are up.
+# Open https://uptimekuma.<domain> right after install to create the admin user.
+
+- name: Create Uptime Kuma folders
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0700"
+  loop:
+    - "{{ uptimekuma_dir }}"
+    - "{{ uptimekuma_dir }}/data"
+
+- name: Mirror Uptime Kuma image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [uptimekuma]
+
+- name: Write Uptime Kuma compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ uptimekuma_dir }}/compose.yml"
+    mode: "0600"
+
+- name: Start Uptime Kuma
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: uptimekuma
+
+- name: Add Uptime Kuma to Traefik
+  ansible.builtin.include_role:
+    name: traefik
+    tasks_from: route
+  vars:
+    traefik_route_name: uptimekuma
+    traefik_route_port: 3001

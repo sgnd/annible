@@ -1,0 +1,45 @@
+server:
+  address: tcp://0.0.0.0:9091
+
+log:
+  level: info
+
+identity_validation:
+  reset_password:
+    jwt_secret: {{ authelia_jwt_secret }}
+
+# Users and password hashes. Edit users.yml to add users.
+authentication_backend:
+  file:
+    path: /config/users.yml
+
+access_control:
+  default_policy: one_factor
+
+session:
+  secret: {{ authelia_session_secret }}
+  cookies:
+    - domain: {{ domain }}
+      authelia_url: https://{{ authelia_host }}
+  redis:
+    host: {{ cache_ip }}
+    port: 6379
+    password: {{ cache_password }}
+
+storage:
+  encryption_key: {{ authelia_storage_key }}
+{% if database_app == 'postgres' %}
+  postgres:
+    address: tcp://{{ database_ip }}:5432
+{% else %}
+  mysql:
+    address: tcp://{{ database_ip }}:3306
+{% endif %}
+    database: authelia
+    username: authelia
+    password: {{ authelia_db_password }}
+
+# No email server: password reset links are written to this file.
+notifier:
+  filesystem:
+    filename: /config/notification.txt

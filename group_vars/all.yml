@@ -12,3 +12,10 @@ apt_env: "{{ {'APT_CONFIG': bundle_dir ~ '/apt.conf'} if offline else {} }}"
 
 # Generated passwords, kept on the machine running the installer.
 secrets_dir: "{{ playbook_dir }}/state/secrets"
+
+# Where the database and cache run, for apps that need them (empty if not installed).
+database_app: "{{ 'postgres' if 'postgres' in apps else 'mariadb' if 'mariadb' in apps else '' }}"
+database_ip: "{{ hostvars[apps[database_app]].node_ip if database_app else '' }}"
+cache_app: "{{ 'redis' if 'redis' in apps else 'valkey' if 'valkey' in apps else '' }}"
+cache_ip: "{{ hostvars[apps[cache_app]].node_ip if cache_app else '' }}"
+cache_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/' ~ cache_app, chars=['ascii_letters', 'digits'], length=24) if cache_app else '' }}"

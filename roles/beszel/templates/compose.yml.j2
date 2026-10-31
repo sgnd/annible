@@ -1,0 +1,15 @@
+services:
+  beszel:
+    image: {{ registry_addr }}/beszel:{{ images.beszel.tag }}
+    container_name: beszel
+    restart: always
+    # Host network: the firewall decides who can connect.
+    network_mode: host
+    env_file: .env
+    volumes:
+      - ./data:/beszel_data
+    healthcheck:
+      test: ["CMD", "/beszel", "health", "--url", "http://localhost:8090"]
+      interval: 30s
+      timeout: 5s
+      retries: 5

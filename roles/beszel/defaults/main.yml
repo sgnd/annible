@@ -1,0 +1,6 @@
+beszel_dir: "{{ apps_dir }}/beszel"
+beszel_agent_dir: "{{ apps_dir }}/beszel-agent"
+beszel_agent_port: 45876
+
+# Generated once and saved in state/secrets/ on the installer machine.
+beszel_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/beszel_admin', chars=['ascii_letters', 'digits'], length=24) }}"

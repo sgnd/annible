@@ -10,6 +10,14 @@ but it downloads and runs the software below. Each one keeps its own license.
 | Docker Registry (distribution) | Apache-2.0 | https://github.com/distribution/distribution |
 | Traefik | MIT | https://github.com/traefik/traefik |
 | Portainer CE | zlib | https://github.com/portainer/portainer |
+| Kong Gateway (OSS) | Apache-2.0 | https://github.com/Kong/kong |
+| Swarmpit | EPL-1.0 | https://github.com/swarmpit/swarmpit |
+| CouchDB (for Swarmpit) | Apache-2.0 | https://github.com/apache/couchdb |
+| InfluxDB 1.x (for Swarmpit) | MIT | https://github.com/influxdata/influxdb |
+| Keycloak | Apache-2.0 | https://github.com/keycloak/keycloak |
+| Authelia | Apache-2.0 | https://github.com/authelia/authelia |
+| Uptime Kuma | MIT | https://github.com/louislam/uptime-kuma |
+| Beszel | MIT | https://github.com/henrygd/beszel |
 | PostgreSQL | PostgreSQL | https://www.postgresql.org |
 | MariaDB | GPL-2.0 | https://github.com/MariaDB/server |
 | Redis 8 | AGPL-3.0 (one of its three licenses) | https://github.com/redis/redis |

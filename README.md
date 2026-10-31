@@ -28,8 +28,8 @@ cp config.example.yml config.yml   # edit: servers, ssh key, domain, apps
 ./install.sh
 ```
 
-At the end it prints how to reach each app. Then point DNS for `*.<domain>` to the
-public IP of the first manager.
+At the end it prints how to reach each app, and saves it with all passwords in
+`state/summary.md`. Then point DNS for `*.<domain>` to the public IP of the first manager.
 
 Run `./install.sh` again any time. It only changes what is different in `config.yml`.
 
@@ -107,16 +107,25 @@ Click a name to open its official website.
 | Category | App | Runs on | Port | Web page |
 |----------|-----|---------|------|----------|
 | gateway | [traefik](https://traefik.io/traefik/) | swarm | 80, 443 | `traefik.<domain>` |
-| management | [portainer](https://www.portainer.io) | swarm | | `portainer.<domain>` |
+| api-gateway | [kong](https://konghq.com/products/kong-gateway) | swarm | | `kong.<domain>`, `kong-manager.<domain>` |
+| management | [portainer](https://www.portainer.io) / [swarmpit](https://swarmpit.io) | swarm | | `portainer.<domain>` / `swarmpit.<domain>` |
+| auth (login) | [keycloak](https://www.keycloak.org) / [authelia](https://www.authelia.com) | swarm | | `keycloak.<domain>` / `authelia.<domain>` |
 | database | [postgres](https://www.postgresql.org) / [mariadb](https://mariadb.org) | server | 5432 / 3306 | |
 | cache | [redis](https://redis.io) / [valkey](https://valkey.io) | server | 6379 | |
 | storage (S3) | [rustfs](https://rustfs.com) / [garage](https://garagehq.deuxfleurs.fr) | server | 9000 / 3900 | `rustfs.<domain>/rustfs/console/` |
 | queue | [rabbitmq](https://www.rabbitmq.com) / [nats](https://nats.io) | server | 5672 / 4222 | `rabbitmq.<domain>` / `nats.<domain>` |
+| monitoring | [uptimekuma](https://uptime.kuma.pet) / [beszel](https://beszel.dev) | server | | `uptimekuma.<domain>` / `beszel.<domain>` |
 
 Users and password files are listed in [`catalog.yml`](catalog.yml) and printed at the end of the install.
 Passwords are in `state/secrets/<app>`.
 
-Coming next: kong, swarmpit, keycloak, authelia, uptimekuma, beszel.
+Some apps need others: kong needs postgres; keycloak needs a database; authelia needs a database
+and a cache. The installer creates their databases for them.
+
+Swarmpit and Uptime Kuma ask you to create the admin user on your first visit, so open them
+right after the install (or set `admin_allow_from` first).
+
+To put the Authelia login in front of an app, add `authelia@file` to that app's Traefik middlewares.
 
 ## How it works
 
@@ -194,6 +203,9 @@ Only open-source apps, every version pinned.
 3. Copy a similar role: `roles/postgres/` for a server app, `roles/portainer/` for a swarm app.
    Do not use `ports:` in server apps. Published ports skip the firewall. Use `network_mode: host`.
 4. Test on a fresh VM, then run `./install.sh` a second time: it must report `changed=0`.
+
+**AI agents.** [`.claude/skills/`](.claude/skills) has skills for Claude Code and other agents
+that read `SKILL.md`: set up `config.yml`, install, add an app, and update versions.
 
 **Checks** (also run in CI):
 

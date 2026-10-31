@@ -1,0 +1,6 @@
+keycloak_dir: "{{ apps_dir }}/keycloak"
+keycloak_host: "keycloak.{{ domain }}"
+
+# Generated once and saved in state/secrets/ on the installer machine.
+keycloak_admin_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/keycloak_admin', chars=['ascii_letters', 'digits'], length=24) }}"
+keycloak_db_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/keycloak_db', chars=['ascii_letters', 'digits'], length=24) }}"

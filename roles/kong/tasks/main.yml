@@ -1,0 +1,64 @@
+# Kong: API gateway behind Traefik. Stores its settings in PostgreSQL.
+#   https://kong.<domain>          your APIs (routes you add in Kong)
+#   https://kong-manager.<domain>  Kong Manager web UI (Traefik dashboard password)
+
+- name: Create Kong database
+  ansible.builtin.include_role:
+    name: postgres
+    tasks_from: database
+  vars:
+    postgres_db_name: kong
+    postgres_db_password: "{{ kong_db_password }}"
+
+- name: Create Kong folder
+  ansible.builtin.file:
+    path: "{{ kong_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Write Kong settings
+  ansible.builtin.copy:
+    dest: "{{ kong_dir }}/kong.env"
+    content: |
+      KONG_DATABASE=postgres
+      KONG_PG_HOST={{ database_ip }}
+      KONG_PG_DATABASE=kong
+      KONG_PG_USER=kong
+      KONG_PG_PASSWORD={{ kong_db_password }}
+    mode: "0600"
+  no_log: true
+
+- name: Mirror Kong image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [kong]
+
+# Creates or updates Kong's tables. Safe to run every time.
+- name: Prepare Kong database
+  ansible.builtin.shell:
+    cmd: |
+      set -e
+      run="docker run --rm --env-file {{ kong_dir }}/kong.env {{ registry_addr }}/kong:{{ images.kong.tag }} kong migrations"
+      $run bootstrap
+      $run up
+      $run finish
+    executable: /bin/bash
+  register: kong_migrations
+  changed_when: "'migrated' in kong_migrations.stdout or 'executed' in kong_migrations.stdout"
+
+- name: Write Kong stack
+  ansible.builtin.template:
+    src: stack.yml.j2
+    dest: "{{ kong_dir }}/stack.yml"
+    mode: "0600"
+  register: kong_stack
+
+- name: Deploy Kong
+  ansible.builtin.include_role:
+    name: swarm
+    tasks_from: deploy
+  vars:
+    swarm_stack: kong
+    swarm_stack_changed: "{{ kong_stack.changed }}"

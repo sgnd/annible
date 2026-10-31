@@ -1,0 +1,48 @@
+services:
+  kong:
+    image: {{ registry_addr }}/kong:{{ images.kong.tag }}
+    env_file: {{ kong_dir }}/kong.env
+    environment:
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_ADMIN_GUI_LISTEN: 0.0.0.0:8002
+      KONG_ADMIN_GUI_URL: https://{{ kong_manager_host }}
+      # Kong Manager calls the Admin API through Traefik, on the same address.
+      KONG_ADMIN_GUI_API_URL: https://{{ kong_manager_host }}/api
+      # Requests come through Traefik: use the client IP that Traefik passes on.
+      KONG_TRUSTED_IPS: 0.0.0.0/0,::/0
+      KONG_REAL_IP_HEADER: X-Forwarded-For
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    networks:
+      - public
+    deploy:
+      replicas: {{ kong_replicas }}
+      labels:
+        traefik.enable: "true"
+        # Your APIs
+        traefik.http.routers.kong.rule: Host(`{{ kong_host }}`)
+        traefik.http.routers.kong.service: kong
+        traefik.http.services.kong.loadbalancer.server.port: "8000"
+        # Kong Manager
+        traefik.http.routers.kong-manager.rule: Host(`{{ kong_manager_host }}`)
+        traefik.http.routers.kong-manager.service: kong-manager
+        traefik.http.routers.kong-manager.middlewares: admin@file
+        traefik.http.services.kong-manager.loadbalancer.server.port: "8002"
+        # Admin API, only under Kong Manager's address
+        traefik.http.routers.kong-admin.rule: Host(`{{ kong_manager_host }}`) && PathPrefix(`/api`)
+        traefik.http.routers.kong-admin.service: kong-admin
+        traefik.http.routers.kong-admin.middlewares: admin@file,kong-admin-strip
+        traefik.http.middlewares.kong-admin-strip.stripprefix.prefixes: /api
+        traefik.http.services.kong-admin.loadbalancer.server.port: "8001"
+
+networks:
+  public:
+    external: true

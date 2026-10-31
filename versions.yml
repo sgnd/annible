@@ -59,3 +59,43 @@ images:
     repo: docker.io/library/nats
     tag: 2.15.2
     digest: sha256:991242c32d2738ffd358fd6614dd96c735017b4b3b34bfdb2c52a072d66db211
+  kong:
+    repo: docker.io/library/kong
+    tag: 3.9.4
+    digest: sha256:c1f5fbb80cd666b4b29b4e97875ecd64d93b01b23fb3083bc3e424b3bad5fdd5
+  swarmpit:
+    repo: docker.io/swarmpit/swarmpit
+    tag: "1.10"
+    digest: sha256:15c044a82feda149327822fc49e74a95d8f64da4c57aefe1781614f2e9c8830f
+  swarmpit-agent:
+    repo: docker.io/swarmpit/agent
+    tag: "2.2"
+    digest: sha256:3c7a3900425c2d86dba09e0483f667ca989052fddb6afe196e037688426e62ae
+  couchdb:
+    repo: docker.io/library/couchdb
+    tag: 2.3.1
+    digest: sha256:30dc067ce470fd437f4074d41f150fa81c1ff9c923a371d38f155d1a36159f4e
+  influxdb:
+    repo: docker.io/library/influxdb
+    tag: 1.8.10
+    digest: sha256:299ebda2c7e308dbef42e26ac9b8fd1d9b3bcb8a0aee80c6509aa0219c1d0290
+  keycloak:
+    repo: docker.io/keycloak/keycloak
+    tag: 26.8.1
+    digest: sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b
+  authelia:
+    repo: docker.io/authelia/authelia
+    tag: 4.39.28
+    digest: sha256:bd97cff4fcbf715b5ff1f9ae286afbe6033afce385302520b0368122d43a6f54
+  uptimekuma:
+    repo: docker.io/louislam/uptime-kuma
+    tag: 2.5.8
+    digest: sha256:20abea8c48a163cf0a7a5d5936ab418e4b742d908704e1f58f6c06e56a9c6b67
+  beszel:
+    repo: docker.io/henrygd/beszel
+    tag: 0.21.1
+    digest: sha256:8514a69d9bbbcb74f371a3205561ee231fc0289739cea64e8131f341d695b770
+  beszel-agent:
+    repo: docker.io/henrygd/beszel-agent
+    tag: 0.21.1
+    digest: sha256:cb6868012964d7a68debaa2c84bb72285e5f08531e81f506bd4c493bf052e41c

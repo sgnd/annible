@@ -1,0 +1,55 @@
+# Beszel hub: shows CPU, memory, disk and containers of every server.
+# Web UI: https://beszel.<domain>. The agents are in tasks/agent.yml.
+
+- name: Create Beszel folders
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0700"
+  loop:
+    - "{{ beszel_dir }}"
+    - "{{ beszel_dir }}/data"
+
+# The hub uses this key to connect to the agents. The agents get the public part.
+- name: Create Beszel hub key
+  ansible.builtin.command:
+    cmd: ssh-keygen -q -t ed25519 -N "" -C beszel -f {{ beszel_dir }}/data/id_ed25519
+    creates: "{{ beszel_dir }}/data/id_ed25519"
+
+- name: Write Beszel admin login
+  ansible.builtin.copy:
+    dest: "{{ beszel_dir }}/.env"
+    content: |
+      USER_EMAIL=admin@{{ domain }}
+      USER_PASSWORD={{ beszel_password }}
+      APP_URL=https://beszel.{{ domain }}
+    mode: "0600"
+  no_log: true
+
+- name: Mirror Beszel image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [beszel]
+
+- name: Write Beszel compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ beszel_dir }}/compose.yml"
+    mode: "0600"
+
+- name: Start Beszel
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: beszel
+
+- name: Add Beszel to Traefik
+  ansible.builtin.include_role:
+    name: traefik
+    tasks_from: route
+  vars:
+    traefik_route_name: beszel
+    traefik_route_port: 8090

@@ -4,16 +4,15 @@
 
 - Base setup: OS, firewall, Docker, local registry, swarm
 - `apps:` config: choose apps and the server they run on
-- Swarm apps: traefik, portainer
-- Server apps: postgres, mariadb, redis, valkey, rustfs, garage, rabbitmq, nats
+- Swarm apps: traefik, kong, portainer, swarmpit, keycloak, authelia
+- Server apps: postgres, mariadb, redis, valkey, rustfs, garage, rabbitmq, nats, uptimekuma, beszel
 - Offline install: `build-bundle.sh` makes one file with apt packages, Ansible and images
 
 ## Next
 
-1. Swarm apps: kong, swarmpit, keycloak/authelia, uptimekuma/beszel
-2. Remove apps and nodes automatically (today: by hand, see README)
-3. Optional WireGuard for servers that only have public IPs
-4. Release bundles on GitHub (build in CI on each tag)
+1. Remove apps and nodes automatically (today: by hand, see README)
+2. Optional WireGuard for servers that only have public IPs
+3. Release bundles on GitHub (build in CI on each tag)
 
 ## Rules
 

@@ -1,0 +1,90 @@
+# Authelia: login page in front of your apps. Stores data in PostgreSQL or MariaDB,
+# sessions in Redis or Valkey. Runs on the first manager (it keeps the users file there).
+# Protect an app by adding the Traefik middleware "authelia@file" to its router.
+
+- name: Create Authelia database
+  ansible.builtin.include_role:
+    name: "{{ database_app }}"
+    tasks_from: database
+  vars:
+    postgres_db_name: authelia
+    postgres_db_password: "{{ authelia_db_password }}"
+    mariadb_db_name: authelia
+    mariadb_db_password: "{{ authelia_db_password }}"
+
+- name: Create Authelia folder
+  ansible.builtin.file:
+    path: "{{ authelia_dir }}/config"
+    state: directory
+    mode: "0700"
+
+- name: Write Authelia config
+  ansible.builtin.template:
+    src: configuration.yml.j2
+    dest: "{{ authelia_dir }}/config/configuration.yml"
+    mode: "0600"
+  diff: false  # has secrets
+  register: authelia_config
+
+- name: Mirror Authelia image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [authelia]
+
+# Only the first time. After that, users.yml is yours to edit (add users, change passwords).
+- name: Check users file
+  ansible.builtin.stat:
+    path: "{{ authelia_dir }}/config/users.yml"
+  register: authelia_users
+
+- name: Hash admin password
+  ansible.builtin.command: >-
+    docker run --rm {{ registry_addr }}/authelia:{{ images.authelia.tag }}
+    authelia crypto hash generate argon2 --password {{ authelia_admin_password }}
+  register: authelia_hash
+  when: not authelia_users.stat.exists
+  changed_when: false
+  no_log: true
+
+- name: Write users file with the admin user
+  ansible.builtin.copy:
+    dest: "{{ authelia_dir }}/config/users.yml"
+    content: |
+      users:
+        admin:
+          displayname: Admin
+          email: admin@{{ domain }}
+          password: "{{ authelia_hash.stdout | regex_replace('^Digest: ', '') }}"
+    mode: "0600"
+  when: not authelia_users.stat.exists
+  no_log: true
+
+- name: Add Authelia middleware to Traefik
+  ansible.builtin.copy:
+    dest: "{{ apps_dir }}/traefik/dynamic/authelia.yml"
+    content: |
+      http:
+        middlewares:
+          authelia:
+            forwardAuth:
+              address: http://authelia_authelia:9091/api/authz/forward-auth
+              trustForwardHeader: true
+              authResponseHeaders: [Remote-User, Remote-Groups, Remote-Email, Remote-Name]
+    mode: "0600"
+
+- name: Write Authelia stack
+  ansible.builtin.template:
+    src: stack.yml.j2
+    dest: "{{ authelia_dir }}/stack.yml"
+    mode: "0600"
+  register: authelia_stack
+
+- name: Deploy Authelia
+  ansible.builtin.include_role:
+    name: swarm
+    tasks_from: deploy
+  vars:
+    swarm_stack: authelia
+    swarm_stack_changed: "{{ authelia_stack.changed }}"

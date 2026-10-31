@@ -8,9 +8,11 @@
   register: swarm_stack_list
   changed_when: false
 
+# --resolve-image never: use the image from our registry as it is. Some upstream images
+# have a wrong CPU label (e.g. swarmpit agent), and swarm would refuse to run them.
 - name: Deploy stack {{ swarm_stack }}
   ansible.builtin.command: >-
-    docker stack deploy --prune
+    docker stack deploy --prune --resolve-image never
     -c {{ apps_dir }}/{{ swarm_stack }}/stack.yml {{ swarm_stack }}
   when: swarm_stack_changed | bool or swarm_stack not in swarm_stack_list.stdout_lines
   changed_when: true
