@@ -1,4 +1,5 @@
-# Copy pinned upstream images into the local registry as <registry>/<name>:<tag>.
+# Copy pinned images into the local registry as <registry>/<name>:<tag>.
+# Images come from the internet, or from the bundle when installing offline.
 # Runs on the first manager, where the registry is.
 # Input: registry_mirror_images (list of keys in versions.yml images).
 
@@ -20,13 +21,18 @@
   ansible.builtin.shell:
     cmd: |
       set -e
-      docker pull -q {{ src }}
-      docker tag {{ src }} {{ dst }}
+      {% if offline %}
+      docker load -q -i {{ bundle_dir }}/images/{{ item.item }}.tar.gz
+      {% else %}
+      docker pull -q {{ image.repo }}@{{ image.digest }}
+      docker tag {{ image.repo }}@{{ image.digest }} {{ local }}
+      {% endif %}
+      docker tag {{ local }} {{ dst }}
       docker push -q {{ dst }}
     executable: /bin/bash
   vars:
     image: "{{ images[item.item] }}"
-    src: "{{ image.repo }}:{{ image.tag }}@{{ image.digest }}"
+    local: "{{ image.repo }}:{{ image.tag }}"
     dst: "{{ registry_addr }}/{{ item.item }}:{{ image.tag }}"
   loop: "{{ registry_mirror_check.results | selectattr('status', 'eq', 404) }}"
   loop_control:

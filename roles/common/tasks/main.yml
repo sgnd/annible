@@ -7,7 +7,7 @@
 - name: Add cluster nodes to /etc/hosts
   ansible.builtin.blockinfile:
     path: /etc/hosts
-    marker: "# {mark} swarm nodes"
+    marker: "# {mark} annible nodes"
     block: |
       {% for host in groups['all'] %}
       {{ hostvars[host].node_ip }} {{ host }}

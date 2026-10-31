@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Runs inside an Ubuntu container of the target arch. build-bundle.sh starts it.
+# /src = this project (read only), /out = the bundle folder.
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+# shellcheck source=/dev/null
+. /etc/os-release
+
+echo "- tools"
+apt-get update -qq
+apt-get install -y -qq ca-certificates curl python3-venv apt-utils >/dev/null
+
+echo "- Docker apt repository"
+install -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+echo "deb [signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $VERSION_CODENAME stable" \
+  > /etc/apt/sources.list.d/docker.list
+apt-get update -qq
+
+echo "- Python packages and Ansible collections"
+python3 -m venv /tmp/venv
+/tmp/venv/bin/pip download -q -r /src/requirements.txt -d /out/python
+/tmp/venv/bin/pip install -q --no-index --find-links /out/python -r /src/requirements.txt
+/tmp/venv/bin/ansible-galaxy collection download -r /src/requirements.yml -p /out/collections >/dev/null
+
+echo "- apt packages"
+# List: base packages from roles/common, Docker packages from versions.yml, and what the installer needs.
+# Docker versions like "5:29.9.2-1*" become the exact version from the repo.
+read -ra packages <<< "$(/tmp/venv/bin/python - <<'EOF'
+import subprocess, yaml
+versions = yaml.safe_load(open("/src/versions.yml"))
+common = yaml.safe_load(open("/src/roles/common/defaults/main.yml"))
+wanted = common["common_packages"] + ["python3-venv", "python3-apt", "openssl"]
+for spec in versions["docker_packages"]:
+    name, version = spec.split("=")
+    madison = subprocess.run(["apt-cache", "madison", name], capture_output=True, text=True).stdout
+    found = [line.split("|")[1].strip() for line in madison.splitlines()
+             if line.split("|")[1].strip().startswith(version.rstrip("*"))]
+    if not found:
+        raise SystemExit(f"{name} {version} not found in the Docker apt repo")
+    wanted.append(f"{name}={found[0]}")
+print(" ".join(wanted))
+EOF
+)"
+# An empty package status makes apt download every dependency, even ones this container already has.
+mkdir -p /tmp/debs/partial
+touch /tmp/empty-status
+apt-get install -y -qq --download-only \
+  -o Dir::State::status=/tmp/empty-status -o Dir::Cache::archives=/tmp/debs "${packages[@]}" >/dev/null
+cd /tmp/debs
+rm -rf partial lock
+apt-ftparchive packages . > Packages 2>/dev/null
+tar -cf /out/debs.tar .
+
+echo "- image list"
+/tmp/venv/bin/python - > /out/images.txt <<'EOF'
+import yaml
+for name, image in yaml.safe_load(open("/src/versions.yml"))["images"].items():
+    print(name, image["repo"], image["tag"], image["digest"])
+EOF
+
+cat > /out/info.yml <<EOF
+ubuntu: "$VERSION_ID"
+arch: $(dpkg --print-architecture)
+EOF
+echo "- $(tar -tf /out/debs.tar | grep -c '\.deb$') apt packages"

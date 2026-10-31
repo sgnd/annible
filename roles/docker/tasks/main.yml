@@ -1,10 +1,11 @@
-# Install Docker from the official apt repo, with versions from versions.yml.
+# Install Docker from the official apt repo (or the offline bundle), with versions from versions.yml.
 
 - name: Add Docker apt key
   ansible.builtin.get_url:
     url: "{{ docker_apt_url }}/gpg"
     dest: /etc/apt/keyrings/docker.asc
     mode: "0644"
+  when: not offline
 
 - name: Add Docker apt repository
   ansible.builtin.copy:
@@ -14,6 +15,7 @@
       {{ docker_apt_url }} {{ ansible_distribution_release }} stable
     mode: "0644"
   register: docker_repo
+  when: not offline
 
 - name: Install Docker packages
   ansible.builtin.apt:

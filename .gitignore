@@ -3,10 +3,10 @@ config.*.yml
 !config.example.yml
 *.pem
 *.key
-certs/
-state/
-bundle/
-dist/
+/certs/
+/state/
+/bundle/
+/dist/
 .venv/
 .collections/
 *.retry

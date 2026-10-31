@@ -3,8 +3,12 @@ swarm_leader: "{{ groups['managers'][0] }}"
 registry_port: 5000
 registry_addr: "{{ hostvars[swarm_leader].node_ip }}:{{ registry_port }}"
 
-# Each app keeps its files in /opt/swarm/<app>/ on the server it runs on.
-apps_dir: /opt/swarm
+# Each app keeps its files in /opt/annible/<app>/ on the server it runs on.
+apps_dir: /opt/annible
+
+# Offline install: where the bundle goes on each server, and how apt uses it.
+bundle_dir: "{{ apps_dir }}/bundle"
+apt_env: "{{ {'APT_CONFIG': bundle_dir ~ '/apt.conf'} if offline else {} }}"
 
 # Generated passwords, kept on the machine running the installer.
 secrets_dir: "{{ playbook_dir }}/state/secrets"

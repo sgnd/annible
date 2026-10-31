@@ -1,0 +1,64 @@
+# Checks that run on GitHub after every push, every pull request,
+# and every Monday (to catch pinned versions that were removed upstream).
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 3 * * 1" # every Monday at 03:00 UTC
+  workflow_dispatch: # adds a "Run workflow" button on GitHub
+
+permissions:
+  contents: read
+
+jobs:
+  # 1. The Ansible code has no common bugs, and config.example.yml is valid.
+  ansible:
+    name: Ansible
+    runs-on: ubuntu-24.04
+    env:
+      ANNIBLE_CONFIG: config.example.yml
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Ansible
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -r requirements.txt ansible-lint
+          .venv/bin/ansible-galaxy collection install -r requirements.yml
+      - name: Check config.example.yml
+        run: .venv/bin/python inventory.py --list > /dev/null
+      - name: Check playbook syntax
+        run: .venv/bin/ansible-playbook site.yml --syntax-check
+      - name: Lint
+        run: PATH="$PWD/.venv/bin:$PATH" ansible-lint --profile production
+
+  # 2. The shell scripts have no common bugs.
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: shellcheck install.sh build-bundle.sh scripts/*.sh
+
+  # 3. Every image and package in versions.yml still exists, for amd64 and arm64.
+  versions:
+    name: Pinned versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: scripts/validate-versions.sh
+
+  # 4. Every link in the docs still works.
+  links:
+    name: Doc links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          # Some websites block bots (403, 429) or answer slowly.
+          # Only real errors, like 404 Not Found, fail this check.
+          args: --no-progress --accept 200..=299,403,429 --accept-timeouts --max-retries 3 README.md THIRD_PARTY.md
+          fail: true

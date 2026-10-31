@@ -6,14 +6,14 @@
 - `apps:` config: choose apps and the server they run on
 - Swarm apps: traefik, portainer
 - Server apps: postgres, mariadb, redis, valkey, rustfs, garage, rabbitmq, nats
+- Offline install: `build-bundle.sh` makes one file with apt packages, Ansible and images
 
 ## Next
 
-1. Offline install: `build-bundle.sh` makes one file with all packages, images and Ansible
-   for the target `arch`. Then servers need no internet.
-2. Swarm apps: kong, swarmpit, keycloak/authelia, uptimekuma/beszel
-3. Remove apps and nodes automatically (today: by hand, see README)
-4. Optional WireGuard for servers that only have public IPs
+1. Swarm apps: kong, swarmpit, keycloak/authelia, uptimekuma/beszel
+2. Remove apps and nodes automatically (today: by hand, see README)
+3. Optional WireGuard for servers that only have public IPs
+4. Release bundles on GitHub (build in CI on each tag)
 
 ## Rules
 

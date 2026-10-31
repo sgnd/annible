@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ansible inventory built from config.yml (path taken from $SWARM_CONFIG).
+"""Ansible inventory built from config.yml (path taken from $ANNIBLE_CONFIG).
 
 It also checks config.yml, so mistakes stop the install early with a clear message.
 """
@@ -33,13 +33,19 @@ def load_yaml(path):
 
 
 def load_config():
-    path = os.path.abspath(os.environ.get("SWARM_CONFIG", "config.yml"))
+    path = os.path.abspath(os.environ.get("ANNIBLE_CONFIG", "config.yml"))
     if not os.path.exists(path):
         fail(f"{path} not found (copy config.example.yml)")
     return load_yaml(path), os.path.dirname(path)
 
 
-def check_settings(cfg):
+def load_bundle():
+    """Return the bundle info (offline install), or {} when there is no bundle."""
+    path = os.path.join(HERE, "bundle", "info.yml")
+    return load_yaml(path) if os.path.exists(path) else {}
+
+
+def check_settings(cfg, bundle):
     unknown = set(cfg) - CONFIG_KEYS
     if unknown:
         fail(f"unknown setting {', '.join(sorted(unknown))} (typo?)")
@@ -52,6 +58,10 @@ def check_settings(cfg):
         fail("acme_email is required for tls: letsencrypt")
     if tls == "custom" and not (cfg.get("tls_cert") and cfg.get("tls_key")):
         fail("tls: custom needs tls_cert and tls_key")
+    if bundle and tls == "letsencrypt":
+        fail("offline install: Let's Encrypt needs internet, use tls: selfsigned or custom")
+    if bundle and cfg.get("arch", "amd64") != bundle["arch"]:
+        fail(f"the bundle is for {bundle['arch']}, but config.yml arch is {cfg.get('arch', 'amd64')}")
 
 
 def build_nodes(nodes):
@@ -127,7 +137,8 @@ def build_apps(apps, catalog, hostvars):
 
 
 def build(cfg, base_dir):
-    check_settings(cfg)
+    bundle = load_bundle()
+    check_settings(cfg, bundle)
     groups, hostvars = build_nodes(cfg.get("nodes"))
     catalog = load_yaml(os.path.join(HERE, "catalog.yml"))
     apps = build_apps(cfg.get("apps"), catalog, hostvars)
@@ -142,6 +153,8 @@ def build(cfg, base_dir):
             all_vars[key] = from_config_dir(cfg[key])
     all_vars.update(load_yaml(os.path.join(HERE, "versions.yml")))
     all_vars.update(
+        offline=bool(bundle),
+        bundle=bundle,
         apps=apps,
         catalog=catalog,
         swarm_apps=[name for name, target in apps.items() if target == "swarm"],

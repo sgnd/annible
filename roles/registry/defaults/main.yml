@@ -1,2 +1,3 @@
 registry_dir: "{{ apps_dir }}/registry"
 registry_cert_days: 3650
+registry_image: "{{ images.registry.repo }}:{{ images.registry.tag }}"

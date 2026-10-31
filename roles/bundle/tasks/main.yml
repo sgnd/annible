@@ -1,0 +1,49 @@
+# Offline install only: copy the bundle to each server and make apt use it.
+# apt reads APT_CONFIG (set in site.yml), so the server's normal apt settings stay untouched.
+
+- name: Create bundle folders
+  ansible.builtin.file:
+    path: "{{ bundle_dir }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: [debs, lists, sources.d]
+
+- name: Create apt download folder
+  ansible.builtin.file:
+    path: "{{ bundle_dir }}/lists/partial"
+    state: directory
+    mode: "0700"  # apt sets this mode itself
+
+- name: Copy apt packages
+  ansible.builtin.unarchive:
+    src: "{{ playbook_dir }}/bundle/debs.tar"
+    dest: "{{ bundle_dir }}/debs"
+
+- name: Use only the bundle as apt source
+  ansible.builtin.copy:
+    dest: "{{ bundle_dir }}/sources.list"
+    content: |
+      deb [trusted=yes] file:{{ bundle_dir }}/debs ./
+    mode: "0644"
+
+- name: Write apt settings for the bundle
+  ansible.builtin.copy:
+    dest: "{{ bundle_dir }}/apt.conf"
+    content: |
+      Dir::Etc::SourceList "{{ bundle_dir }}/sources.list";
+      Dir::Etc::SourceParts "{{ bundle_dir }}/sources.d";
+      Dir::State::Lists "{{ bundle_dir }}/lists";
+    mode: "0644"
+
+# Always read it: the normal "is the cache fresh?" check looks at the system lists, not these.
+- name: Read the bundle's package list
+  ansible.builtin.apt:
+    update_cache: true
+  changed_when: false
+
+- name: Copy Docker images to the first manager
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/bundle/images/"
+    dest: "{{ bundle_dir }}/images/"
+    mode: "0644"
+  when: inventory_hostname == swarm_leader

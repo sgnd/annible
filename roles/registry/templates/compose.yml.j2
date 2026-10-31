@@ -2,7 +2,8 @@ name: registry
 
 services:
   registry:
-    image: {{ images.registry.repo }}:{{ images.registry.tag }}@{{ images.registry.digest }}
+    image: {{ registry_image }}
+    pull_policy: never  # the installer gets the image first (pull or offline bundle)
     restart: always
     # Host network so the port is filtered by UFW (published ports bypass it).
     network_mode: host

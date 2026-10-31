@@ -11,6 +11,14 @@
           - ansible_distribution_version is version('24.04', '>=')
         fail_msg: "Ubuntu 24.04 or newer is required, found {{ ansible_distribution }} {{ ansible_distribution_version }}."
 
+    - name: Check Ubuntu version matches the offline bundle
+      ansible.builtin.assert:
+        that: ansible_distribution_version == bundle.ubuntu
+        fail_msg: >-
+          The bundle is for Ubuntu {{ bundle.ubuntu }}, this node runs {{ ansible_distribution_version }}.
+          Build one with: ./build-bundle.sh {{ node_arch }} {{ ansible_distribution_version }}
+      when: offline
+
     - name: Check CPU architecture
       ansible.builtin.assert:
         that: node_arch == arch | default('amd64')
@@ -18,7 +26,10 @@
 
 - name: Base system
   hosts: all
+  environment: "{{ apt_env }}"  # offline: apt uses only the bundle
   roles:
+    - role: bundle
+      when: offline
     - common
     - docker
 
