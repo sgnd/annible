@@ -18,7 +18,7 @@ Set up a production-ready Docker Swarm with one command.
 - SSH key login with passwordless sudo.
 - Python 3.12 or newer on the machine that runs the installer: the first manager, or your laptop.
   It must reach every server's `ip` over SSH (for example over a VPN).
-- Internet on the servers and on the machine that runs the installer, or an offline bundle
+- Internet on the servers and on the machine that runs the installer (it uses PyPI and Ansible Galaxy), or an offline bundle
   (see [Offline install](#offline-install)).
 - With `tls: letsencrypt`: DNS for `*.<domain>` already points to the public IP of the first manager.
 
@@ -140,8 +140,15 @@ Some apps need others:
 - kong needs postgres. keycloak needs a database. authelia needs a database and a cache.
   The installer creates their databases for them.
 
-Swarmpit and Uptime Kuma ask you to create the admin user on your first visit, so open them
-right after the install (or set `admin_allow_from` first).
+Swarmpit and Uptime Kuma create their admin user on the first visit. So their pages first ask for
+the Traefik dashboard login (user `admin`, password in `state/secrets/traefik_admin`); after that you
+create the app's own admin user.
+
+**Kong** runs on its own network, `kong`, shared only with Traefik. Put your API services on that
+network too (`networks: [kong]`, external) so Kong can reach them. Other apps cannot reach Kong's admin API.
+
+**Swarmpit** needs CouchDB 2.3 and InfluxDB 1.8, which are old. They are only on Swarmpit's own
+network, but if you want only up-to-date software, choose Portainer.
 
 **Authelia login in front of an app.** Add `authelia@file` to the app's Traefik middlewares:
 for a swarm app in `roles/<app>/templates/stack.yml.j2` (the `...middlewares` label, comma-separated),
@@ -170,14 +177,24 @@ A server app has one middleware, so this replaces its `admin_allow_from` limit.
 | 80, 443 | anyone, on swarm servers |
 | everything | other servers in `config.yml` |
 | everything | containers on the same server (`docker0`, `docker_gwbridge`) |
+| your own ports | `firewall_allow` in `config.yml` (for example a VPN) |
 
 Everything else is blocked. Server apps use the host network, so the firewall controls them.
 Admin web pages can be limited to some IPs with `admin_allow_from`.
+
+The installer owns the firewall. The first run, and every run where the rules change, resets it:
+rules you added by hand are removed (put them in `firewall_allow`). During that reset the firewall
+is off for a few seconds. Ports you publish yourself with `docker run -p` or in your own swarm
+stacks skip the firewall (that is how Docker works), so prefer Traefik for web apps.
 
 ### Good to know
 
 - **The first manager is special.** The registry, Traefik, Portainer, Authelia and Swarmpit's
   databases run there and keep their data there. 3 managers keep the swarm itself alive, but not those apps.
+  Keep it first in the `nodes` list: the installer stops if the first manager is not the one that made the swarm.
+- **The registry needs a login.** Every server logs in (password in `state/secrets/registry`),
+  so a container cannot push a fake image into it.
+- **Swarm networks use `10.200.0.0/16`.** Your servers' IPs must be outside that range.
 - **Use a private network between servers.** Traffic between servers is not encrypted.
 - **The `ip` of a node is its private IP.** DNS must point to the public IP of the first manager.
 - **Let's Encrypt** needs port 80 reachable from the internet. Without internet use `tls: selfsigned`.
@@ -186,9 +203,10 @@ Admin web pages can be limited to some IPs with `admin_allow_from`.
 
 **Upgrade an app.** Change its tag and digest in `versions.yml`, then run `./install.sh`.
 Major Postgres upgrades (for example 18 to 19) need a manual dump and restore.
+A new Docker version is installed one server at a time, so the swarm keeps running.
 
 Commands on the servers need `sudo`: the installer does not add users to the `docker` group,
-and `/opt/annible/<app>/` is readable by root only.
+and the passwords and data in `/opt/annible/` are readable by root only.
 
 **Back up.** Copy `state/` (passwords) from the installer machine, and on each server
 `sudo tar -czf <app>.tgz -C /opt/annible <app>`.
@@ -204,15 +222,20 @@ sudo docker compose -f /opt/annible/<app>/compose.yml down      # server app, on
 If you do not need the data: `sudo rm -rf /opt/annible/<app>` on its server, and
 `sudo rm -f /opt/annible/traefik/dynamic/<app>.yml` on the first manager.
 For beszel, also run `sudo docker compose -f /opt/annible/beszel-agent/compose.yml down` on every server.
+Not removed by itself: the app's database (drop it in Postgres or MariaDB), its old images in the
+registry, a server in Beszel's list (delete it in Beszel), and ports 80/443 if you remove traefik.
 
 **Remove a server.** Move its apps to other servers first, then remove it from `config.yml`.
 - Worker: run `sudo docker swarm leave` on it, then `sudo docker node rm <name>` on a manager.
 - Manager: first `sudo docker node demote <name>` on another manager, then the same as a worker.
 - Standalone: nothing else to do.
 
-Run `./install.sh` again, so the firewall forgets the removed server.
+Run `./install.sh` again, so the firewall forgets the removed server. Never remove the first manager.
 
-**Add a server.** Add it to `config.yml` and run `./install.sh`.
+**Add a server.** Add it to `config.yml`, after the first manager, and run `./install.sh`.
+
+**Change a server's role** (worker to manager or back). The installer does not do this; it stops and
+shows the command: `sudo docker node promote <name>` or `sudo docker node demote <name>` on a manager.
 
 ## Troubleshooting
 
@@ -222,6 +245,7 @@ Run `./install.sh` again, so the firewall forgets the removed server.
 | Locked out of SSH | Check `ssh.allow_from`. Use your provider's console to run `sudo ufw disable`. |
 | No HTTPS certificate | DNS must point to the first manager, and port 80 must be open. Then run `sudo docker service update --force traefik_traefik` on the first manager. Let's Encrypt has rate limits. |
 | App not starting | Swarm apps: `sudo docker service ls`, `sudo docker service logs <stack>_<service>`. Server apps: `sudo docker ps`, `sudo docker logs <app>`. |
+| `no such host` or a timeout while downloading | A network problem on the server. Check its internet, then run `./install.sh` again. It is safe to run again: it continues where it stopped. |
 | `toomanyrequests` from Docker Hub | Docker Hub limits pulls. Wait, or run `sudo docker login` on the first manager. |
 
 ## Testing
@@ -261,7 +285,7 @@ No servers needed. The first line makes `.venv/` with Ansible:
 
 ```bash
 ./install.sh config.example.yml --syntax-check
-.venv/bin/pip install ansible-lint
+.venv/bin/pip install ansible-lint==26.10.1
 .venv/bin/python tests/test_config.py      # config.example.yml works, mistakes are refused
 ANNIBLE_CONFIG=config.example.yml PATH="$PWD/.venv/bin:$PATH" ansible-lint --profile production
 shellcheck install.sh build-bundle.sh scripts/*.sh
@@ -271,4 +295,5 @@ scripts/validate-versions.sh               # needs yq, docker and curl
 ## License
 
 [MIT](LICENSE). The apps it installs have their own licenses, see [THIRD_PARTY.md](THIRD_PARTY.md).
+Changes: see [CHANGELOG.md](CHANGELOG.md).
 Security issues: see [SECURITY.md](SECURITY.md).

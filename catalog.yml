@@ -33,7 +33,7 @@ swarmpit:
   runs_on: swarm
   requires: [traefik]
   license: EPL-1.0
-  info: "https://swarmpit.<domain> (create the admin user on first visit)"
+  info: "https://swarmpit.<domain> (Traefik dashboard login first, then create Swarmpit's admin user)"
 
 keycloak:
   category: auth
@@ -102,7 +102,7 @@ uptimekuma:
   runs_on: node
   requires: [traefik]
   license: MIT
-  info: "https://uptimekuma.<domain> (create the admin user on first visit)"
+  info: "https://uptimekuma.<domain> (Traefik dashboard login first, then create Uptime Kuma's admin user)"
 
 beszel:
   category: monitoring

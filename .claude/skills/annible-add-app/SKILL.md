@@ -58,7 +58,7 @@ No servers needed. The first line makes `.venv/` with Ansible:
 
 ```bash
 ./install.sh config.example.yml --syntax-check
-.venv/bin/pip install ansible-lint
+.venv/bin/pip install ansible-lint==26.10.1
 .venv/bin/python tests/test_config.py
 ANNIBLE_CONFIG=config.example.yml PATH="$PWD/.venv/bin:$PATH" ansible-lint --profile production
 shellcheck install.sh build-bundle.sh scripts/*.sh

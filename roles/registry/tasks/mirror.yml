@@ -12,6 +12,9 @@
         application/vnd.oci.image.manifest.v1+json,
         application/vnd.docker.distribution.manifest.v2+json
     ca_path: "/etc/docker/certs.d/{{ registry_addr }}/ca.crt"
+    url_username: "{{ registry_user }}"
+    url_password: "{{ registry_password }}"
+    force_basic_auth: true
     status_code: [200, 404]
   loop: "{{ registry_mirror_images }}"
   delegate_to: "{{ swarm_leader }}"
@@ -39,3 +42,8 @@
     label: "{{ item.item }}"
   delegate_to: "{{ swarm_leader }}"
   changed_when: true
+  # Downloads sometimes fail for a moment (DNS, network). Try again before giving up.
+  register: registry_push
+  retries: 3
+  delay: 15
+  until: registry_push is not failed

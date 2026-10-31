@@ -32,6 +32,7 @@
     src: compose.yml.j2
     dest: "{{ redis_dir }}/compose.yml"
     mode: "0600"
+  diff: false  # has the password
 
 - name: Start Redis
   ansible.builtin.include_role:

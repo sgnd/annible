@@ -11,7 +11,10 @@ services:
       REGISTRY_HTTP_ADDR: "{{ node_ip }}:{{ registry_port }}"
       REGISTRY_HTTP_TLS_CERTIFICATE: /certs/registry.crt
       REGISTRY_HTTP_TLS_KEY: /certs/registry.key
-      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: annible
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
     volumes:
+      - ./auth:/auth:ro
       - ./certs:/certs:ro
       - ./data:/var/lib/registry

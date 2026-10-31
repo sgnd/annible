@@ -9,5 +9,6 @@ config.*.yml
 /dist/
 .venv/
 .collections/
+.ansible/
 *.retry
 __pycache__/

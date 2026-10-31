@@ -25,6 +25,12 @@ ssh:
 # (Keycloak and Authelia are login pages for everyone, so they are not limited.)
 admin_allow_from: []
 
+# The installer owns the firewall: it removes rules you add by hand. Open your own ports here,
+# for example a WireGuard VPN. from is optional (default: anyone).
+firewall_allow: []
+#  - { port: 51820, proto: udp }
+#  - { port: 9100, proto: tcp, from: 10.0.0.0/8 }
+
 # Your servers.
 #   name: lowercase letters, numbers and -
 #   ip:   the private IPv4 the servers use to talk to each other.

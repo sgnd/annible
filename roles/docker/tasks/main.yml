@@ -14,15 +14,28 @@
       deb [arch={{ node_arch }} signed-by=/etc/apt/keyrings/docker.asc]
       {{ docker_apt_url }} {{ ansible_distribution_release }} stable
     mode: "0644"
-  register: docker_repo
   when: not offline
 
-- name: Install Docker packages
+- name: Get installed packages
+  ansible.builtin.package_facts:
+
+- name: Install Docker packages (new server)
   ansible.builtin.apt:
     name: "{{ docker_packages }}"
-    update_cache: "{{ docker_repo.changed }}"
+    update_cache: true
     allow_change_held_packages: true
     allow_downgrade: true
+  when: "'docker-ce' not in ansible_facts.packages"
+
+# Changing a version restarts Docker. One server at a time, so the swarm keeps running.
+- name: Install Docker packages (server that has Docker)
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    update_cache: true
+    allow_change_held_packages: true
+    allow_downgrade: true
+  when: "'docker-ce' in ansible_facts.packages"
+  throttle: 1
 
 # Hold = "apt upgrade" will not change the Docker version.
 - name: Hold Docker packages

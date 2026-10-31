@@ -13,7 +13,7 @@ Their source code is at the links below and at https://launchpad.net/ubuntu (apt
 | containerd | Apache-2.0 | https://github.com/containerd/containerd |
 | Docker Buildx and Compose plugins | Apache-2.0 | https://github.com/docker/buildx, https://github.com/docker/compose |
 | Ansible (ansible-core) | GPL-3.0 | https://github.com/ansible/ansible |
-| Python packages for Ansible (cffi, cryptography, Jinja2, MarkupSafe, packaging, pycparser, PyYAML, resolvelib) | MIT, BSD, Apache-2.0 | https://pypi.org (versions in `requirements.txt`) |
+| Python packages for Ansible (bcrypt, cffi, cryptography, Jinja2, MarkupSafe, packaging, pycparser, PyYAML, resolvelib) | MIT, BSD, Apache-2.0 | https://pypi.org (versions in `requirements.txt`) |
 | Ansible collections: ansible.posix, community.general, community.library_inventory_filtering_v1 | GPL-3.0 | https://github.com/ansible-collections |
 | Docker Registry (distribution) | Apache-2.0 | https://github.com/distribution/distribution |
 | Traefik | MIT | https://github.com/traefik/traefik |

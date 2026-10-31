@@ -5,7 +5,7 @@
     path: "{{ registry_dir }}/{{ item }}"
     state: directory
     mode: "0700"
-  loop: [ca, certs, data]
+  loop: [ca, certs, data, auth]
 
 # Full certificate fields: newer tools (for example Python 3.13+) reject certificates without them.
 - name: Write certificate extensions
@@ -40,6 +40,32 @@
       -days {{ registry_cert_days }} -extfile san.cnf -out ../certs/registry.crt
     chdir: "{{ registry_dir }}/ca"
     creates: "{{ registry_dir }}/certs/registry.crt"
+
+# The password file holds a bcrypt hash. It is made once; the hash is different every time.
+- name: Check registry password file
+  ansible.builtin.stat:
+    path: "{{ registry_dir }}/auth/htpasswd"
+  register: registry_htpasswd
+
+- name: Hash registry password
+  ansible.builtin.command:
+    cmd: "{{ ansible_playbook_python }} -c 'import bcrypt, sys; print(bcrypt.hashpw(sys.stdin.read().encode(), bcrypt.gensalt()).decode())'"
+    stdin: "{{ registry_password }}"
+    stdin_add_newline: false  # hash the password only, not a newline after it
+  delegate_to: localhost
+  become: false
+  register: registry_hash
+  when: not registry_htpasswd.stat.exists
+  changed_when: false
+  no_log: true
+
+- name: Write registry password file
+  ansible.builtin.copy:
+    dest: "{{ registry_dir }}/auth/htpasswd"
+    content: "{{ registry_user }}:{{ registry_hash.stdout }}\n"
+    mode: "0600"
+  when: not registry_htpasswd.stat.exists
+  no_log: true
 
 - name: Check if the registry image is here
   ansible.builtin.command: docker image inspect {{ registry_image }}

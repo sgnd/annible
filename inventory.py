@@ -16,12 +16,18 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GROUPS = {"manager": "managers", "worker": "workers", "standalone": "standalone"}
 CONFIG_KEYS = {
     "domain", "acme_email", "acme_server", "acme_ca_cert", "tls", "tls_cert", "tls_key", "timezone", "arch",
-    "ssh", "admin_allow_from", "nodes", "apps",
+    "ssh", "admin_allow_from", "firewall_allow", "nodes", "apps",
 }
 # Node names become hostnames, and must not clash with "swarm" or group names.
 NODE_NAME = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
-RESERVED_NAMES = {"swarm", "all", "managers", "workers", "standalone"}
+RESERVED_NAMES = {"swarm", "all", "managers", "workers", "standalone", "localhost"}
+DOMAIN = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$")
+LABEL = re.compile(r"^[A-Za-z0-9._-]+$")
 SSH_KEYS = {"user", "key", "port", "allow_from"}
+# Swarm's own networks use this range. Docker's default (10.0.0.0/8) often clashes with servers' IPs.
+SWARM_ADDRESS_POOL = "10.200.0.0/16"
+REGISTRY_PORT = 5000  # the local image registry on the first manager
+KONG_SUBNET = "10.200.255.0/24"  # Kong's own network, inside the pool
 NODE_KEYS = {"name", "ip", "role", "labels"}
 
 
@@ -60,6 +66,23 @@ def check_ip_list(name, value):
             fail(f"{name}: {item} is not an IP or range")
 
 
+def check_firewall_allow(rules):
+    """firewall_allow: a list like [{port: 51820, proto: udp, from: 203.0.113.0/24}]."""
+    if rules is None:
+        return
+    if not isinstance(rules, list):
+        fail("firewall_allow must be a list, like [{port: 51820, proto: udp}]")
+    for rule in rules:
+        if not isinstance(rule, dict) or set(rule) - {"port", "proto", "from"}:
+            fail(f"firewall_allow: {rule} must look like {{port: 51820, proto: udp, from: 203.0.113.0/24}}")
+        if not isinstance(rule.get("port"), int) or not 1 <= rule["port"] <= 65535:
+            fail(f"firewall_allow: port must be a number from 1 to 65535, got {rule.get('port')}")
+        if rule.get("proto", "tcp") not in ("tcp", "udp"):
+            fail(f"firewall_allow: proto must be tcp or udp, got {rule.get('proto')}")
+        if rule.get("from", "any") != "any":
+            check_ip_list("firewall_allow from", [rule["from"]])
+
+
 def check_settings(cfg, bundle):
     unknown = set(cfg) - CONFIG_KEYS
     if unknown:
@@ -69,6 +92,8 @@ def check_settings(cfg, bundle):
         fail(f"unknown setting ssh.{', ssh.'.join(sorted(unknown))} (typo?)")
     if not cfg.get("domain"):
         fail("domain is required")
+    if not DOMAIN.match(str(cfg["domain"])):
+        fail(f"domain must be a plain lowercase name like example.com, got {cfg['domain']}")
     tls = cfg.get("tls", "letsencrypt")
     if tls not in ("letsencrypt", "selfsigned", "custom"):
         fail("tls must be letsencrypt, selfsigned or custom")
@@ -85,6 +110,7 @@ def check_settings(cfg, bundle):
         fail("arch must be amd64 or arm64")
     check_ip_list("ssh.allow_from", (cfg.get("ssh") or {}).get("allow_from"))
     check_ip_list("admin_allow_from", cfg.get("admin_allow_from"))
+    check_firewall_allow(cfg.get("firewall_allow"))
     if bundle and cfg.get("arch", "amd64") != bundle["arch"]:
         fail(f"the bundle is for {bundle['arch']}, but config.yml arch is {cfg.get('arch', 'amd64')}")
 
@@ -92,6 +118,8 @@ def check_settings(cfg, bundle):
 def build_nodes(nodes):
     if not nodes:
         fail("nodes is empty")
+    if not isinstance(nodes, list) or not all(isinstance(node, dict) for node in nodes):
+        fail("nodes must be a list, like - { name: swarm1, ip: 10.0.0.11, role: manager }")
 
     groups = {g: [] for g in GROUPS.values()}
     hostvars = {}
@@ -108,12 +136,20 @@ def build_nodes(nodes):
             fail(f"{name}: role must be one of {', '.join(GROUPS)}")
         if node.get("labels") and role == "standalone":
             fail(f"{name}: labels only work on swarm nodes (manager or worker)")
+        labels = node.get("labels") or {}
+        if not isinstance(labels, dict):
+            fail(f"{name}: labels must look like {{ tier: app }}")
+        for key, value in labels.items():
+            if not LABEL.match(str(key)) or not LABEL.match(str(value)):
+                fail(f"{name}: label {key}: {value} may only use letters, numbers, . _ and -")
         if name in hostvars:
             fail(f"duplicate node name {name}")
         try:
-            ipaddress.IPv4Address(ip)
+            address = ipaddress.IPv4Address(ip)
         except ValueError:
             fail(f"{name}: ip must be an IPv4 address, got {ip}")
+        if address in ipaddress.ip_network(SWARM_ADDRESS_POOL):
+            fail(f"{name}: ip {ip} is inside {SWARM_ADDRESS_POOL}, which the swarm uses for its own networks")
         if any(h["node_ip"] == ip for h in hostvars.values()):
             fail(f"duplicate ip {ip}")
 
@@ -192,6 +228,9 @@ def build(cfg, base_dir):
         apps=apps,
         catalog=catalog,
         swarm_apps=[name for name, target in apps.items() if target == "swarm"],
+        swarm_address_pool=SWARM_ADDRESS_POOL,
+        registry_port=REGISTRY_PORT,
+        kong_subnet=KONG_SUBNET,
         ansible_user=ssh.get("user", "ubuntu"),
         ansible_port=ssh.get("port", 22),
         ansible_ssh_private_key_file=from_config_dir(ssh.get("key", "~/.ssh/id_ed25519")),

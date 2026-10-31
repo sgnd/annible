@@ -1,5 +1,5 @@
 # Swarmpit: web UI to manage the swarm. Its databases (CouchDB, InfluxDB) run on the first manager.
-# Open https://swarmpit.<domain> right after install to create the admin user.
+# https://swarmpit.<domain> first asks for the Traefik dashboard password, then you create Swarmpit's admin user.
 
 # CouchDB sets its own data folder to user 5984 and mode 0755 when it starts, so we do the same.
 # The swarmpit folder above it stays private (0700).

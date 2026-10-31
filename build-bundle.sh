@@ -33,16 +33,19 @@ work="$root/annible"              # the folder that goes into the tar file
 bundle="$work/bundle"
 
 echo "== Copy the project"
+# Only the files git knows about, so your own configs, keys and passwords never go in.
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "error: run this in a git clone of annible (it copies only the files git tracks)" >&2
+  exit 1
+fi
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "warning: you have changes that are not committed; the bundle has the committed files only." >&2
+fi
 rm -rf "$root"
 mkdir -p "$bundle/images"
 # --no-xattrs and COPYFILE_DISABLE: do not add macOS file attributes (Linux tar warns about them).
 export COPYFILE_DISABLE=1
-# Leave out your own configs, passwords, keys and certificates (like .gitignore).
-tar --no-xattrs -cf - --exclude ./.git --exclude ./.venv --exclude ./.collections --exclude ./state \
-  --exclude ./dist --exclude ./bundle --exclude ./certs --exclude './config*.yml' \
-  --exclude '*.pem' --exclude '*.key' . \
-  | tar -C "$work" -xf -
-cp config.example.yml "$work/"
+git archive HEAD | tar -C "$work" -xf -
 
 echo "== apt packages, Python packages and collections (in an Ubuntu $ubuntu $arch container)"
 # OWNER: the container gives the files back to you (on Linux it would leave them owned by root).
@@ -54,7 +57,13 @@ echo "== Docker images"
 # bundle-inside.sh wrote one line per image: name repo tag digest
 while read -r name repo tag digest; do
   echo "- $name"
-  docker pull -q --platform "linux/$arch" "$repo@$digest" >/dev/null
+  # Try 3 times: a slow or unstable network often fails once.
+  for try in 1 2 3; do
+    if docker pull -q --platform "linux/$arch" "$repo@$digest" >/dev/null; then break; fi
+    if [ "$try" = 3 ]; then exit 1; fi
+    echo "  download failed, trying again in 15 seconds"
+    sleep 15
+  done
   docker tag "$repo@$digest" "$repo:$tag"
   docker save --platform "linux/$arch" "$repo:$tag" | gzip > "$bundle/images/$name.tar.gz"
 done < "$bundle/images.txt"

@@ -61,15 +61,26 @@
   when: "'No nodes currently have a role' in garage_layout.stdout"
   changed_when: true
 
+# The key goes in through Garage's admin API, so the secret is never on a command line.
 - name: Get Garage keys
-  ansible.builtin.command: docker exec garage /garage key list
+  ansible.builtin.uri:
+    url: http://127.0.0.1:3903/v2/ListKeys
+    headers:
+      Authorization: "Bearer {{ garage_admin_token }}"
   register: garage_keys
-  changed_when: false
+  no_log: true
 
 - name: Add Garage access key
-  ansible.builtin.command: >-
-    docker exec garage /garage key import --yes -n default
-    {{ garage_access_key }} {{ garage_secret_key }}
-  when: garage_access_key not in garage_keys.stdout
+  ansible.builtin.uri:
+    url: http://127.0.0.1:3903/v2/ImportKey
+    method: POST
+    headers:
+      Authorization: "Bearer {{ garage_admin_token }}"
+    body_format: json
+    body:
+      name: default
+      accessKeyId: "{{ garage_access_key }}"
+      secretAccessKey: "{{ garage_secret_key }}"
+  when: garage_access_key not in garage_keys.json | map(attribute='id')
   changed_when: true
   no_log: true

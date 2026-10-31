@@ -1,3 +1,4 @@
+# Actions are pinned to a commit (the comment shows the version), like everything else here.
 # Checks that run on GitHub after every push, every pull request,
 # and every Monday (to catch pinned versions that were removed upstream).
 name: Validate
@@ -21,16 +22,16 @@ jobs:
     env:
       ANNIBLE_CONFIG: config.example.yml
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Ansible
         run: |
           python3 -m venv .venv
-          .venv/bin/pip install -r requirements.txt ansible-lint
+          .venv/bin/pip install -r requirements.txt ansible-lint==26.10.1
           .venv/bin/ansible-galaxy collection install -r requirements.yml
       - name: Check config.example.yml and common config mistakes
         run: .venv/bin/python tests/test_config.py
       - name: Check playbook syntax
-        run: .venv/bin/ansible-playbook site.yml --syntax-check
+        run: PATH="$PWD/.venv/bin:$PATH" ansible-playbook site.yml --syntax-check
       - name: Lint
         run: PATH="$PWD/.venv/bin:$PATH" ansible-lint --profile production
 
@@ -39,7 +40,7 @@ jobs:
     name: ShellCheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: shellcheck install.sh build-bundle.sh scripts/*.sh
 
   # 3. Every image and package in versions.yml still exists, for amd64 and arm64.
@@ -47,7 +48,7 @@ jobs:
     name: Pinned versions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: scripts/validate-versions.sh
 
   # 4. Every link in the docs still works.
@@ -55,8 +56,8 @@ jobs:
     name: Doc links
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: lycheeverse/lychee-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           # Some websites block bots (403, 429) or answer slowly.
           # Only real errors, like 404 Not Found, fail this check.

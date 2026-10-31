@@ -3,6 +3,7 @@
 - name: Check servers
   hosts: all
   gather_facts: true
+  any_errors_fatal: true  # one failed check stops the whole install, before anything changes
   tasks:
     - name: Check operating system
       ansible.builtin.assert:
@@ -23,6 +24,41 @@
       ansible.builtin.assert:
         that: node_arch == arch | default('amd64')
         fail_msg: "config.yml arch is {{ arch | default('amd64') }} but this node is {{ node_arch }}. All nodes must match it (amd64 or arm64)."
+
+    # Before anything changes: does config.yml still match the swarm? (No Docker yet = a new server.)
+    - name: Read swarm state
+      ansible.builtin.command: docker info --format '{% raw %}{{ .Swarm.LocalNodeState }} {{ .Swarm.ControlAvailable }}{% endraw %}'
+      register: swarm_now
+      failed_when: false
+      changed_when: false
+      when: inventory_hostname in groups['swarm']
+
+    # The registry lives on the first manager. If another manager has it, the managers were
+    # reordered (or a new one was put first). Stop before anything moves.
+    - name: Look for the registry
+      ansible.builtin.stat:
+        path: "{{ apps_dir }}/registry/ca/ca.crt"
+      register: registry_here
+      when: inventory_hostname in groups['managers']
+
+    - name: Check the first manager in config.yml has the registry
+      ansible.builtin.assert:
+        that: >-
+          hostvars[swarm_leader].registry_here.stat.exists or
+          groups['managers'] | intersect(ansible_play_hosts) | map('extract', hostvars, ['registry_here', 'stat', 'exists'])
+          | select | list | length == 0
+        fail_msg: >-
+          {{ swarm_leader }} is listed first in config.yml, but the registry (and the swarm's start) is on another manager.
+          Keep the original first manager first in the nodes list, and add new managers after it.
+      run_once: true
+
+    - name: Check each server's role matches the swarm
+      ansible.builtin.assert:
+        that: swarm_now.stdout.split() | last == ('true' if node_role == 'manager' else 'false')
+        fail_msg: >-
+          {{ inventory_hostname }} is {{ node_role }} in config.yml but not in the swarm. Change it by hand
+          on a manager: sudo docker node {{ 'promote' if node_role == 'manager' else 'demote' }} {{ inventory_hostname }}
+      when: inventory_hostname in groups['swarm'] and swarm_now.stdout is match('active')
 
 - name: Base system
   hosts: all

@@ -1,5 +1,6 @@
 # Ansible and everything it needs, pinned. install.sh installs these into .venv.
 ansible-core==2.21.5
+bcrypt==5.0.0          # hashes the registry password
 cffi==2.1.1
 cryptography==50.0.2
 Jinja2==3.1.6

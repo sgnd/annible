@@ -1,24 +1,17 @@
-# Create a database and a user with the same name, for another app.
+# Create a database and a user with the same name, for another app, and set the user's password.
 # Used by app roles. Input: mariadb_db_name, mariadb_db_password
 # Runs on the server where MariaDB is. The root password comes from the container's own
 # environment and the SQL goes in through stdin, so no password shows up in a process list.
 
-- name: Check database {{ mariadb_db_name }}
-  ansible.builtin.command:
-    cmd: docker exec -i mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" exec mariadb -uroot -N'
-    stdin: "SHOW DATABASES LIKE '{{ mariadb_db_name }}';"
-  delegate_to: "{{ apps.mariadb }}"
-  register: mariadb_db_check
-  changed_when: false
-
-- name: Create database {{ mariadb_db_name }}
+# Every run, so the password always matches state/secrets/ (for example after a restore).
+- name: Create or update database and user {{ mariadb_db_name }}
   ansible.builtin.command:
     cmd: docker exec -i mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" exec mariadb -uroot'
     stdin: |
-      CREATE DATABASE {{ mariadb_db_name }};
-      CREATE USER '{{ mariadb_db_name }}'@'%' IDENTIFIED BY '{{ mariadb_db_password }}';
+      CREATE DATABASE IF NOT EXISTS {{ mariadb_db_name }};
+      CREATE USER IF NOT EXISTS '{{ mariadb_db_name }}'@'%';
+      ALTER USER '{{ mariadb_db_name }}'@'%' IDENTIFIED BY '{{ mariadb_db_password }}';
       GRANT ALL ON {{ mariadb_db_name }}.* TO '{{ mariadb_db_name }}'@'%';
   delegate_to: "{{ apps.mariadb }}"
-  when: mariadb_db_check.stdout != mariadb_db_name
-  changed_when: true
+  changed_when: false
   no_log: true

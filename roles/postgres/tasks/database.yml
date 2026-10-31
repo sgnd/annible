@@ -1,4 +1,4 @@
-# Create a database and a user with the same name, for another app.
+# Create a database and a user with the same name, for another app, and set the user's password.
 # Used by app roles. Input: postgres_db_name, postgres_db_password
 # Runs on the server where PostgreSQL is. The SQL goes in through stdin, so the
 # password never shows up in a process list.
@@ -11,13 +11,22 @@
   register: postgres_db_check
   changed_when: false
 
-- name: Create database {{ postgres_db_name }}
+# Every run, so the password always matches state/secrets/ (for example after a restore).
+- name: Create or update user {{ postgres_db_name }}
   ansible.builtin.command:
-    cmd: docker exec -i postgres psql -U postgres -v ON_ERROR_STOP=1
+    cmd: docker exec -i postgres psql -U postgres -v ON_ERROR_STOP=1 -q
     stdin: |
-      CREATE ROLE {{ postgres_db_name }} LOGIN PASSWORD '{{ postgres_db_password }}';
-      CREATE DATABASE {{ postgres_db_name }} OWNER {{ postgres_db_name }};
+      SELECT 'CREATE ROLE {{ postgres_db_name }} LOGIN'
+        WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{{ postgres_db_name }}') \gexec
+      ALTER ROLE {{ postgres_db_name }} PASSWORD '{{ postgres_db_password }}';
+  delegate_to: "{{ apps.postgres }}"
+  changed_when: false
+  no_log: true
+
+- name: Create database {{ postgres_db_name }}
+  ansible.builtin.command: >-
+    docker exec postgres psql -U postgres -v ON_ERROR_STOP=1
+    -c "CREATE DATABASE {{ postgres_db_name }} OWNER {{ postgres_db_name }}"
   delegate_to: "{{ apps.postgres }}"
   when: postgres_db_check.stdout != '1'
   changed_when: true
-  no_log: true

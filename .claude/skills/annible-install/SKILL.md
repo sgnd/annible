@@ -47,7 +47,7 @@ The installer sees the `bundle/` folder and uses it instead of the internet.
 - Tell the user to **back up `state/`**. If it is lost, the next run makes new passwords that don't match the running databases.
 - DNS for `*.<domain>` must point to the public IP of the first manager. With Let's Encrypt it must be
   set before the install; if it came later, run `sudo docker service update --force traefik_traefik` on the first manager.
-- Swarmpit and Uptime Kuma ask for an admin user on the first visit. Open them right away.
+- Swarmpit and Uptime Kuma first ask for the Traefik dashboard login (user admin), then for a new admin user of their own.
 
 ## When it fails
 

@@ -17,7 +17,8 @@ services:
       labels:
         traefik.enable: "true"
         traefik.http.routers.swarmpit.rule: Host(`{{ swarmpit_host }}`)
-        traefik.http.routers.swarmpit.middlewares: admin-ip@file
+        # admin: the Traefik password first, because Swarmpit creates its admin user on the first visit.
+        traefik.http.routers.swarmpit.middlewares: admin@file
         traefik.http.services.swarmpit.loadbalancer.server.port: "8080"
 
   db:

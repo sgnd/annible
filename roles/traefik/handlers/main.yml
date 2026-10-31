@@ -1,3 +1,9 @@
+# Only if Traefik already runs (a first install deploys it fresh anyway).
 - name: Restart traefik
-  ansible.builtin.command: docker service update --force --detach=false traefik_traefik
+  ansible.builtin.shell:
+    cmd: |
+      if docker service inspect traefik_traefik >/dev/null 2>&1; then
+        docker service update --force --detach=false --with-registry-auth traefik_traefik
+      fi
+    executable: /bin/bash
   changed_when: true

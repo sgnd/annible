@@ -88,4 +88,10 @@ else
 fi
 
 export PATH="$PWD/$venv/bin:$PATH"
+
+# Check config.yml first, so a mistake stops here with a clear message.
+if ! "$venv/bin/python" inventory.py --list >/dev/null; then
+  exit 1
+fi
+
 exec ansible-playbook site.yml "$@"

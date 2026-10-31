@@ -32,6 +32,7 @@
     src: compose.yml.j2
     dest: "{{ valkey_dir }}/compose.yml"
     mode: "0600"
+  diff: false  # has the password
 
 - name: Start Valkey
   ansible.builtin.include_role:

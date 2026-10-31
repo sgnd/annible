@@ -1,5 +1,5 @@
 # Uptime Kuma: checks that your sites and services are up.
-# Open https://uptimekuma.<domain> right after install to create the admin user.
+# https://uptimekuma.<domain> first asks for the Traefik dashboard password, then you create Uptime Kuma's admin user.
 
 - name: Create Uptime Kuma folders
   ansible.builtin.file:
@@ -37,3 +37,5 @@
   vars:
     traefik_route_name: uptimekuma
     traefik_route_port: 3001
+    # The Traefik password first, because Uptime Kuma creates its admin user on the first visit.
+    traefik_route_middleware: admin

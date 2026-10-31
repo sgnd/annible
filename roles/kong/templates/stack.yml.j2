@@ -9,8 +9,8 @@ services:
       KONG_ADMIN_GUI_URL: https://{{ kong_manager_host }}
       # Kong Manager calls the Admin API through Traefik, on the same address.
       KONG_ADMIN_GUI_API_URL: https://{{ kong_manager_host }}/api
-      # Requests come through Traefik: use the client IP that Traefik passes on.
-      KONG_TRUSTED_IPS: 0.0.0.0/0,::/0
+      # Requests come through Traefik (on the kong network): use the client IP that Traefik passes on.
+      KONG_TRUSTED_IPS: {{ kong_subnet }}
       KONG_REAL_IP_HEADER: X-Forwarded-For
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
@@ -21,12 +21,15 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
+    # Only the kong network: other apps cannot reach the admin API (port 8001).
+    # Put your API services on the kong network too, so Kong can reach them.
     networks:
-      - public
+      - kong
     deploy:
       replicas: {{ kong_replicas }}
       labels:
         traefik.enable: "true"
+        traefik.swarm.network: kong
         # Your APIs
         traefik.http.routers.kong.rule: Host(`{{ kong_host }}`)
         traefik.http.routers.kong.service: kong
@@ -44,5 +47,5 @@ services:
         traefik.http.services.kong-admin.loadbalancer.server.port: "8001"
 
 networks:
-  public:
+  kong:
     external: true

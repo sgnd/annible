@@ -53,6 +53,17 @@ CASES = [
     ("unknown arch", lambda c: c.update(arch="x86_64"), "arch must be amd64 or arm64"),
     ("labels on a standalone node", lambda c: c["nodes"][2].update(labels={"a": "b"}), "labels only work on swarm nodes"),
     ("acme_ca_cert without acme_server", lambda c: c.update(acme_ca_cert="ca.pem"), "only used with acme_server"),
+    ("domain with https://", lambda c: c.update(domain="https://example.com"), "plain lowercase name"),
+    ("nodes as a dict", lambda c: c.update(nodes={"swarm1": "10.0.0.11"}), "nodes must be a list"),
+    ("labels as a list", lambda c: c["nodes"][1].update(labels=["tier=app"]), "labels must look like"),
+    ("label with a space", lambda c: c["nodes"][1].update(labels={"tier": "my app"}), "may only use letters"),
+    ("node named localhost", lambda c: c["nodes"][0].update(name="localhost"), "node name localhost"),
+    ("server ip inside the swarm range", lambda c: c["nodes"][1].update(ip="10.200.1.5"), "which the swarm uses"),
+    ("firewall_allow as text", lambda c: c.update(firewall_allow="51820/udp"), "firewall_allow must be a list"),
+    ("firewall_allow bad port", lambda c: c.update(firewall_allow=[{"port": 70000}]), "port must be a number"),
+    ("firewall_allow bad proto", lambda c: c.update(firewall_allow=[{"port": 53, "proto": "icmp"}]), "proto must be tcp or udp"),
+    ("firewall_allow typo", lambda c: c.update(firewall_allow=[{"port": 53, "prot": "udp"}]), "must look like"),
+    ("firewall_allow bad from", lambda c: c.update(firewall_allow=[{"port": 53, "from": "lan"}]), "not an IP or range"),
 ]
 
 

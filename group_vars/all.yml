@@ -1,7 +1,9 @@
 node_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_architecture] | default(ansible_architecture) }}"
 swarm_leader: "{{ groups['managers'][0] }}"
-registry_port: 5000
 registry_addr: "{{ hostvars[swarm_leader].node_ip }}:{{ registry_port }}"
+# The registry needs a login, so a container cannot push a fake image into it.
+registry_user: annible
+registry_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/registry', chars=['ascii_letters', 'digits'], length=32) }}"
 
 # Each app keeps its files in /opt/annible/<app>/ on the server it runs on.
 apps_dir: /opt/annible

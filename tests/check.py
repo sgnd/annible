@@ -37,7 +37,7 @@ APPS = CFG["apps"]
 DOMAIN = CFG["domain"]
 LEADER = inv["managers"]["hosts"][0]
 LEADER_IP = HOSTS[LEADER]["node_ip"]
-REGISTRY = f"{LEADER_IP}:5000"
+REGISTRY = f"{LEADER_IP}:{CFG['registry_port']}"
 IMAGES = CFG["images"]
 WEB = "traefik" in APPS  # web pages only exist with traefik
 ON_LEADER = socket.gethostname() == LEADER  # the installer sets each server's hostname to its name
@@ -157,6 +157,15 @@ def check_swarm():
     _, out = on_leader(["sudo", "docker", "node", "ls", "--format", "{{.Hostname}} {{.Status}}"])
     for node in inv["managers"]["hosts"] + inv["workers"]["hosts"]:
         check(f"swarm node {node} ready", f"{node} Ready" in out)
+    # A swarm made before v1.0.1 keeps Docker's old range (shown as []), so only check newer ones.
+    _, pool = on_leader(["sudo", "docker", "info", "--format", "{{.Swarm.Cluster.DefaultAddrPool}}"])
+    if pool == "[]":
+        print("SKIP  swarm networks use the 10.200.0.0/16 range  (swarm made before v1.0.1)")
+    else:
+        _, out = on_leader(["sudo", "docker", "network", "inspect", "public", "--format", "{{range .IPAM.Config}}{{.Subnet}}{{end}}"])
+        check("swarm networks use the 10.200.0.0/16 range", out.startswith("10.200."), out)
+    code, _ = curl(f"https://{REGISTRY}/v2/")
+    check("registry refuses access without login", code == "401", code)
 
 
 def check_traefik():
@@ -172,7 +181,8 @@ def check_portainer():
 
 
 def check_swarmpit():
-    check("swarmpit page", https("swarmpit")[0] == "200")
+    check("swarmpit needs the Traefik password", https("swarmpit")[0] == "401")
+    check("swarmpit page opens with the password", https("swarmpit", user="admin:" + secret("traefik_admin"))[0] == "200")
 
 
 def check_kong():
@@ -183,6 +193,10 @@ def check_kong():
     check("kong manager opens with the password", https("kong-manager", user=pw)[0] == "200")
     code, body = https("kong-manager", "/api/", user=pw)
     check("kong admin API works", code == "200" and "version" in body, code)
+    # From the public network (where other apps are), the admin API must not be reachable.
+    _, out = on_leader(["sudo", "docker", "run", "--rm", "--network", "public", f"{REGISTRY}/kong:{IMAGES['kong']['tag']}",
+                        "curl", "-s", "-m", "5", "-o", "/dev/null", "-w", "%{http_code}", "http://kong_kong:8001/"])
+    check("kong admin API is not reachable from other apps", not out.endswith("200"), out[-80:])
 
 
 def check_keycloak():
@@ -256,7 +270,8 @@ def check_nats():
 
 
 def check_uptimekuma():
-    check("uptime kuma page", https("uptimekuma")[0] in ("200", "302"))
+    check("uptime kuma needs the Traefik password", https("uptimekuma")[0] == "401")
+    check("uptime kuma page opens with the password", https("uptimekuma", user="admin:" + secret("traefik_admin"))[0] in ("200", "302"))
 
 
 def check_beszel():

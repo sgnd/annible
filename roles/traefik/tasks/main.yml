@@ -31,6 +31,7 @@
   loop_control:
     label: "{{ item.dest }}"
   when: tls | default('letsencrypt') == 'custom'
+  notify: Restart traefik  # Traefik reads certificate files only when it starts
 
 - name: Copy the ACME server's CA certificate
   ansible.builtin.copy:

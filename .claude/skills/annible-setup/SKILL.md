@@ -51,5 +51,8 @@ If a `bundle/` folder is here, the check treats it as an offline install.
 ## Tell the user
 
 - Point DNS for `*.<domain>` to the **public** IP of the first manager, before the install.
+- The firewall is owned by the installer: other open ports (for example a VPN) must be in `firewall_allow`,
+  or they are closed. Server IPs must be outside `10.200.0.0/16` (used by the swarm).
+- Keep the first manager first in `nodes`; add new servers after it.
 - The `ip` of each node is its **private** IP.
 - Next step: run the installer (skill `annible-install`).
