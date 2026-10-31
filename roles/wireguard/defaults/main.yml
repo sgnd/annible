@@ -1,0 +1,2 @@
+# WireGuard adds up to 80 bytes to each packet. On a normal 1500 network this is 1420.
+wireguard_mtu: "{{ (ansible_default_ipv4.mtu | default(1500) | int) - 80 }}"

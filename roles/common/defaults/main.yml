@@ -5,6 +5,7 @@ common_packages:
   - chrony
   - ufw
   - jq
+  - wireguard-tools  # for wireguard: true (small, so always installed)
 
 common_sysctl:
   net.ipv4.ip_forward: 1
@@ -19,5 +20,7 @@ common_journald_max_use: 1G
 # Firewall inputs (see tasks/firewall.yml).
 common_ssh_allow_from: "{{ (ssh.allow_from | default([])) or ['any'] }}"
 common_cluster_ips: "{{ groups['all'] | difference([inventory_hostname]) | map('extract', hostvars, 'node_ip') | sort }}"
+# With wireguard: the real addresses of the other servers, which send WireGuard traffic.
+common_wireguard_hosts: "{{ groups['all'] | difference([inventory_hostname]) | map('extract', hostvars, 'node_host') | sort if wireguard else [] }}"
 # docker0: default bridge. docker_gwbridge: how swarm containers reach the host.
 common_docker_interfaces: [docker0, docker_gwbridge]

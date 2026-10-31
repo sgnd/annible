@@ -4,6 +4,23 @@
   ansible.builtin.hostname:
     name: "{{ inventory_hostname }}"
 
+# On cloud servers (AWS, DigitalOcean, ...) cloud-init can set the old hostname and /etc/hosts
+# back on reboot. Swarm apps are placed by hostname, so tell cloud-init to keep ours.
+- name: Look for cloud-init
+  ansible.builtin.stat:
+    path: /etc/cloud/cloud.cfg.d
+  register: common_cloud_init
+
+- name: Keep hostname and /etc/hosts after reboot
+  ansible.builtin.copy:
+    dest: /etc/cloud/cloud.cfg.d/99-annible.cfg
+    content: |
+      # Managed by annible: keep the hostname and /etc/hosts that annible set.
+      preserve_hostname: true
+      manage_etc_hosts: false
+    mode: "0644"
+  when: common_cloud_init.stat.exists
+
 - name: Add cluster nodes to /etc/hosts
   ansible.builtin.blockinfile:
     path: /etc/hosts

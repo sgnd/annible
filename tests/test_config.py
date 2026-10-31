@@ -64,6 +64,27 @@ CASES = [
     ("firewall_allow bad proto", lambda c: c.update(firewall_allow=[{"port": 53, "proto": "icmp"}]), "proto must be tcp or udp"),
     ("firewall_allow typo", lambda c: c.update(firewall_allow=[{"port": 53, "prot": "udp"}]), "must look like"),
     ("firewall_allow bad from", lambda c: c.update(firewall_allow=[{"port": 53, "from": "lan"}]), "not an IP or range"),
+    ("wireguard as text", lambda c: c.update(wireguard="yes"), "wireguard must be true or false"),
+    ("wireguard without host", lambda c: c.update(wireguard=True), "every node needs host"),
+    ("host that is not an IP", lambda c: c["nodes"][0].update(host="swarm1.example.com"), "host must be an IPv4 address"),
+    ("duplicate host",
+     lambda c: (c["nodes"][0].update(host="203.0.113.5"), c["nodes"][1].update(host="203.0.113.5")), "duplicate host"),
+    ("wireguard with host same as ip",
+     lambda c: (c.update(wireguard=True), [n.update(host=n["ip"]) for n in c["nodes"]]), "must differ from host"),
+]
+
+
+def with_wireguard(c):
+    c["wireguard"] = True
+    for i, node in enumerate(c["nodes"]):
+        node["host"] = node["ip"]
+        node["ip"] = f"10.99.0.{i + 1}"
+
+
+# Settings that must be accepted.
+GOOD = [
+    ("host on one node", lambda c: c["nodes"][0].update(host="203.0.113.5")),
+    ("wireguard with host on every node", with_wireguard),
 ]
 
 
@@ -91,5 +112,12 @@ for name, change, expected in CASES:
     failed += not ok
     print(f"{'PASS' if ok else 'FAIL'}  {name} is refused" + ("" if ok else f"  (got: {err or 'accepted'})"))
 
-print(f"\n{len(CASES) + 1 - failed} passed, {failed} failed")
+for name, change in GOOD:
+    cfg = copy.deepcopy(BASE)
+    change(cfg)
+    code, err = run(cfg)
+    failed += code != 0
+    print(f"{'PASS' if code == 0 else 'FAIL'}  {name} is accepted" + (f"  ({err})" if code else ""))
+
+print(f"\n{len(CASES) + len(GOOD) + 1 - failed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

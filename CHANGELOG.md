@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+New
+- `host` per node: the address the installer connects to over SSH, when it is not the node's `ip`.
+  For servers with more than one IP, like a public IP for SSH and a private IP for the cluster.
+- `wireguard: true`: an encrypted WireGuard network between all servers. The swarm uses only the
+  WireGuard addresses (`ip`), so a server's real address (`host`) can change.
+- Swarm networks get the right MTU (smallest server MTU minus 50), so big requests do not hang on
+  WireGuard or on clouds with a smaller network MTU. New networks only.
+- On cloud servers, cloud-init keeps the hostname and `/etc/hosts` after a reboot.
+- The install stops with a clear message if a server's swarm address differs from its `ip` in `config.yml`
+  (for example after a snapshot restore on a new IP).
+
 ## 1.0.1
 
 Fixes from a full independent review of 1.0.0. Upgrade: pull, then run `./install.sh` again.

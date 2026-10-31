@@ -17,7 +17,7 @@ Set up a production-ready Docker Swarm with one command.
 - Ubuntu 24.04 or 26.04 on every server. All servers use the same CPU type (all amd64 or all arm64).
 - SSH key login with passwordless sudo.
 - Python 3.12 or newer on the machine that runs the installer: the first manager, or your laptop.
-  It must reach every server's `ip` over SSH (for example over a VPN).
+  It must reach every server over SSH: its `host`, or its `ip` if it has no `host` (for example over a VPN).
 - Internet on the servers and on the machine that runs the installer (it uses PyPI and Ansible Galaxy), or an offline bundle
   (see [Offline install](#offline-install)).
 - With `tls: letsencrypt`: DNS for `*.<domain>` already points to the public IP of the first manager.
@@ -113,6 +113,31 @@ apps:
   rustfs: data1
 ```
 
+**Servers with more than one IP** (for example AWS: a public IP for SSH, a private IP inside the VPC).
+`ip` is what the swarm uses, `host` is where the installer connects:
+
+```yaml
+nodes:
+  - { name: app1, ip: 10.0.0.11, host: 203.0.113.11, role: manager }
+  - { name: app2, ip: 10.0.0.12, host: 203.0.113.12, role: worker }
+```
+
+**Encrypted network between servers** (WireGuard). For servers that talk over the internet,
+in different clouds, or that may move. `host` is the server's real address, `ip` is a new
+address on the WireGuard network that you pick, and it never has to change:
+
+```yaml
+wireguard: true
+nodes:
+  - { name: app1,  ip: 10.99.0.11, host: 203.0.113.11, role: manager }
+  - { name: app2,  ip: 10.99.0.12, host: 198.51.100.7, role: worker }
+  - { name: data1, ip: 10.99.0.21, host: 192.0.2.30,   role: standalone }
+```
+
+Each `host` must be reachable from the other servers (WireGuard) and from the installer (SSH).
+Open UDP port 51820 between the servers' `host` addresses in your cloud firewall (security group).
+Turn it on for a new cluster: an existing swarm cannot change its servers' addresses.
+
 See [`config.example.yml`](config.example.yml) for every setting.
 
 ## Apps
@@ -162,12 +187,13 @@ A server app has one middleware, so this replaces its `admin_allow_from` limit.
 
 1. **bundle** (offline only): copies the bundle to the servers
 2. **common**: hostname, packages, time sync, firewall
-3. **docker**: installs Docker
-4. **registry**: a private image registry on the first manager. All servers pull from it.
-5. **swarm**: creates the swarm and joins the servers
-6. **server apps**: `roles/<app>/`, Docker Compose in `/opt/annible/<app>/`
-7. **beszel agents** (if beszel is picked): on every server
-8. **swarm apps**: `roles/<app>/`, swarm stacks in `/opt/annible/<app>/`
+3. **wireguard** (if `wireguard: true`): the encrypted network between the servers
+4. **docker**: installs Docker
+5. **registry**: a private image registry on the first manager. All servers pull from it.
+6. **swarm**: creates the swarm and joins the servers
+7. **server apps**: `roles/<app>/`, Docker Compose in `/opt/annible/<app>/`
+8. **beszel agents** (if beszel is picked): on every server
+9. **swarm apps**: `roles/<app>/`, swarm stacks in `/opt/annible/<app>/`
 
 ### Firewall
 
@@ -175,7 +201,8 @@ A server app has one middleware, so this replaces its `admin_allow_from` limit.
 |------|----|
 | SSH | `ssh.allow_from`, or anyone |
 | 80, 443 | anyone, on swarm servers |
-| everything | other servers in `config.yml` |
+| everything | other servers in `config.yml` (from their `ip`) |
+| UDP 51820 | other servers' `host`, with `wireguard: true` |
 | everything | containers on the same server (`docker0`, `docker_gwbridge`) |
 | your own ports | `firewall_allow` in `config.yml` (for example a VPN) |
 
@@ -195,8 +222,15 @@ stacks skip the firewall (that is how Docker works), so prefer Traefik for web a
 - **The registry needs a login.** Every server logs in (password in `state/secrets/registry`),
   so a container cannot push a fake image into it.
 - **Swarm networks use `10.200.0.0/16`.** Your servers' IPs must be outside that range.
-- **Use a private network between servers.** Traffic between servers is not encrypted.
-- **The `ip` of a node is its private IP.** DNS must point to the public IP of the first manager.
+- **Use a private network between servers, or `wireguard: true`.** Without WireGuard, traffic between servers is not encrypted.
+- **The `ip` of a node is its private IP** (or its WireGuard address). DNS must point to the public IP of the first manager.
+- **A swarm server cannot change its `ip`.** The installer stops if a server's swarm address differs from `ip`
+  (for example after a snapshot restore on a new IP). With `wireguard: true` you only change `host`.
+- **Network size (MTU) is set for you.** Swarm networks use the smallest MTU of the servers minus 50
+  (1370 with WireGuard), so big requests do not hang. This applies to networks the installer creates.
+  For your own overlay networks, add `driver_opts: { com.docker.network.driver.mtu: "1370" }` with WireGuard.
+- **On cloud servers** the installer tells cloud-init to keep the hostname after a reboot, because
+  swarm apps are placed by hostname.
 - **Let's Encrypt** needs port 80 reachable from the internet. Without internet use `tls: selfsigned`.
 
 ## How to
@@ -243,6 +277,7 @@ shows the command: `sudo docker node promote <name>` or `sudo docker node demote
 |---------|-----|
 | `config error: ...` | The message says what to fix in `config.yml`. |
 | Locked out of SSH | Check `ssh.allow_from`. Use your provider's console to run `sudo ufw disable`. |
+| `cannot reach ... over WireGuard` | Open UDP 51820 between the servers' `host` addresses in your cloud firewall. `sudo wg show` shows the last handshake. |
 | No HTTPS certificate | DNS must point to the first manager, and port 80 must be open. Then run `sudo docker service update --force traefik_traefik` on the first manager. Let's Encrypt has rate limits. |
 | App not starting | Swarm apps: `sudo docker service ls`, `sudo docker service logs <stack>_<service>`. Server apps: `sudo docker ps`, `sudo docker logs <app>`. |
 | `no such host` or a timeout while downloading | A network problem on the server. Check its internet, then run `./install.sh` again. It is safe to run again: it continues where it stopped. |

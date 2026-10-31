@@ -1,0 +1,16 @@
+# Managed by annible. Change config.yml instead of this file.
+[Interface]
+Address = {{ node_ip }}/32
+ListenPort = {{ wireguard_port }}
+MTU = {{ wireguard_mtu }}
+# The private key stays in its own file, so it is not in this config.
+PostUp = wg set %i private-key /etc/wireguard/private.key
+{% for host in groups['all'] if host != inventory_hostname %}
+
+# {{ host }}
+[Peer]
+PublicKey = {{ hostvars[host].wireguard_public_key.stdout }}
+Endpoint = {{ hostvars[host].node_host }}:{{ wireguard_port }}
+AllowedIPs = {{ hostvars[host].node_ip }}/32
+PersistentKeepalive = 25
+{% endfor %}

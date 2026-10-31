@@ -1,0 +1,72 @@
+# WireGuard: an encrypted private network between all servers (wireguard: true in config.yml).
+# Each server gets its "ip" from config.yml on the wg0 interface, and the swarm only uses those.
+# So the servers' real addresses ("host") can change without breaking the swarm.
+
+- name: Create WireGuard folder
+  ansible.builtin.file:
+    path: /etc/wireguard
+    state: directory
+    mode: "0700"
+
+# The private key is made on the server and never leaves it.
+- name: Make WireGuard private key
+  ansible.builtin.shell: umask 077 && wg genkey > /etc/wireguard/private.key
+  args:
+    creates: /etc/wireguard/private.key
+
+- name: Read WireGuard public key
+  ansible.builtin.shell: wg pubkey < /etc/wireguard/private.key
+  register: wireguard_public_key
+  changed_when: false
+
+- name: Write WireGuard config
+  ansible.builtin.template:
+    src: wg0.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    mode: "0600"
+  notify: Restart wireguard
+
+# After a reboot, Docker must wait for wg0: the swarm listens on the WireGuard address.
+- name: Create Docker service drop-in folder
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    mode: "0755"
+
+- name: Start Docker after WireGuard
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/docker.service.d/wireguard.conf
+    content: |
+      [Unit]
+      Wants=wg-quick@wg0.service
+      After=wg-quick@wg0.service
+    mode: "0644"
+
+- name: Start WireGuard
+  ansible.builtin.systemd_service:
+    name: wg-quick@wg0
+    state: started
+    enabled: true
+    daemon_reload: true  # so systemd sees the drop-in above
+
+- name: Apply WireGuard config changes now
+  ansible.builtin.meta: flush_handlers
+
+- name: Check every other server answers over WireGuard
+  ansible.builtin.command: ping -c 1 -W 2 {{ hostvars[item].node_ip }}
+  loop: "{{ groups['all'] | difference([inventory_hostname]) }}"
+  register: wireguard_ping
+  until: wireguard_ping.rc == 0
+  retries: 10
+  delay: 3
+  failed_when: false
+  changed_when: false
+
+- name: Stop if a server cannot be reached over WireGuard
+  ansible.builtin.assert:
+    that: wireguard_ping.results | rejectattr('rc', 'eq', 0) | list | length == 0
+    fail_msg: >-
+      {{ inventory_hostname }} cannot reach
+      {{ wireguard_ping.results | rejectattr('rc', 'eq', 0) | map(attribute='item') | join(', ') }} over WireGuard.
+      Open UDP port {{ wireguard_port }} between the servers' host addresses in your cloud firewall
+      (security group), and check each node's host in config.yml.

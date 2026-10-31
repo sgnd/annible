@@ -27,7 +27,7 @@
 
     # Before anything changes: does config.yml still match the swarm? (No Docker yet = a new server.)
     - name: Read swarm state
-      ansible.builtin.command: docker info --format '{% raw %}{{ .Swarm.LocalNodeState }} {{ .Swarm.ControlAvailable }}{% endraw %}'
+      ansible.builtin.command: docker info --format '{% raw %}{{ .Swarm.LocalNodeState }} {{ .Swarm.ControlAvailable }} {{ .Swarm.NodeAddr }}{% endraw %}'
       register: swarm_now
       failed_when: false
       changed_when: false
@@ -54,10 +54,21 @@
 
     - name: Check each server's role matches the swarm
       ansible.builtin.assert:
-        that: swarm_now.stdout.split() | last == ('true' if node_role == 'manager' else 'false')
+        that: swarm_now.stdout.split()[1] == ('true' if node_role == 'manager' else 'false')
         fail_msg: >-
           {{ inventory_hostname }} is {{ node_role }} in config.yml but not in the swarm. Change it by hand
           on a manager: sudo docker node {{ 'promote' if node_role == 'manager' else 'demote' }} {{ inventory_hostname }}
+      when: inventory_hostname in groups['swarm'] and swarm_now.stdout is match('active')
+
+    # A swarm cannot change a node's address. This happens after a snapshot restore or a move
+    # to a new server, or when ip in config.yml was changed.
+    - name: Check each server's swarm address matches ip in config.yml
+      ansible.builtin.assert:
+        that: swarm_now.stdout.split()[2] == node_ip
+        fail_msg: >-
+          {{ inventory_hostname }} is in the swarm with address {{ swarm_now.stdout.split()[2] }},
+          but its ip in config.yml is {{ node_ip }}. Put {{ swarm_now.stdout.split()[2] }} back as ip.
+          If the server's real address changed, set the new one as host (with wireguard: true, ip never has to change).
       when: inventory_hostname in groups['swarm'] and swarm_now.stdout is match('active')
 
 - name: Base system
@@ -67,6 +78,8 @@
     - role: bundle
       when: offline
     - common
+    - role: wireguard
+      when: wireguard
     - docker
 
 - name: Registry

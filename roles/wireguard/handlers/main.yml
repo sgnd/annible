@@ -1,0 +1,6 @@
+- name: Restart wireguard
+  ansible.builtin.service:
+    name: wg-quick@wg0
+    state: restarted
+  # One server at a time, so the swarm keeps a working majority.
+  throttle: 1

@@ -60,5 +60,7 @@ The installer sees the `bundle/` folder and uses it instead of the internet.
 | Swarm app not starting | `sudo docker service ls`, `sudo docker service logs <stack>_<service>` on a manager. |
 | Server app not starting | `sudo docker ps`, `sudo docker logs <app>` on that server. |
 | `toomanyrequests` | Docker Hub limit. Wait, or run `sudo docker login` on the first manager. |
+| `cannot reach ... over WireGuard` | Open UDP 51820 between the servers' `host` addresses in the cloud firewall (security group). Check each `host`. `sudo wg show` on a server shows the last handshake. |
+| `is in the swarm with address ...` | A swarm server cannot change its address. Put the old address back as `ip`. If the server's real address changed, set it as `host`. |
 
 Read the failed Ansible task name first. It usually says what went wrong.

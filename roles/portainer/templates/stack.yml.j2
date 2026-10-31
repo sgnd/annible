@@ -39,5 +39,7 @@ services:
 networks:
   agent:
     driver: overlay
+    driver_opts:
+      com.docker.network.driver.mtu: "{{ swarm_mtu }}"
   public:
     external: true

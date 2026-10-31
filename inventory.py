@@ -16,7 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GROUPS = {"manager": "managers", "worker": "workers", "standalone": "standalone"}
 CONFIG_KEYS = {
     "domain", "acme_email", "acme_server", "acme_ca_cert", "tls", "tls_cert", "tls_key", "timezone", "arch",
-    "ssh", "admin_allow_from", "firewall_allow", "nodes", "apps",
+    "ssh", "admin_allow_from", "firewall_allow", "wireguard", "nodes", "apps",
 }
 # Node names become hostnames, and must not clash with "swarm" or group names.
 NODE_NAME = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
@@ -28,7 +28,8 @@ SSH_KEYS = {"user", "key", "port", "allow_from"}
 SWARM_ADDRESS_POOL = "10.200.0.0/16"
 REGISTRY_PORT = 5000  # the local image registry on the first manager
 KONG_SUBNET = "10.200.255.0/24"  # Kong's own network, inside the pool
-NODE_KEYS = {"name", "ip", "role", "labels"}
+NODE_KEYS = {"name", "ip", "host", "role", "labels"}
+WIREGUARD_PORT = 51820  # UDP port of the WireGuard network between the servers
 
 
 def fail(msg):
@@ -111,11 +112,13 @@ def check_settings(cfg, bundle):
     check_ip_list("ssh.allow_from", (cfg.get("ssh") or {}).get("allow_from"))
     check_ip_list("admin_allow_from", cfg.get("admin_allow_from"))
     check_firewall_allow(cfg.get("firewall_allow"))
+    if cfg.get("wireguard", False) not in (True, False):
+        fail("wireguard must be true or false")
     if bundle and cfg.get("arch", "amd64") != bundle["arch"]:
         fail(f"the bundle is for {bundle['arch']}, but config.yml arch is {cfg.get('arch', 'amd64')}")
 
 
-def build_nodes(nodes):
+def build_nodes(nodes, wireguard):
     if not nodes:
         fail("nodes is empty")
     if not isinstance(nodes, list) or not all(isinstance(node, dict) for node in nodes):
@@ -153,10 +156,24 @@ def build_nodes(nodes):
         if any(h["node_ip"] == ip for h in hostvars.values()):
             fail(f"duplicate ip {ip}")
 
+        # host: the server's own address (SSH, WireGuard). ip: the address the cluster uses.
+        host = node.get("host") or ip
+        if wireguard and not node.get("host"):
+            fail(f"{name}: with wireguard, every node needs host (its real address); ip is its WireGuard address")
+        try:
+            ipaddress.IPv4Address(host)
+        except ValueError:
+            fail(f"{name}: host must be an IPv4 address, got {host}")
+        if wireguard and host == ip:
+            fail(f"{name}: with wireguard, ip is a new address on the WireGuard network, so it must differ from host")
+        if node.get("host") and any(h["node_host"] == host for h in hostvars.values()):
+            fail(f"duplicate host {host}")
+
         groups[GROUPS[role]].append(name)
         hostvars[name] = {
-            "ansible_host": ip,
+            "ansible_host": host,
             "node_ip": ip,
+            "node_host": host,
             "node_role": role,
             "node_labels": {str(k): str(v) for k, v in (node.get("labels") or {}).items()},
             "node_apps": [],
@@ -209,7 +226,7 @@ def build_apps(apps, catalog, hostvars):
 def build(cfg, base_dir):
     bundle = load_bundle()
     check_settings(cfg, bundle)
-    groups, hostvars = build_nodes(cfg.get("nodes"))
+    groups, hostvars = build_nodes(cfg.get("nodes"), cfg.get("wireguard", False))
     catalog = load_yaml(os.path.join(HERE, "catalog.yml"))
     apps = build_apps(cfg.get("apps"), catalog, hostvars)
 
@@ -231,6 +248,8 @@ def build(cfg, base_dir):
         swarm_address_pool=SWARM_ADDRESS_POOL,
         registry_port=REGISTRY_PORT,
         kong_subnet=KONG_SUBNET,
+        wireguard=cfg.get("wireguard", False),
+        wireguard_port=WIREGUARD_PORT,
         ansible_user=ssh.get("user", "ubuntu"),
         ansible_port=ssh.get("port", 22),
         ansible_ssh_private_key_file=from_config_dir(ssh.get("key", "~/.ssh/id_ed25519")),

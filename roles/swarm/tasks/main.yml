@@ -6,6 +6,20 @@
   register: swarm_state
   changed_when: false
 
+# Swarm networks add 50 bytes to each packet. If a packet gets bigger than the servers' network
+# allows (WireGuard, some clouds), big requests hang. So use the smallest MTU of all swarm servers.
+- name: Read the MTU of the network the swarm uses
+  ansible.builtin.shell: set -o pipefail && cat /sys/class/net/$(ip -o -4 addr show to {{ node_ip }}/32 | awk '{print $2}')/mtu
+  args:
+    executable: /bin/bash
+  register: swarm_host_mtu
+  changed_when: false
+
+- name: Set the MTU of swarm networks
+  ansible.builtin.set_fact:
+    swarm_mtu: "{{ (ansible_play_hosts | map('extract', hostvars, ['swarm_host_mtu', 'stdout']) | map('int') | min) - 50 }}"
+  run_once: true
+
 - name: Create swarm on the first manager
   ansible.builtin.command: >-
     docker swarm init
@@ -84,7 +98,9 @@
   changed_when: false
 
 - name: Create overlay networks
-  ansible.builtin.command: docker network create --driver overlay --attachable {{ item }}
+  ansible.builtin.command: >-
+    docker network create --driver overlay --attachable
+    --opt com.docker.network.driver.mtu={{ swarm_mtu }} {{ item }}
   loop: "{{ swarm_networks | difference(swarm_existing_networks.stdout_lines) }}"
   run_once: true
   delegate_to: "{{ swarm_leader }}"
@@ -93,7 +109,9 @@
 # Kong gets its own network, shared only with Traefik and your API services,
 # so other apps cannot reach Kong's admin API. Fixed subnet: Kong trusts it for client IPs.
 - name: Create Kong network
-  ansible.builtin.command: docker network create --driver overlay --attachable --subnet {{ kong_subnet }} kong
+  ansible.builtin.command: >-
+    docker network create --driver overlay --attachable --subnet {{ kong_subnet }}
+    --opt com.docker.network.driver.mtu={{ swarm_mtu }} kong
   when:
     - "'kong' in apps"
     - "'kong' not in swarm_existing_networks.stdout_lines"

@@ -26,15 +26,26 @@ ssh:
 admin_allow_from: []
 
 # The installer owns the firewall: it removes rules you add by hand. Open your own ports here,
-# for example a WireGuard VPN. from is optional (default: anyone).
+# for example a VPN. from is optional (default: anyone).
 firewall_allow: []
-#  - { port: 51820, proto: udp }
+#  - { port: 1194, proto: udp }
 #  - { port: 9100, proto: tcp, from: 10.0.0.0/8 }
+
+# Optional: an encrypted network (WireGuard) between all servers. Use it when servers talk over
+# the internet or a network you do not trust, or to keep the swarm working when servers move:
+# the swarm only uses ip, so a server's real address (host) can change.
+# Every node then needs host, and ip is a new private address you pick, e.g. 10.99.0.11.
+# Each host must be reachable from the other servers and from the installer.
+# Open UDP port 51820 between the servers in your cloud firewall (security group).
+wireguard: false
 
 # Your servers.
 #   name: lowercase letters, numbers and -
-#   ip:   the private IPv4 the servers use to talk to each other.
-#         The installer also connects to it over SSH.
+#   ip:   the private IPv4 the servers use to talk to each other (the swarm uses it).
+#         With wireguard: true, a new address on the WireGuard network.
+#   host: optional, the server's own address, where the installer connects over SSH
+#         (and WireGuard, when on). Use it when a server has more than one IP, like a
+#         public IP for SSH and a private IP for the cluster. Default: same as ip.
 #   role: manager    runs the swarm and swarm apps (use 1, 3 or 5)
 #         worker     runs swarm apps
 #         standalone not in the swarm, runs server apps like databases
@@ -43,6 +54,7 @@ firewall_allow: []
 nodes:
   - name: swarm1
     ip: 10.0.0.11
+    # host: 203.0.113.11     # optional, see above
     role: manager
   - name: swarm2
     ip: 10.0.0.12

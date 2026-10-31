@@ -37,6 +37,7 @@ APPS = CFG["apps"]
 DOMAIN = CFG["domain"]
 LEADER = inv["managers"]["hosts"][0]
 LEADER_IP = HOSTS[LEADER]["node_ip"]
+LEADER_HOST = HOSTS[LEADER]["node_host"]  # where SSH connects
 REGISTRY = f"{LEADER_IP}:{CFG['registry_port']}"
 IMAGES = CFG["images"]
 WEB = "traefik" in APPS  # web pages only exist with traefik
@@ -60,7 +61,7 @@ def on_leader(cmd, stdin=None):
     if not ON_LEADER:
         cmd = ["ssh", "-i", CFG["ansible_ssh_private_key_file"], "-p", str(CFG["ansible_port"]),
                "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new",
-               f"{CFG['ansible_user']}@{LEADER_IP}", shlex.join(cmd)]
+               f"{CFG['ansible_user']}@{LEADER_HOST}", shlex.join(cmd)]
     p = subprocess.run(cmd, input=stdin, capture_output=True, text=True, timeout=180)
     return p.returncode, (p.stdout + p.stderr).strip()
 
@@ -166,6 +167,36 @@ def check_swarm():
         check("swarm networks use the 10.200.0.0/16 range", out.startswith("10.200."), out)
     code, _ = curl(f"https://{REGISTRY}/v2/")
     check("registry refuses access without login", code == "401", code)
+    for node in inv["managers"]["hosts"] + inv["workers"]["hosts"]:
+        _, addr = on_leader(["sudo", "docker", "node", "inspect", node, "--format", "{{.Status.Addr}}"])
+        check(f"swarm node {node} uses its ip {HOSTS[node]['node_ip']}", addr == HOSTS[node]["node_ip"], addr)
+    # Networks made before the MTU setting have none (Docker then uses 1450), so only check newer ones.
+    _, mtu = on_leader(["sudo", "docker", "network", "inspect", "public", "--format",
+                        '{{index .Options "com.docker.network.driver.mtu"}}'])
+    if mtu in ("", "<no value>"):
+        print("SKIP  swarm network MTU is set  (network made before MTU was set)")
+    else:
+        # The biggest packet must fit through the servers' network: ping it with "do not split".
+        for node in HOSTS:
+            if node != LEADER:
+                code, out = on_leader(["ping", "-c", "1", "-W", "2", "-M", "do", "-s", str(int(mtu) + 50 - 28),
+                                       HOSTS[node]["node_ip"]])
+                check(f"packets of {int(mtu) + 50} bytes reach {node} (swarm MTU {mtu})", code == 0, out[-200:])
+
+
+def check_wireguard():
+    """Every other server has made a WireGuard handshake with the first manager in the last 3 minutes."""
+    _, out = on_leader(["sudo", "wg", "show", "wg0", "latest-handshakes"])
+    _, now = on_leader(["date", "+%s"])
+    handshakes = dict(line.split() for line in out.splitlines())
+    for node in HOSTS:
+        if node == LEADER:
+            continue
+        # Peers are listed by public key; find the one for this node through its allowed IP.
+        _, peers = on_leader(["sudo", "wg", "show", "wg0", "allowed-ips"])
+        key = next((line.split()[0] for line in peers.splitlines() if f"{HOSTS[node]['node_ip']}/32" in line), None)
+        age = int(now) - int(handshakes.get(key, 0))
+        check(f"wireguard link to {node}", age < 180, f"last handshake {age}s ago" if key else "no peer")
 
 
 def check_traefik():
@@ -301,6 +332,8 @@ CHECKS = {
 if __name__ == "__main__":
     print(f"Checking {', '.join(APPS)} on {DOMAIN} (from {'the first manager' if ON_LEADER else 'here, over SSH'})\n")
     check_swarm()
+    if CFG.get("wireguard"):
+        check_wireguard()
     for app in APPS:
         try:
             CHECKS[app]()

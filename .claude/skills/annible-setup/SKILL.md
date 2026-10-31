@@ -54,5 +54,7 @@ If a `bundle/` folder is here, the check treats it as an offline install.
 - The firewall is owned by the installer: other open ports (for example a VPN) must be in `firewall_allow`,
   or they are closed. Server IPs must be outside `10.200.0.0/16` (used by the swarm).
 - Keep the first manager first in `nodes`; add new servers after it.
-- The `ip` of each node is its **private** IP.
+- The `ip` of each node is its **private** IP. If the installer must SSH to another address (a public IP),
+  put that in `host`. With `wireguard: true`, every node needs `host`, and `ip` is a new WireGuard address
+  (for example 10.99.0.11); open UDP 51820 between the hosts in the cloud firewall.
 - Next step: run the installer (skill `annible-install`).

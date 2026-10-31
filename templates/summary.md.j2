@@ -7,14 +7,14 @@ Keep this file private. It has passwords.
 
 ## DNS
 
-Point `*.{{ domain }}` to the public IP of {{ swarm_leader }} ({{ hostvars[swarm_leader].node_ip }}).
+Point `*.{{ domain }}` to the public IP of {{ swarm_leader }} (server address {{ hostvars[swarm_leader].node_host }}).
 
 ## Servers
 
-| Name | IP | Role |
-|------|----|------|
+| Name | IP (cluster) | Host (SSH{{ ', WireGuard' if wireguard else '' }}) | Role |
+|------|--------------|------|------|
 {% for host in groups['all'] %}
-| {{ host }} | {{ hostvars[host].node_ip }} | {{ hostvars[host].node_role }} |
+| {{ host }} | {{ hostvars[host].node_ip }} | {{ hostvars[host].node_host }} | {{ hostvars[host].node_role }} |
 {% endfor %}
 
 ## Apps
