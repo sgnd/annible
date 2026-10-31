@@ -32,6 +32,14 @@
     label: "{{ item.dest }}"
   when: tls | default('letsencrypt') == 'custom'
 
+- name: Copy the ACME server's CA certificate
+  ansible.builtin.copy:
+    src: "{{ acme_ca_cert }}"
+    dest: "{{ traefik_dir }}/certs/acme-ca.pem"
+    mode: "0600"
+  when: acme_ca_cert is defined
+  notify: Restart traefik
+
 - name: Remove custom certificate config
   ansible.builtin.file:
     path: "{{ traefik_dir }}/dynamic/tls.yml"
@@ -53,7 +61,9 @@
 
 # A fixed salt gives the same hash every run, so nothing changes on rerun.
 - name: Hash dashboard password
-  ansible.builtin.command: openssl passwd -apr1 -salt {{ traefik_password_salt }} {{ traefik_password }}
+  ansible.builtin.command:
+    cmd: openssl passwd -apr1 -salt {{ traefik_password_salt }} -stdin
+    stdin: "{{ traefik_password }}"  # not on the command line
   register: traefik_password_hash
   changed_when: false
   no_log: true

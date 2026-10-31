@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # Checks that every version pinned in versions.yml still exists:
 #   - each Docker image digest, with an amd64 and an arm64 build
-#   - each Docker apt package, for Ubuntu 24.04 (noble) on amd64 and arm64
+#   - each Docker apt package, for Ubuntu 24.04 (noble) and 26.04 (resolute), on amd64 and arm64
 # Needs: yq, docker (buildx), curl.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-ubuntu=noble
 failed=0
 
 echo "== Docker images"
@@ -24,7 +23,9 @@ for name in $(yq '.images | keys | .[]' versions.yml); do
 done
 
 echo "== Docker apt packages"
-for arch in amd64 arm64; do
+for target in noble/amd64 noble/arm64 resolute/amd64 resolute/arm64; do
+  ubuntu=${target%/*}
+  arch=${target#*/}
   # One line per package: "name version"
   available=$(curl -fsSL "https://download.docker.com/linux/ubuntu/dists/$ubuntu/stable/binary-$arch/Packages" \
     | awk '/^Package: /{p=$2} /^Version: /{print p, $2}')
@@ -33,11 +34,11 @@ for arch in amd64 arm64; do
     version=${spec#*=}
     version=${version%\*}
     if ! grep -q "^$name $version" <<< "$available"; then
-      echo "MISSING $name $version for $arch"
+      echo "MISSING $name $version for $ubuntu $arch"
       failed=1
     fi
   done
-  echo "ok $arch"
+  echo "ok $ubuntu $arch"
 done
 
 exit $failed

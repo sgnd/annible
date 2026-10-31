@@ -10,19 +10,21 @@ description: Add a new app to the Annible catalog (a new role, catalog entry and
 - **Open source only.** The license must be OSI-approved. If it is not (for example BSL or SSPL), stop and tell the user.
 - **Pinned version.** Tag + multi-arch digest (amd64 and arm64). Never `latest`.
 - **Works offline.** Images come from `versions.yml`, so the bundle and the local registry pick them up. Don't download anything else at install time.
-- **Stateful apps** (databases, storage, queues) use `runs_on: node` and Docker Compose.
+- **Apps with data** (databases, caches, storage, queues, monitoring) use `runs_on: node` and Docker Compose.
+  A swarm app that must keep data is pinned to the first manager (see `roles/portainer/`).
 - **Keep it simple.** A beginner must be able to read every file. Simple English in comments.
 - Each category has two choices at most. The popular one comes first.
 
 ## Steps
 
-1. **catalog.yml**: add the app in deploy order (apps it `requires` come before it):
+1. **catalog.yml**: add the app next to the other app of its category. (The installer deploys
+   all server apps first, then all swarm apps, so a swarm app can use a server app's database.)
 
    ```yaml
    myapp:
      category: cache
      runs_on: node            # or swarm
-     requires: [traefik]      # optional
+     requires: [traefik]      # needed if it has a web page; can also name a category, e.g. database
      license: MIT
      info: "<ip>:1234 (password state/secrets/myapp)"
    ```
@@ -48,14 +50,20 @@ description: Add a new app to the Annible catalog (a new role, catalog entry and
    - `README.md`: add a row to the Apps table.
    - `THIRD_PARTY.md`: add name, license and source link.
    - `config.example.yml`: mention it as a comment next to the other app in its category.
+   - `tests/check.py`: add a check that logs in to it for real.
 
 ## Check
 
+No servers needed. The first line makes `.venv/` with Ansible:
+
 ```bash
-ANNIBLE_CONFIG=config.example.yml .venv/bin/python inventory.py --list > /dev/null
-.venv/bin/ansible-playbook site.yml --syntax-check
-.venv/bin/ansible-lint --profile production
-scripts/validate-versions.sh      # needs yq and docker
+./install.sh config.example.yml --syntax-check
+.venv/bin/pip install ansible-lint
+.venv/bin/python tests/test_config.py
+ANNIBLE_CONFIG=config.example.yml PATH="$PWD/.venv/bin:$PATH" ansible-lint --profile production
+shellcheck install.sh build-bundle.sh scripts/*.sh
+scripts/validate-versions.sh               # needs yq, docker and curl
 ```
 
 Then test on a fresh VM: run `./install.sh` two times. The second run must show `changed=0`.
+Then run `.venv/bin/python tests/check.py` where you ran `./install.sh`: every check must PASS.

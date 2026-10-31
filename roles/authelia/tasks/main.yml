@@ -39,13 +39,32 @@
     path: "{{ authelia_dir }}/config/users.yml"
   register: authelia_users
 
-- name: Hash admin password
+# Authelia makes the admin password and its hash itself, so the password is never on a command line.
+- name: Make admin password
   ansible.builtin.command: >-
     docker run --rm {{ registry_addr }}/authelia:{{ images.authelia.tag }}
-    authelia crypto hash generate argon2 --password {{ authelia_admin_password }}
+    authelia crypto hash generate argon2 --random --random.length 24 --random.charset alphanumeric
   register: authelia_hash
   when: not authelia_users.stat.exists
   changed_when: false
+  no_log: true
+
+- name: Create the secrets folder
+  ansible.builtin.file:
+    path: "{{ secrets_dir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+
+- name: Save admin password to state/secrets/authelia_admin
+  ansible.builtin.copy:
+    dest: "{{ secrets_dir }}/authelia_admin"
+    content: "{{ authelia_hash.stdout_lines[0] | regex_replace('^Random Password: ', '') }}\n"
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  when: not authelia_users.stat.exists
   no_log: true
 
 - name: Write users file with the admin user
@@ -56,7 +75,7 @@
         admin:
           displayname: Admin
           email: admin@{{ domain }}
-          password: "{{ authelia_hash.stdout | regex_replace('^Digest: ', '') }}"
+          password: "{{ authelia_hash.stdout_lines[1] | regex_replace('^Digest: ', '') }}"
     mode: "0600"
   when: not authelia_users.stat.exists
   no_log: true

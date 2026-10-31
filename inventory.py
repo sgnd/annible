@@ -15,12 +15,14 @@ import yaml
 HERE = os.path.dirname(os.path.abspath(__file__))
 GROUPS = {"manager": "managers", "worker": "workers", "standalone": "standalone"}
 CONFIG_KEYS = {
-    "domain", "acme_email", "tls", "tls_cert", "tls_key", "timezone", "arch",
+    "domain", "acme_email", "acme_server", "acme_ca_cert", "tls", "tls_cert", "tls_key", "timezone", "arch",
     "ssh", "admin_allow_from", "nodes", "apps",
 }
 # Node names become hostnames, and must not clash with "swarm" or group names.
 NODE_NAME = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
 RESERVED_NAMES = {"swarm", "all", "managers", "workers", "standalone"}
+SSH_KEYS = {"user", "key", "port", "allow_from"}
+NODE_KEYS = {"name", "ip", "role", "labels"}
 
 
 def fail(msg):
@@ -45,10 +47,26 @@ def load_bundle():
     return load_yaml(path) if os.path.exists(path) else {}
 
 
+def check_ip_list(name, value):
+    """A list of IPs or ranges, like [203.0.113.0/24, 198.51.100.7]. Empty is fine."""
+    if value is None:
+        return
+    if not isinstance(value, list):
+        fail(f"{name} must be a list, like [203.0.113.0/24]")
+    for item in value:
+        try:
+            ipaddress.ip_network(str(item), strict=False)
+        except ValueError:
+            fail(f"{name}: {item} is not an IP or range")
+
+
 def check_settings(cfg, bundle):
     unknown = set(cfg) - CONFIG_KEYS
     if unknown:
         fail(f"unknown setting {', '.join(sorted(unknown))} (typo?)")
+    unknown = set(cfg.get("ssh") or {}) - SSH_KEYS
+    if unknown:
+        fail(f"unknown setting ssh.{', ssh.'.join(sorted(unknown))} (typo?)")
     if not cfg.get("domain"):
         fail("domain is required")
     tls = cfg.get("tls", "letsencrypt")
@@ -58,8 +76,15 @@ def check_settings(cfg, bundle):
         fail("acme_email is required for tls: letsencrypt")
     if tls == "custom" and not (cfg.get("tls_cert") and cfg.get("tls_key")):
         fail("tls: custom needs tls_cert and tls_key")
-    if bundle and tls == "letsencrypt":
-        fail("offline install: Let's Encrypt needs internet, use tls: selfsigned or custom")
+    if bundle and tls == "letsencrypt" and not cfg.get("acme_server"):
+        fail("offline install: Let's Encrypt needs internet. Use tls: selfsigned or custom, "
+             "or set acme_server to an ACME server in your network")
+    if cfg.get("acme_ca_cert") and not cfg.get("acme_server"):
+        fail("acme_ca_cert is only used with acme_server")
+    if cfg.get("arch", "amd64") not in ("amd64", "arm64"):
+        fail("arch must be amd64 or arm64")
+    check_ip_list("ssh.allow_from", (cfg.get("ssh") or {}).get("allow_from"))
+    check_ip_list("admin_allow_from", cfg.get("admin_allow_from"))
     if bundle and cfg.get("arch", "amd64") != bundle["arch"]:
         fail(f"the bundle is for {bundle['arch']}, but config.yml arch is {cfg.get('arch', 'amd64')}")
 
@@ -72,12 +97,17 @@ def build_nodes(nodes):
     hostvars = {}
     for node in nodes:
         name, ip, role = node.get("name"), node.get("ip"), node.get("role")
+        unknown = set(node) - NODE_KEYS
+        if unknown:
+            fail(f"node {name}: unknown setting {', '.join(sorted(unknown))} (typo?)")
         if not name or not ip:
             fail(f"every node needs name and ip: {node}")
         if not NODE_NAME.match(str(name)) or name in RESERVED_NAMES:
             fail(f"node name {name}: use lowercase letters, numbers and -, not {', '.join(sorted(RESERVED_NAMES))}")
         if role not in GROUPS:
             fail(f"{name}: role must be one of {', '.join(GROUPS)}")
+        if node.get("labels") and role == "standalone":
+            fail(f"{name}: labels only work on swarm nodes (manager or worker)")
         if name in hostvars:
             fail(f"duplicate node name {name}")
         try:
@@ -129,7 +159,9 @@ def build_apps(apps, catalog, hostvars):
     for name in apps:
         for dep in catalog[name].get("requires", []):
             if dep not in apps and dep not in categories:
-                fail(f"{name} needs {dep}, add it to apps")
+                choices = [app for app, info in catalog.items() if info["category"] == dep]
+                what = f"a {dep} ({' or '.join(choices)})" if choices else dep
+                fail(f"{name} needs {what}, add it to apps")
 
     ordered = {name: apps[name] for name in catalog if name in apps}
     for name, target in ordered.items():
@@ -150,7 +182,7 @@ def build(cfg, base_dir):
 
     ssh = cfg.get("ssh") or {}
     all_vars = {k: v for k, v in cfg.items() if k not in ("nodes", "apps")}
-    for key in ("tls_cert", "tls_key"):
+    for key in ("tls_cert", "tls_key", "acme_ca_cert"):
         if key in cfg:
             all_vars[key] = from_config_dir(cfg[key])
     all_vars.update(load_yaml(os.path.join(HERE, "versions.yml")))

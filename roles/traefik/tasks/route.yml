@@ -2,7 +2,8 @@
 # Used by app roles. Does nothing if traefik is not installed. Input:
 #   traefik_route_name:       app name, also the subdomain
 #   traefik_route_port:       port of the app on this server
-#   traefik_route_middleware: admin-ip (default) or admin (adds the dashboard password)
+#   traefik_route_middleware: admin-ip (default), admin (adds the dashboard password),
+#                             or authelia@file (Authelia login; this replaces the admin-ip limit)
 
 - name: Create Traefik route folder
   ansible.builtin.file:

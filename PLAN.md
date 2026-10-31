@@ -18,6 +18,7 @@
 
 - Simple and easy to read. A beginner should be able to change it.
 - Simple English.
-- Open-source apps only. Two choices per category, the popular one first.
+- Open-source apps only. At most two choices per category, the popular one first.
 - Pin every version. No `latest`.
-- Swarm apps are stateless. Apps with data run on one server with Docker Compose.
+- Databases, caches, storage, queues and monitoring run on one server with Docker Compose.
+  Swarm apps that keep data (Traefik, Portainer, Swarmpit, Authelia) are pinned to the first manager.

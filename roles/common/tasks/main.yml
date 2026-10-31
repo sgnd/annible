@@ -23,17 +23,19 @@
   community.general.timezone:
     name: "{{ timezone | default('UTC') }}"
 
+# In a container (for example Proxmox LXC) the host keeps the time,
+# and chrony does not start there (Ubuntu 26.04 skips it on purpose).
 - name: Enable chrony
   ansible.builtin.service:
     name: chrony
-    state: started
+    state: "{{ omit if ansible_virtualization_type in ['lxc', 'container', 'docker', 'podman', 'systemd-nspawn', 'openvz'] else 'started' }}"
     enabled: true
 
 - name: Apply sysctl settings
   ansible.posix.sysctl:
     name: "{{ item.key }}"
     value: "{{ item.value }}"
-    sysctl_file: /etc/sysctl.d/90-swarm.conf
+    sysctl_file: /etc/sysctl.d/90-annible.conf
     reload: true
   loop: "{{ common_sysctl | dict2items }}"
 
@@ -45,7 +47,7 @@
 
 - name: Limit journald disk usage
   ansible.builtin.copy:
-    dest: /etc/systemd/journald.conf.d/90-swarm.conf
+    dest: /etc/systemd/journald.conf.d/90-annible.conf
     content: |
       [Journal]
       SystemMaxUse={{ common_journald_max_use }}

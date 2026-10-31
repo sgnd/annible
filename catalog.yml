@@ -1,4 +1,5 @@
-# Available apps, in deploy order.
+# Available apps. The installer first deploys all server apps (runs_on: node),
+# then all swarm apps, each group in the order below.
 #   category: only one app per category can be installed
 #   runs_on:  swarm (swarm service) | node (docker compose on one server)
 #   requires: apps or categories that must also be installed (optional),
@@ -18,7 +19,7 @@ kong:
   runs_on: swarm
   requires: [postgres, traefik]
   license: Apache-2.0
-  info: "APIs at https://kong.<domain>, Kong Manager https://kong-manager.<domain> (Traefik dashboard password)"
+  info: "APIs at https://kong.<domain>, Kong Manager https://kong-manager.<domain> (user admin, password state/secrets/traefik_admin)"
 
 portainer:
   category: management
@@ -76,34 +77,36 @@ rustfs:
   category: storage
   runs_on: node
   license: Apache-2.0
-  info: "S3 http://<ip>:9000, console https://rustfs.<domain>/rustfs/console/ (keys state/secrets/rustfs_access_key, rustfs_secret_key)"
+  info: "S3 http://<ip>:9000 (keys state/secrets/rustfs_access_key, rustfs_secret_key), console https://rustfs.<domain>/rustfs/console/ (needs traefik)"
 
 garage:
   category: storage
   runs_on: node
   license: AGPL-3.0
-  info: "S3 http://<ip>:3900, region garage (keys state/secrets/garage_access_key with GK prefix, garage_secret_key)"
+  info: "S3 http://<ip>:3900, region garage (access key = GK + state/secrets/garage_access_key, secret key = state/secrets/garage_secret_key)"
 
 rabbitmq:
   category: queue
   runs_on: node
   license: MPL-2.0
-  info: "amqp://<ip>:5672, UI https://rabbitmq.<domain> (user admin, password state/secrets/rabbitmq)"
+  info: "amqp://<ip>:5672 (user admin, password state/secrets/rabbitmq), UI https://rabbitmq.<domain> (needs traefik)"
 
 nats:
   category: queue
   runs_on: node
   license: Apache-2.0
-  info: "nats://<ip>:4222 (user admin, password state/secrets/nats), monitoring https://nats.<domain>"
+  info: "nats://<ip>:4222 (user admin, password state/secrets/nats). Monitoring https://nats.<domain> (needs traefik; Traefik dashboard login)"
 
 uptimekuma:
   category: monitoring
   runs_on: node
+  requires: [traefik]
   license: MIT
   info: "https://uptimekuma.<domain> (create the admin user on first visit)"
 
 beszel:
   category: monitoring
   runs_on: node
+  requires: [traefik]
   license: MIT
   info: "https://beszel.<domain> (user admin@<domain>, password state/secrets/beszel_admin). Agents run on every server"

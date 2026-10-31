@@ -24,6 +24,7 @@ providers:
   swarm:
     exposedByDefault: false
     network: public
+    refreshSeconds: 5   # how often Traefik looks for new swarm apps (default 15)
   file:
     directory: /etc/traefik/dynamic
     watch: true
@@ -34,6 +35,12 @@ certificatesResolvers:
     acme:
       email: {{ acme_email }}
       storage: /etc/traefik/acme/acme.json
+{% if acme_server is defined %}
+      caServer: {{ acme_server }}
+{% endif %}
+{% if acme_ca_cert is defined %}
+      caCertificates: [/etc/traefik/certs/acme-ca.pem]
+{% endif %}
       httpChallenge:
         entryPoint: web
 

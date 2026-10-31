@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Check that inventory.py accepts config.example.yml and refuses common mistakes.
+
+Run it from the project folder (CI runs it too):
+
+    .venv/bin/python tests/test_config.py
+
+Each case changes config.example.yml a little and checks the error message.
+No servers are needed.
+"""
+
+import copy
+import os
+import subprocess
+import sys
+import tempfile
+
+import yaml
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE = yaml.safe_load(open(os.path.join(HERE, "config.example.yml")))
+
+# (what we test, how we change the config, text the error must contain)
+CASES = [
+    ("missing domain", lambda c: c.pop("domain"), "domain is required"),
+    ("letsencrypt without acme_email", lambda c: c.pop("acme_email"), "acme_email is required"),
+    ("custom TLS without cert", lambda c: c.update(tls="custom"), "needs tls_cert and tls_key"),
+    ("unknown tls value", lambda c: c.update(tls="tls13"), "tls must be"),
+    ("typo in a setting", lambda c: c.update(timzone="x"), "unknown setting timzone"),
+    ("typo inside ssh", lambda c: c["ssh"].update(alow_from=[]), "unknown setting ssh.alow_from"),
+    ("typo inside a node", lambda c: c["nodes"][0].update(rol="manager"), "unknown setting rol"),
+    ("bad node name", lambda c: c["nodes"][0].update(name="Swarm_1"), "node name Swarm_1"),
+    ("reserved node name", lambda c: c["nodes"][0].update(name="swarm"), "node name swarm"),
+    ("duplicate ip", lambda c: c["nodes"][1].update(ip="10.0.0.11"), "duplicate ip"),
+    ("IPv6 address", lambda c: c["nodes"][1].update(ip="fd00::1"), "must be an IPv4 address"),
+    ("even number of managers", lambda c: c["nodes"][1].update(role="manager"), "odd number of managers"),
+    ("no manager", lambda c: c["nodes"][0].update(role="worker"), "at least one manager"),
+    ("unknown role", lambda c: c["nodes"][0].update(role="boss"), "role must be one of"),
+    ("unknown app", lambda c: c["apps"].update(mysql="data1"), "unknown app mysql"),
+    ("server app on swarm", lambda c: c["apps"].update(postgres="swarm"), "postgres runs on one server"),
+    ("swarm app on a server", lambda c: c["apps"].update(traefik="data1"), "traefik runs as a swarm service"),
+    ("app on unknown node", lambda c: c["apps"].update(postgres="nowhere"), "got nowhere"),
+    ("two apps in one category", lambda c: c["apps"].update(mariadb="data1"), "both database"),
+    ("kong without postgres",
+     lambda c: (c["apps"].update(kong="swarm", mariadb="data1"), c["apps"].pop("postgres")), "kong needs postgres"),
+    ("portainer without traefik", lambda c: c["apps"].pop("traefik"), "portainer needs traefik"),
+    ("authelia without cache",
+     lambda c: (c["apps"].update(authelia="swarm"), c["apps"].pop("redis")), "needs a cache (redis or valkey)"),
+    ("long app form", lambda c: c["apps"].update(postgres={"on": "data1"}), "write it as"),
+    ("allow_from as text, not a list", lambda c: c["ssh"].update(allow_from="203.0.113.0/24"), "must be a list"),
+    ("allow_from with a bad IP", lambda c: c["ssh"].update(allow_from=["300.1.1.1"]), "not an IP or range"),
+    ("admin_allow_from as text", lambda c: c.update(admin_allow_from="203.0.113.0/24"), "must be a list"),
+    ("unknown arch", lambda c: c.update(arch="x86_64"), "arch must be amd64 or arm64"),
+    ("labels on a standalone node", lambda c: c["nodes"][2].update(labels={"a": "b"}), "labels only work on swarm nodes"),
+    ("acme_ca_cert without acme_server", lambda c: c.update(acme_ca_cert="ca.pem"), "only used with acme_server"),
+]
+
+
+def run(cfg):
+    """Write cfg to a file, run inventory.py on it. Returns (exit code, error text)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "config.yml")
+        with open(path, "w") as f:
+            yaml.safe_dump(cfg, f)
+        p = subprocess.run([sys.executable, os.path.join(HERE, "inventory.py"), "--list"],
+                           capture_output=True, text=True, cwd=HERE, env={**os.environ, "ANNIBLE_CONFIG": path})
+    return p.returncode, p.stderr.strip()
+
+
+failed = 0
+code, err = run(BASE)
+print(f"{'PASS' if code == 0 else 'FAIL'}  config.example.yml is accepted" + (f"  ({err})" if code else ""))
+failed += code != 0
+
+for name, change, expected in CASES:
+    cfg = copy.deepcopy(BASE)
+    change(cfg)
+    code, err = run(cfg)
+    ok = code != 0 and expected in err
+    failed += not ok
+    print(f"{'PASS' if ok else 'FAIL'}  {name} is refused" + ("" if ok else f"  (got: {err or 'accepted'})"))
+
+print(f"\n{len(CASES) + 1 - failed} passed, {failed} failed")
+sys.exit(1 if failed else 0)

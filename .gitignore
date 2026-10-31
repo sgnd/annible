@@ -10,3 +10,4 @@ config.*.yml
 .venv/
 .collections/
 *.retry
+__pycache__/

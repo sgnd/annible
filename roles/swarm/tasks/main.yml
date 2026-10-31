@@ -59,7 +59,7 @@
   delegate_to: "{{ swarm_leader }}"
   changed_when: false
 
-# Labels only get added. Remove old ones by hand: docker node update --label-rm <key> <node>
+# Labels only get added. Remove old ones by hand, on a manager: sudo docker node update --label-rm <key> <node>
 - name: Add node labels from config.yml
   ansible.builtin.command: >-
     docker node update

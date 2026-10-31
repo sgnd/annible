@@ -27,8 +27,8 @@ jobs:
           python3 -m venv .venv
           .venv/bin/pip install -r requirements.txt ansible-lint
           .venv/bin/ansible-galaxy collection install -r requirements.yml
-      - name: Check config.example.yml
-        run: .venv/bin/python inventory.py --list > /dev/null
+      - name: Check config.example.yml and common config mistakes
+        run: .venv/bin/python tests/test_config.py
       - name: Check playbook syntax
         run: .venv/bin/ansible-playbook site.yml --syntax-check
       - name: Lint

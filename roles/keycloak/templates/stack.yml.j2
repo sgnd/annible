@@ -16,6 +16,13 @@ services:
       # Only used the first time, to create the admin user.
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: {{ keycloak_admin_password }}
+    # Ready = Keycloak answers on /health/ready (port 9000). The image has no curl, so bash does the request.
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
     networks:
       - public
     deploy:

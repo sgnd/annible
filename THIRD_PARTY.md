@@ -1,12 +1,20 @@
 # Third-party software
 
-This project is MIT licensed. It does not include other software in the repository,
-but it downloads and runs the software below. Each one keeps its own license.
+This project is MIT licensed. The repository has no other software in it, but the installer
+downloads and runs the software below. Each one keeps its own license.
+
+The offline bundle (`build-bundle.sh`) contains copies of this software: Docker images,
+Ubuntu and Docker apt packages, and Python packages. If you share a bundle, you share them too.
+Their source code is at the links below and at https://launchpad.net/ubuntu (apt packages).
 
 | Software | License | Source |
 |----------|---------|--------|
 | Docker Engine | Apache-2.0 | https://github.com/moby/moby |
-| Ansible | GPL-3.0 | https://github.com/ansible/ansible |
+| containerd | Apache-2.0 | https://github.com/containerd/containerd |
+| Docker Buildx and Compose plugins | Apache-2.0 | https://github.com/docker/buildx, https://github.com/docker/compose |
+| Ansible (ansible-core) | GPL-3.0 | https://github.com/ansible/ansible |
+| Python packages for Ansible (cffi, cryptography, Jinja2, MarkupSafe, packaging, pycparser, PyYAML, resolvelib) | MIT, BSD, Apache-2.0 | https://pypi.org (versions in `requirements.txt`) |
+| Ansible collections: ansible.posix, community.general, community.library_inventory_filtering_v1 | GPL-3.0 | https://github.com/ansible-collections |
 | Docker Registry (distribution) | Apache-2.0 | https://github.com/distribution/distribution |
 | Traefik | MIT | https://github.com/traefik/traefik |
 | Portainer CE | zlib | https://github.com/portainer/portainer |

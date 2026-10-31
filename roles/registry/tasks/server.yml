@@ -7,12 +7,17 @@
     mode: "0700"
   loop: [ca, certs, data]
 
+# Full certificate fields: newer tools (for example Python 3.13+) reject certificates without them.
 - name: Write certificate extensions
   ansible.builtin.copy:
     dest: "{{ registry_dir }}/ca/san.cnf"
     content: |
       subjectAltName = IP:{{ node_ip }}, DNS:{{ inventory_hostname }}
+      basicConstraints = critical, CA:FALSE
+      keyUsage = critical, digitalSignature
       extendedKeyUsage = serverAuth
+      subjectKeyIdentifier = hash
+      authorityKeyIdentifier = keyid
     mode: "0600"
 
 - name: Create registry CA
@@ -20,6 +25,8 @@
     cmd: >-
       openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes
       -days {{ registry_cert_days }} -subj /CN=annible-registry-ca
+      -addext "basicConstraints = critical, CA:TRUE"
+      -addext "keyUsage = critical, keyCertSign, cRLSign"
       -keyout ca.key -out ca.crt
     chdir: "{{ registry_dir }}/ca"
     creates: "{{ registry_dir }}/ca/ca.crt"

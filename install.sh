@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 # Usage: ./install.sh [config.yml] [extra ansible-playbook options]
+#   ./install.sh                     uses config.yml
+#   ./install.sh prod.yml -v         another config file, plus an ansible-playbook option
 #
 # If a bundle/ folder is here (made by build-bundle.sh), it installs offline:
 # Ansible, packages and images all come from the bundle.
 set -euo pipefail
 
-config="${1:-config.yml}"
-[ "$#" -gt 0 ] && shift
+# The first argument is the config file, unless it is an option like -v.
+config=config.yml
+if [ "$#" -gt 0 ] && [ "${1#-}" = "$1" ]; then
+  config="$1"
+  shift
+fi
 if [ ! -f "$config" ]; then
   echo "error: $config not found (cp config.example.yml config.yml)" >&2
   exit 1
@@ -16,8 +22,30 @@ ANNIBLE_CONFIG="$(cd "$(dirname "$config")" && pwd)/$(basename "$config")"
 export ANNIBLE_CONFIG
 
 cd "$(dirname "$0")"
+
+# Ansible needs Python 3.12 or newer.
+if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 12))' 2>/dev/null; then
+  echo "error: Python 3.12 or newer is needed, found: $(python3 --version 2>&1)" >&2
+  echo "  On a Mac: brew install python@3.12 (or newer), then run ./install.sh again." >&2
+  exit 1
+fi
+
 offline=false
 [ -f bundle/info.yml ] && offline=true
+
+# Offline: this machine must match the bundle (its packages are for one Ubuntu version and CPU).
+if $offline; then
+  bundle_ubuntu=$(sed -n 's/^ubuntu: "\(.*\)"/\1/p' bundle/info.yml)
+  bundle_arch=$(sed -n 's/^arch: //p' bundle/info.yml)
+  here_ubuntu=$(sed -n 's/^VERSION_ID="\(.*\)"/\1/p' /etc/os-release 2>/dev/null || true)
+  here_arch=$(dpkg --print-architecture 2>/dev/null || true)
+  if [ "$here_ubuntu" != "$bundle_ubuntu" ] || [ "$here_arch" != "$bundle_arch" ]; then
+    echo "error: this bundle is for Ubuntu $bundle_ubuntu $bundle_arch, this machine is ${here_ubuntu:-not Ubuntu} ${here_arch}." >&2
+    echo "  Run the offline install on the first manager, or build a matching bundle:" >&2
+    echo "  ./build-bundle.sh <amd64|arm64> <ubuntu version>" >&2
+    exit 1
+  fi
+fi
 
 # Install python3-venv with apt, from the internet or from the bundle.
 install_venv_package() {

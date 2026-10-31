@@ -24,14 +24,16 @@ Some apps have two images with the same version (for example `portainer` and `po
 
 ## Big upgrades: warn the user
 
-- **Major database versions** (Postgres 18 to 19, MariaDB 11 to 12) need a manual dump and restore. Don't bump these without asking.
+- **Major Postgres versions** (18 to 19) need a manual dump and restore. Don't bump these without asking.
+  MariaDB upgrades its data files by itself (`MARIADB_AUTO_UPGRADE=1`), but still take a backup first.
 - Read the release notes for breaking changes in config or data.
 - Check the license did not change to a non-open-source one.
 
 ## Docker apt packages
 
 `docker_packages` uses `name=version*`. Find versions at
-`https://download.docker.com/linux/ubuntu/dists/noble/stable/binary-amd64/Packages`.
+`https://download.docker.com/linux/ubuntu/dists/<noble|resolute>/stable/binary-<amd64|arm64>/Packages`.
+The same version must exist for Ubuntu 24.04 (noble) and 26.04 (resolute).
 Keep `docker-ce` and `docker-ce-cli` on the same version.
 
 ## Check
@@ -40,5 +42,5 @@ Keep `docker-ce` and `docker-ce-cli` on the same version.
 scripts/validate-versions.sh      # needs yq, docker and curl
 ```
 
-It checks every image has amd64 and arm64, and every apt package exists.
-Then run `./install.sh` on a test VM. Offline users need a new bundle (`./build-bundle.sh <arch>`).
+It checks every image has amd64 and arm64, and every apt package exists for both Ubuntu versions.
+Then run `./install.sh` on a test VM. Offline users need a new bundle (`./build-bundle.sh <amd64|arm64> <24.04|26.04>`).

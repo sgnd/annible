@@ -2,7 +2,6 @@ authelia_dir: "{{ apps_dir }}/authelia"
 authelia_host: "authelia.{{ domain }}"
 
 # Generated once and saved in state/secrets/ on the installer machine.
-authelia_admin_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/authelia_admin', chars=['ascii_letters', 'digits'], length=24) }}"
 authelia_db_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/authelia_db', chars=['ascii_letters', 'digits'], length=24) }}"
 authelia_jwt_secret: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/authelia_jwt_secret', chars=['ascii_letters', 'digits'], length=64) }}"
 authelia_session_secret: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/authelia_session_secret', chars=['ascii_letters', 'digits'], length=64) }}"
