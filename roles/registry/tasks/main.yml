@@ -55,21 +55,12 @@
   until: registry_check.status == 200
   no_log: true
 
-- name: Check if Docker is logged in to the registry
-  ansible.builtin.command: grep -qF '"{{ item }}"' /root/.docker/config.json
-  loop: "{{ registry_names }}"
-  register: registry_login_check
-  failed_when: false
-  changed_when: false
-
 # The login is saved in /root/.docker/config.json (root only). The password goes in through stdin.
+# Logging in again is safe and quick, so it runs every time (and does not count as a change).
 - name: Log Docker in to the registry
   ansible.builtin.command:
-    cmd: docker login --username {{ registry_user }} --password-stdin {{ item.item }}
+    cmd: docker login --username {{ registry_user }} --password-stdin {{ item }}
     stdin: "{{ registry_password }}"
-  loop: "{{ registry_login_check.results }}"
-  loop_control:
-    label: "{{ item.item }}"
-  when: item.rc != 0
-  changed_when: true
+  loop: "{{ registry_names }}"
+  changed_when: false
   no_log: true

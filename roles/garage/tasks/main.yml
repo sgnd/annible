@@ -60,28 +60,38 @@
 
 # A new Garage server stores nothing until it gets a place in the layout.
 # Each server is its own zone, so the 3 copies of a file go to 3 different servers.
-- name: Add new servers to the Garage layout
-  ansible.builtin.shell:
-    cmd: |
-      set -eo pipefail
-      layout=$(docker exec garage /garage layout show)
-      added=0
-      {% for host in app_nodes.garage %}
-      id={{ hostvars[host].garage_node_id.stdout.split('@')[0] }}
-      if ! grep -q "${id:0:16}" <<< "$layout"; then
-        docker exec garage /garage layout assign -z {{ host }} -c {{ garage_capacity }} "$id"
-        added=1
-      fi
-      {% endfor %}
-      if [ "$added" = 1 ]; then
-        version=$(sed -n 's/.*Current cluster layout version: \([0-9]*\).*/\1/p' <<< "$layout")
-        docker exec garage /garage layout apply --version $(( ${version:-0} + 1 ))
-        echo added
-      fi
-    executable: /bin/bash
+# The admin API gives the layout as JSON: its version, and the servers that have a place.
+- name: Get Garage layout
+  ansible.builtin.uri:
+    url: http://127.0.0.1:3903/v2/GetClusterLayout
+    headers:
+      Authorization: "Bearer {{ garage_admin_token }}"
   register: garage_layout
   when: garage_first
-  changed_when: "'added' in garage_layout.stdout"
+  no_log: true
+
+- name: Add new servers to the Garage layout
+  ansible.builtin.command: docker exec garage /garage layout assign -z {{ item }} -c {{ garage_capacity }} {{ garage_id }}
+  vars:
+    garage_id: "{{ hostvars[item].garage_node_id.stdout.split('@')[0] }}"
+  loop: "{{ app_nodes.garage }}"
+  when: garage_first and garage_id not in garage_layout.json.roles | map(attribute='id')
+  register: garage_assign
+  changed_when: true
+
+# The new places count only after the next layout version is applied.
+- name: Apply the new Garage layout
+  ansible.builtin.uri:
+    url: http://127.0.0.1:3903/v2/ApplyClusterLayout
+    method: POST
+    headers:
+      Authorization: "Bearer {{ garage_admin_token }}"
+    body_format: json
+    body:
+      version: "{{ garage_layout.json.version + 1 }}"
+  when: garage_first and garage_assign is changed
+  changed_when: true
+  no_log: true
 
 # The key goes in through Garage's admin API, so the secret is never on a command line.
 - name: Get Garage keys
