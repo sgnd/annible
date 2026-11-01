@@ -9,13 +9,13 @@
     state: directory
     mode: "0700"
 
-# The app in the container runs as user 999 (one server), Spilo sets its own owner (Patroni).
+# PostgreSQL in the container runs as user 999 (one server) or 101, group 103 (Spilo, with Patroni).
 - name: Create PostgreSQL data folder
   ansible.builtin.file:
     path: "{{ postgres_dir }}/data"
     state: directory
-    owner: "{{ omit if postgres_patroni else '999' }}"
-    group: "{{ omit if postgres_patroni else '999' }}"
+    owner: "{{ '101' if postgres_patroni else '999' }}"
+    group: "{{ '103' if postgres_patroni else '999' }}"
     mode: "0700"
 
 - name: Write PostgreSQL passwords
