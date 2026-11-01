@@ -20,7 +20,7 @@ This command installs it: `docker run --privileged --rm tonistiigi/binfmt --inst
 ./build-bundle.sh arm64 26.04    # ARM servers, Ubuntu 26.04
 ```
 
-This makes `dist/ansibro-<ubuntu>-<arch>.tar.gz` (about 2.5 GB). It holds this project, apt packages,
+This makes `dist/ansibro-<ubuntu>-<arch>.tar.gz` (about 4 GB). It holds this project, apt packages,
 Ansible and all Docker images from `versions.yml`. Your project folder is not changed.
 
 **2. Copy it to the first manager**, together with your SSH private key and, if you use them,
