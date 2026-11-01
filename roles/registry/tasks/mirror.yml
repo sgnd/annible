@@ -33,8 +33,12 @@
       docker tag {{ image.repo }}:{{ image.tag }} {{ dst }}
       docker push -q {{ dst }}
       {% else %}
-      docker buildx imagetools create {{ registry_platforms | map('regex_replace', '^', '--platform linux/') | join(' ') }} \
-        --tag {{ dst }} {{ src }}
+      platforms="{{ registry_platforms | map('regex_replace', '^', '--platform linux/') | join(' ') }}"
+      {% if src_mirror %}
+      # Docker Hub allows few downloads without a login; Google's copy of it (same digest) has no limit.
+      docker buildx imagetools create $platforms --tag {{ dst }} {{ src_mirror }} 2>/dev/null ||
+      {% endif %}
+      docker buildx imagetools create $platforms --tag {{ dst }} {{ src }}
       {% endif %}
     executable: /bin/bash
   vars:
@@ -45,6 +49,9 @@
     src: >-
       {{ image.repo ~ '@' ~ image.digest if item.item.1 == registry_manager_addrs[0]
       else registry_manager_addrs[0] ~ '/' ~ item.item.0 ~ ':' ~ image.tag }}
+    src_mirror: >-
+      {{ image.repo | regex_replace('^docker\\.io/', 'mirror.gcr.io/') ~ '@' ~ image.digest
+      if src.startswith('docker.io/') else '' }}
     # Online, the image must also be there for every CPU type (a new arm64 server, for example).
     have: "{{ (item.json | default({})).manifests | default([]) | selectattr('platform', 'defined') | map(attribute='platform.architecture') }}"
   loop: "{{ registry_mirror_check.results }}"

@@ -77,6 +77,9 @@ New
   (for example after a snapshot restore on a new IP).
 
 Fixes
+- Docker Hub allows few downloads without a login (429 Too Many Requests). Images are now copied
+  from Google's copy of Docker Hub (mirror.gcr.io, same pinned digest) when they can be, each image
+  is downloaded once (the other managers copy it from the first), and Docker and k3s use the mirror too.
 - With `wireguard: true` and the installer on one of the servers, the install could hang on new
   servers when the firewall or Docker started. The firewall now always lets SSH replies from the
   other servers in.

@@ -1,5 +1,11 @@
 # Pods pull images from the cluster's own registry (registry.ansibro:5000) with this login.
 # Made by ansibro, do not change it here.
+{% if not offline %}
+# Docker Hub allows few downloads without a login; try Google's copy of it first.
+mirrors:
+  docker.io:
+    endpoint: ["https://mirror.gcr.io"]
+{% endif %}
 configs:
   "{{ registry_addr }}":
     auth:
