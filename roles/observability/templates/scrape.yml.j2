@@ -47,7 +47,7 @@ scrape_configs:
         labels: { node: {{ host }} }
 {% endfor %}
 {% endif %}
-{% if 'traefik' in apps %}
+{% if 'traefik' in apps and orchestrator == 'swarm' %}
 
   # Traefik: requests, backends that are down, and when the certificates end.
   - job_name: traefik

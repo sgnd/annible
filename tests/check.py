@@ -98,7 +98,7 @@ def https(sub, path="/", **kwargs):
 
 def client(image, *args, env=()):
     """Run a tool from an app image (for example psql) on the first manager. env goes in through stdin."""
-    cmd = ["sudo", "docker", "run", "--rm", "--network", "host", "--env-file", "/dev/stdin",
+    cmd = ["sudo", "docker", "run", "--rm", "--quiet", "--network", "host", "--env-file", "/dev/stdin",
            f"{REGISTRY}/{image}:{IMAGES[image]['tag']}", *args]
     return on_leader(cmd, stdin="\n".join(env) + "\n")
 
@@ -217,10 +217,17 @@ def check_k3s():
 
 def check_backup():
     """Every server has a backup in the repository, and the nightly timer is on."""
-    code, out = on_leader(["sudo", "ansibro-backup", "snapshots", "--json"])
-    hosts = {s["hostname"] for s in json.loads(out)} if code == 0 else set()
-    for node in HOSTS:
-        check(f"backup of {node} in the repository", node in hosts, out[-200:] if code else "no backup")
+    # A folder repository (/mnt/...) is on each server; S3 and rest-server hold all of them.
+    folder = str(CFG["backup"]["repository"]).startswith("/")
+    for node in HOSTS if folder else [LEADER]:
+        cmd = ["sudo", "ansibro-backup", "snapshots", "--json"]
+        if node != LEADER:
+            cmd = ["ssh", "-i", CFG["ansible_ssh_private_key_file"], "-p", str(CFG["ansible_port"]), "-o", "BatchMode=yes",
+                   "-o", "StrictHostKeyChecking=accept-new", f"{CFG['ansible_user']}@{HOSTS[node]['node_host']}", *cmd]
+        code, out = on_leader(cmd)
+        hosts = {s["hostname"] for s in json.loads(out)} if code == 0 else set()
+        for host in [node] if folder else HOSTS:
+            check(f"backup of {host} in the repository", host in hosts, out[-200:] if code else "no backup")
     code, out = on_leader(["systemctl", "is-active", "ansibro-backup.timer"])
     check("nightly backup timer is on", out == "active", out)
 

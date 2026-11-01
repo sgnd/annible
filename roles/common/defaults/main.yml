@@ -46,7 +46,7 @@ common_app_ports:
 common_cluster_tcp_ports: >-
   {{ (([registry_port] if inventory_hostname in groups['managers'] else [])
   + (common_swarm_tcp_ports if orchestrator == 'swarm' else common_k3s_tcp_ports)
-  + ([8082] if monitoring_app and 'traefik' in apps and inventory_hostname in traefik_nodes else [])
+  + ([8082] if monitoring_app and 'traefik' in apps and orchestrator == 'swarm' and inventory_hostname in traefik_nodes else [])
   + ([9100, 9280, 9598, 9187, 9104, 9121] if monitoring_app else [])
   + ([9400] if monitoring_app and node_gpu else [])
   + ([45876] if 'beszel' in apps else [])
