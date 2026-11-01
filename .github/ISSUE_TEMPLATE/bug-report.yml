@@ -1,0 +1,67 @@
+name: Bug report
+description: install.sh, a bundle or an app did not work
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: The command you ran, and the error. Paste the last lines of the output.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Ansibro version
+      description: The release, or the commit (`git rev-parse --short HEAD`)
+      placeholder: v1.0.1
+    validations:
+      required: true
+  - type: dropdown
+    id: ubuntu
+    attributes:
+      label: Ubuntu version on the servers
+      options:
+        - "24.04"
+        - "26.04"
+    validations:
+      required: true
+  - type: dropdown
+    id: arch
+    attributes:
+      label: CPU type
+      options:
+        - amd64
+        - arm64
+    validations:
+      required: true
+  - type: dropdown
+    id: cluster
+    attributes:
+      label: Cluster
+      options:
+        - Docker Swarm
+        - k3s
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: How did you install?
+      options:
+        - Online
+        - Offline (bundle)
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Your config.yml (remove passwords, keys and IP addresses)
+      render: yaml
+  - type: textarea
+    id: check
+    attributes:
+      label: Check output (if you ran it)
+      description: The FAIL lines from `.venv/bin/python tests/check.py`
+      render: text

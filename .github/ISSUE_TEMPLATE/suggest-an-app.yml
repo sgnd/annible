@@ -1,0 +1,37 @@
+name: Suggest an app
+description: Suggest an app for the catalog
+labels: [enhancement]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: App and image
+      description: The app's name and its container image
+      placeholder: Valkey, docker.io/valkey/valkey
+    validations:
+      required: true
+  - type: input
+    id: category
+    attributes:
+      label: Category
+      description: Like database, cache, queue, storage, monitoring or gateway
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: What do you use it for?
+    validations:
+      required: true
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Does it fit the catalog?
+      description: See [CONTRIBUTING.md](https://github.com/sgnd/ansibro/blob/main/CONTRIBUTING.md).
+      options:
+        - label: It is open source, with an OSI-approved license (not BSL or SSPL)
+          required: true
+        - label: It has an image for both amd64 and arm64
+          required: true
+        - label: It works offline (everything it needs is in its image)
+          required: true

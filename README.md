@@ -446,32 +446,8 @@ It prints PASS or FAIL for each check. The checks run on the first manager
 Rules: keep it simple, a beginner must be able to read every file. Use simple English.
 Only open-source apps, every version pinned.
 
-**Add an app:**
-
-1. Add it to [`catalog.yml`](catalog.yml) with its license and how to reach it.
-2. Add its image to [`versions.yml`](versions.yml): tag and multi-arch digest
-   (`docker buildx imagetools inspect <image>:<tag>`).
-3. Copy a similar role: `roles/postgres/` for a server app, `roles/portainer/` for a swarm app.
-   Do not use `ports:` in server apps. Published ports skip the firewall. Use `network_mode: host`.
-4. Add it to the Apps table above, to [`THIRD_PARTY.md`](THIRD_PARTY.md), to
-   [`config.example.yml`](config.example.yml), and a check to [`tests/check.py`](tests/check.py).
-5. Test on a fresh VM: run `./install.sh` two times (the second run must report `changed=0`),
-   then `.venv/bin/python tests/check.py`.
-
-**AI agents.** [`.claude/skills/`](.claude/skills) has skills for Claude Code and other agents
-that read `SKILL.md`: set up `config.yml`, install, add an app, and update versions.
-
-**Checks** (also run in CI, see [`validate.yml`](.github/workflows/validate.yml)).
-No servers needed. The first line makes `.venv/` with Ansible:
-
-```bash
-./install.sh config.example.yml --syntax-check
-.venv/bin/pip install ansible-lint==26.10.1
-.venv/bin/python tests/test_config.py      # config.example.yml works, mistakes are refused
-ANSIBRO_CONFIG=config.example.yml PATH="$PWD/.venv/bin:$PATH" ansible-lint --profile production
-shellcheck install.sh build-bundle.sh scripts/*.sh
-scripts/validate-versions.sh               # needs yq, docker and curl
-```
+How to suggest or add an app, run the checks and send a pull request: see [CONTRIBUTING.md](CONTRIBUTING.md).
+This project follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
