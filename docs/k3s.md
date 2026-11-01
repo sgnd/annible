@@ -2,7 +2,7 @@
 
 Ansibro sets up Docker Swarm by default. It can set up k3s (a small Kubernetes) instead.
 
-`orchestrator: swarm` (the default) or `orchestrator: k3s` in `config.yml`. Everything around the
+To choose, set `orchestrator: swarm` (the default) or `orchestrator: k3s` in `config.yml`. Everything around the
 cluster is the same: firewall, WireGuard, registry, server apps (databases, storage, monitoring...),
 backup, monitoring and alerts, offline bundle.
 

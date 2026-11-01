@@ -26,7 +26,7 @@ What the installer does, step by step, and things good to know.
 | 80, 443 | anyone, on swarm servers |
 | the ports a server needs: swarm, registry, its apps, monitoring agents | other servers in `config.yml` (from their `ip`) |
 | UDP 51820 | other servers' `host`, with `wireguard: true` |
-| everything | containers on the same server (`docker0`, `docker_gwbridge`) |
+| everything | containers on the same server (Docker's own internal networks) |
 | your own ports | `firewall_allow` in `config.yml` (for example a VPN) |
 
 Everything else is blocked. Server apps use the host network, so the firewall controls them.
@@ -68,3 +68,21 @@ is open to everyone: the firewall cannot block it (that is how Docker works). Us
 - **On cloud servers** the installer tells cloud-init to keep the hostname after a reboot, because
   swarm apps are placed by hostname.
 - **Let's Encrypt** needs port 80 reachable from the internet. Without internet use `tls: selfsigned`.
+
+## Files in this repo
+
+| File or folder | What it is |
+|----------------|------------|
+| `install.sh` | The installer you run. It installs Ansible in `.venv/` and runs `site.yml`. |
+| `config.example.yml` | The example config. Copy it to `config.yml`. |
+| `inventory.py` | Reads and checks `config.yml`, and tells Ansible about your servers. |
+| `site.yml` | The list of steps (the Ansible playbook). |
+| `roles/` | One folder per step or app, with its tasks and files. |
+| `catalog.yml` | All apps: category, where they run, license, how to reach them. |
+| `versions.yml` | Every pinned version: images, packages, k3s. |
+| `group_vars/`, `templates/`, `ansible.cfg` | Settings shared by all steps, the summary template, Ansible's settings. |
+| `requirements.txt`, `requirements.yml` | The Python packages (Ansible) and Ansible add-ons the installer downloads. |
+| `build-bundle.sh` | Builds an offline bundle. |
+| `scripts/` | Small helpers: open and close `state/`, check versions, scan images. |
+| `tests/` | `check.py` checks a real install; `test_config.py` checks `config.yml` mistakes. |
+| `.claude/skills/` | Help for AI agents (set up, install, add an app, update versions). |

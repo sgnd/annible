@@ -61,7 +61,7 @@ cp config.example.yml config.yml   # edit: servers, ssh key, domain, apps
 ```
 
 Point DNS for `*.<domain>` to the public IP of the first manager **before** you run it, so
-Let's Encrypt can check the domain. Did you set DNS later? Then log in to the first manager
+Let's Encrypt can check the domain. Did you set DNS later? With Docker Swarm, log in to the first manager
 (`ssh <user>@<its IP>`) and run `sudo docker service update --force traefik_traefik`.
 It asks Let's Encrypt for the certificates again.
 
@@ -73,7 +73,7 @@ Run `./install.sh` again any time. It changes what is different in `config.yml`
 > **Back up the `state/` folder.** It holds all generated passwords. If you lose it,
 > the next run makes new passwords that do not match your running databases.
 > Always run the installer from the same machine, or copy `state/` with it.
-> See [Keep `state/` safe](docs/how-to.md).
+> See [Keep `state/` safe](docs/how-to.md#keep-state-safe-and-encrypted).
 
 ## A small example
 
@@ -109,7 +109,7 @@ Click a name to open its official website.
 | queue | [rabbitmq](https://www.rabbitmq.com) / [nats](https://nats.io) | server | 5672 / 4222 | `rabbitmq.<domain>` / `nats.<domain>` |
 | monitoring | [uptimekuma](https://uptime.kuma.pet) / [beszel](https://beszel.dev) | server | | `uptimekuma.<domain>` / `beszel.<domain>` |
 | secrets | [openbao](https://openbao.org) | server | 8200 | `openbao.<domain>` |
-| observability (metrics, logs, alerts) | [prometheus](https://prometheus.io) (+ Loki) / [victoria](https://victoriametrics.com) (VictoriaMetrics + VictoriaLogs), both with Alertmanager and Grafana | server | | `grafana.<domain>`, `alertmanager.<domain>`, `metrics.<domain>` (+ `logs.<domain>` for victoria) |
+| observability (metrics, logs, alerts) | [prometheus](https://prometheus.io) / [victoria](https://victoriametrics.com) | server | | `grafana.<domain>` and more, see [How to](docs/how-to.md#monitoring-and-alerts) |
 
 Logins, what each app needs, and notes: [docs/apps.md](docs/apps.md).
 
@@ -129,11 +129,8 @@ Logins, what each app needs, and notes: [docs/apps.md](docs/apps.md).
 
 ## Contributing
 
-Rules: keep it simple, a beginner must be able to read every file. Use simple English.
-Only open-source apps, every version pinned.
-
-How to suggest or add an app, run the checks and send a pull request: see [CONTRIBUTING.md](CONTRIBUTING.md).
-This project follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+Ideas, bug reports and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
+Plans for later: [docs/roadmap.md](docs/roadmap.md).
 
 ## License
 

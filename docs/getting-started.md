@@ -125,19 +125,16 @@ Want to be sure everything works? Run the checks in [Check and fix](troubleshoot
 ## 6. Open your apps
 
 Open `https://portainer.example.com` in your browser. Portainer shows your containers and lets you
-start your own apps. The passwords are in `state/summary.md`. (If you set up encryption for `state/`,
-run `scripts/state.sh open` first, and `scripts/state.sh close` when you are done.)
+start your own apps. The passwords are in `state/summary.md`.
 
 You are done. Next:
 
 - **Keep the `state/` folder safe.** It holds every password. Without it, the next run makes new
-  passwords that do not match your database. Copy it somewhere safe, or keep it encrypted:
-  install [age](https://age-encryption.org) (`brew install age`, or `sudo apt install age`), then run
-  `mkdir -p ~/.config/ansibro && age-keygen -o ~/.config/ansibro/age.key` once, and keep a copy of that key file
-  (for example in a password manager). From the next run, `state/` is kept encrypted.
+  passwords that do not match your database. Copy it somewhere safe, and
+  [keep it encrypted](how-to.md#keep-state-safe-and-encrypted).
 - **Run `./install.sh` again** whenever you change `config.yml`, for example to add an app or a server.
   It only changes what is different.
-- **Add backups and alerts**: see "Back up and restore" and "Monitoring and alerts" in [How to](how-to.md).
+- **Add [backups](how-to.md#back-up-and-restore) and [alerts](how-to.md#monitoring-and-alerts).**
 
 ## Words
 
@@ -184,4 +181,14 @@ You are done. Next:
 | **Docker Compose** | A way to start containers from a file. Ansibro uses it for server apps. |
 | **YAML** | The format of `config.yml`: `name: value` lines, with spaces at the start to show what belongs together. Use spaces, not tabs. |
 | **VPC** | A private network for your servers at a cloud provider. |
+| **S3** | A common way to store files over the network. RustFS and Garage speak it, like Amazon S3. |
+| **restic** | The backup tool Ansibro uses. Backups are encrypted. |
+| **webhook** | A web address that an app calls to send a message, for example into a Slack channel. |
+| **heartbeat** | A "still alive" message sent again and again. When it stops, something is broken. |
+| **agent**, **exporter** | Small programs on each server that collect numbers (CPU, disk, ...) for monitoring. |
+| **primary**, **replica** | The main copy of a database, and read-only copies that follow it. |
+| **middleware** | A step Traefik runs before a web page, for example a login. |
+| **apt** | Ubuntu's tool to install packages. |
+| **PyPI**, **Ansible Galaxy** | The websites the installer downloads Ansible and its add-ons from. |
+| **kubectl**, **Ingress** | The command to control Kubernetes (k3s), and its way to send web traffic to an app. |
 | **Ansible**, **playbook** | Ansible is the tool Ansibro uses to set up the servers. A playbook is its list of steps. You do not need to learn it. |
