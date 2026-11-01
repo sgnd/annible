@@ -14,17 +14,22 @@
     update_cache: true
   when: gpu_smi.rc != 0
 
-# The newest server (headless) driver that Ubuntu has for this GPU, and nvidia-smi.
+# The newest server (headless) driver that Ubuntu has for this GPU, and nvidia-smi. The "open"
+# kernel modules first: NVIDIA's choice for newer GPUs, and some versions only come that way.
 - name: Install the NVIDIA driver
   ansible.builtin.shell:
     cmd: |
       set -eo pipefail
-      driver=$(ubuntu-drivers list --gpgpu 2>/dev/null | grep -o 'nvidia-driver-[0-9]*-server' | sort -V | tail -1)
+      drivers=$(ubuntu-drivers list --gpgpu 2>/dev/null | grep -oE 'nvidia-driver-[0-9]+-server(-open)?' || true)
+      driver=$(grep -- '-open$' <<< "$drivers" | sort -V | tail -1)
+      [ -n "$driver" ] || driver=$(sort -V <<< "$drivers" | tail -1)
       if [ -z "$driver" ]; then echo "Ubuntu has no NVIDIA driver for this server's GPU" >&2; exit 1; fi
-      version=${driver#nvidia-driver-}
-      version=${version%-server}
-      ubuntu-drivers install --gpgpu "nvidia:${version}-server"
+      flavor=${driver#nvidia-driver-}              # for example 615-server-open
+      version=${flavor%%-*}                         # 615
+      ubuntu-drivers install --gpgpu "nvidia:${flavor}"
       DEBIAN_FRONTEND=noninteractive apt-get install -y -q "nvidia-utils-${version}-server"
+      # Stop here if the kernel part did not come (it would only show after the restart).
+      dpkg -l | grep -q "linux-modules-nvidia-${version}-server" || { echo "the NVIDIA kernel modules were not installed" >&2; exit 1; }
     executable: /bin/bash
   when: gpu_smi.rc != 0
   changed_when: true

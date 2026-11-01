@@ -170,8 +170,8 @@ print(s.recv(4096).decode().strip())
 def check_swarm():
     _, out = on_leader(["sudo", "docker", "service", "ls", "--format", "{{.Name}} {{.Replicas}}"])
     for line in out.splitlines():
-        name, replicas = line.split()[:2]
-        running, wanted = replicas.split("/")
+        name, replicas = (line.split() + ["?"])[:2]
+        running, _, wanted = replicas.partition("/")
         check(f"swarm service {name} running ({replicas})", running == wanted)
     _, out = on_leader(["sudo", "docker", "node", "ls", "--format", "{{.Hostname}} {{.Status}}"])
     for node in inv["managers"]["hosts"] + inv["workers"]["hosts"]:
