@@ -5,21 +5,18 @@
 Annible is now called Ansibro: the repo is github.com/sgnd/ansibro, app files are in
 `/opt/ansibro`, and the commands are `ansibro-backup` and `ansibro-metrics`.
 
+Tested on DigitalOcean (Ubuntu 24.04, amd64), with `tests/check.py` passing and a second run with no changes:
+- Docker Swarm, 3 managers + worker + 3 data servers: the registry and Traefik on every manager
+  (also with the first manager turned off), tier labels, PostgreSQL replica, Garage on 3 servers,
+  OpenBao, Authelia login on admin pages, the per-port firewall, `state.age`, victoria monitoring
+  with webhook alerts, backup to a folder, removing an app and a server.
+- k3s, 3 servers + agent + data server, over WireGuard: Traefik routes to server apps, the registry,
+  PostgreSQL, Valkey, OpenBao, victoria monitoring, backup with the etcd snapshot.
+- The release workflow builds all four bundles.
+
 Not tested yet (test before the next release):
-- The rename to Ansibro on real servers (only the local checks ran).
-- `prometheus` (Prometheus + Loki). `victoria` was tested on 3 arm64 servers: all checks, alerts
-  by email and webhook, a second run with no changes.
-- Mixed amd64 + arm64 clusters and the registry copy for both CPU types.
-- Telegram alerts, RabbitMQ metrics, and a restore of a cluster with monitoring.
-- HA: the registry on every manager, Traefik on every manager, tier labels.
-- PostgreSQL replicas and Garage on 3 servers.
-- Zero trust: the per-port firewall between servers, the Authelia login for admin pages,
-  `state.age` encryption (only tried on a Mac), the image scan in CI.
-- OpenBao.
-- Removing apps and servers.
-- The release workflow (bundles built by GitHub Actions on each tag).
-- GPU servers (needs a server with an NVIDIA GPU).
-- k3s.
+- Mixed amd64 + arm64 clusters (DigitalOcean has no arm64 servers), GPU servers, Telegram alerts,
+  a restore of a cluster with monitoring, offline installs with k3s, uploading bundles to a release.
 
 New
 - k3s: `orchestrator: k3s` makes a k3s (Kubernetes) cluster instead of Docker Swarm: managers are
