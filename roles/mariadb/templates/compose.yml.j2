@@ -16,7 +16,13 @@ services:
       - ./galera.cnf:/etc/mysql/conf.d/galera.cnf:ro
 {% endif %}
     healthcheck:
+{% if mariadb_galera %}
+      # Galera copies the data folder from another server, without the image's own health check
+      # login. So log in as root (the same on every server) and ask if this server is in sync.
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MARIADB_ROOT_PASSWORD\" mariadb -uroot -N -e \"SHOW STATUS LIKE 'wsrep_ready'\" | grep -q ON"]
+{% else %}
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+{% endif %}
       interval: 10s
       timeout: 5s
       retries: 5
