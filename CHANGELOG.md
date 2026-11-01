@@ -73,6 +73,9 @@ New
 - The install stops with a clear message if a server's swarm address differs from its `ip` in `config.yml`
   (for example after a snapshot restore on a new IP).
 
+Updates
+- Traefik v3.7.17.
+
 Fixes
 - Docker Hub allows few downloads without a login (429 Too Many Requests). Images are now copied
   from Google's copy of Docker Hub (mirror.gcr.io, same pinned digest) when they can be, each image

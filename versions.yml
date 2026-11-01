@@ -31,8 +31,8 @@ images:
     digest: sha256:d4032d4cc323c1731c707931ecada07a53076eac38e3b61ae57533f170f2c6c3
   traefik:
     repo: docker.io/library/traefik
-    tag: v3.7.16
-    digest: sha256:1336e85aaed293bd63d005086e0dd013b04078b26aaeb1c18b26a2f928af7e65
+    tag: v3.7.17
+    digest: sha256:30ff62491aacdb862ceb8c9edcf2627da638d7deafdd4b6dab32fe34f8aa3e90
   portainer:
     repo: docker.io/portainer/portainer-ce
     tag: 2.45.3
