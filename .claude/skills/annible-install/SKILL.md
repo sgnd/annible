@@ -61,6 +61,8 @@ The installer sees the `bundle/` folder and uses it instead of the internet.
 | Server app not starting | `sudo docker ps`, `sudo docker logs <app>` on that server. |
 | `toomanyrequests` | Docker Hub limit. Wait, or run `sudo docker login` on the first manager. |
 | `cannot reach ... over WireGuard` | Open UDP 51820 between the servers' `host` addresses in the cloud firewall (security group). Check each `host`. `sudo wg show` on a server shows the last handshake. |
+| Backup fails | `sudo annible-backup` on the server shows the error. Check `backup.repository` and the S3 keys. |
+| `restore=true is only for new, empty servers` | A restore replaces the swarm and data, so it only runs on new servers. |
 | `is in the swarm with address ...` | A swarm server cannot change its address. Put the old address back as `ip`. If the server's real address changed, set it as `host`. |
 
 Read the failed Ansible task name first. It usually says what went wrong.

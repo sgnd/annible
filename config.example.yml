@@ -39,6 +39,20 @@ firewall_allow: []
 # Open UDP port 51820 between the servers in your cloud firewall (security group).
 wireguard: false
 
+# Optional: back up every server each night with restic (encrypted). Use storage outside this cluster.
+# repository: s3:https://<s3 server>/<bucket> (AWS S3, Wasabi, another cluster's RustFS or Garage, ...),
+#   rest:https://user:pass@<host>/ (restic rest-server), or a folder that is mounted on every server.
+# The restic password is made for you in state/secrets/restic. Without it the backups cannot be
+# read: keep a copy of state/ outside the cluster. Restore on new servers: ./install.sh -e restore=true
+# backup:
+#   repository: s3:https://s3.example.com/annible-backup
+#   s3_access_key: AKIA...
+#   s3_secret_key: ...
+#   time: "02:00"          # every night at this time (in quotes)
+#   keep_daily: 7          # how many backups to keep
+#   keep_weekly: 4
+#   keep_monthly: 6
+
 # Your servers.
 #   name: lowercase letters, numbers and -
 #   ip:   the private IPv4 the servers use to talk to each other (the swarm uses it).

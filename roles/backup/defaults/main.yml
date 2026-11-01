@@ -1,0 +1,7 @@
+backup_dir: "{{ apps_dir }}/backup"
+# The restic password. Without it the backups cannot be read: keep state/ safe, outside the cluster.
+backup_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/restic', chars=['ascii_letters', 'digits'], length=40) }}"
+backup_time: "{{ backup.time | default('02:00') }}"
+backup_keep_daily: "{{ backup.keep_daily | default(7) }}"
+backup_keep_weekly: "{{ backup.keep_weekly | default(4) }}"
+backup_keep_monthly: "{{ backup.keep_monthly | default(6) }}"

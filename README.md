@@ -242,9 +242,35 @@ A new Docker version is installed one server at a time, so the swarm keeps runni
 Commands on the servers need `sudo`: the installer does not add users to the `docker` group,
 and the passwords and data in `/opt/annible/` are readable by root only.
 
-**Back up.** Copy `state/` (passwords) from the installer machine, and on each server
-`sudo tar -czf <app>.tgz -C /opt/annible <app>`.
-For databases, use `pg_dump` / `mariadb-dump` while they run.
+**Back up and restore.** Add `backup:` to `config.yml` (see [`config.example.yml`](config.example.yml))
+and run `./install.sh`. Every server then backs up each night with [restic](https://restic.net)
+(encrypted), and the install runs the first backup right away. What is saved:
+
+- databases (PostgreSQL, MariaDB) as a dump, while they run
+- every other folder in `/opt/annible/`: the app is paused for a moment while its files are copied
+- RustFS and Garage data as it is, while it runs
+- on the first manager: the swarm (your stacks, secrets, configs, networks), `config.yml` and `state/`
+
+Not saved: the image registry (the installer fills it again; push your own images again from CI)
+and Docker volumes. Keep your own stacks' files in `/opt/annible/<stack name>/` so they are saved too:
+their containers are paused while copied, like the apps above.
+
+```bash
+sudo annible-backup              # back up now
+sudo annible-backup snapshots    # list the backups
+```
+
+To move the cluster to new servers, or after you lost it: make new servers, keep the same node names
+and `ip` values (with `wireguard: true` only `host` changes), keep `state/`, and run:
+
+```bash
+./install.sh -e restore=true
+```
+
+Each server gets its newest backup back, the swarm comes back with your stacks, and the databases are
+loaded from their dumps. Old servers are removed from the swarm. A restore only runs on new servers.
+If you lost `state/` too, get it from the backup with the restic password (`state/secrets/restic`):
+`restic -r <repository> restore latest --host <first manager> --include /opt/annible/backup/stage/installer --target .`
 
 **Remove an app.** Remove it from `config.yml`, then:
 

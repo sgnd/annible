@@ -6,6 +6,7 @@ common_packages:
   - ufw
   - jq
   - wireguard-tools  # for wireguard: true (small, so always installed)
+  - restic           # for backup:
 
 common_sysctl:
   net.ipv4.ip_forward: 1

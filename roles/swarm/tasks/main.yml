@@ -118,3 +118,20 @@
   run_once: true
   delegate_to: "{{ swarm_leader }}"
   changed_when: true
+
+# After a restore, the swarm still lists the old servers (they are gone). Remove them.
+- name: List swarm nodes
+  ansible.builtin.command: docker node ls -q
+  register: swarm_all_nodes
+  run_once: true
+  delegate_to: "{{ swarm_leader }}"
+  changed_when: false
+  when: restore | bool
+
+- name: Remove old servers from the swarm (after a restore)
+  ansible.builtin.shell: docker node demote {{ item }} >/dev/null 2>&1; docker node rm --force {{ item }}
+  loop: "{{ swarm_all_nodes.stdout_lines | difference(ansible_play_hosts | map('extract', hostvars, ['swarm_node_id', 'stdout']) | list) }}"
+  run_once: true
+  delegate_to: "{{ swarm_leader }}"
+  changed_when: true
+  when: restore | bool

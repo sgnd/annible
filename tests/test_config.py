@@ -69,6 +69,12 @@ CASES = [
     ("host that is not an IP", lambda c: c["nodes"][0].update(host="swarm1.example.com"), "host must be an IPv4 address"),
     ("duplicate host",
      lambda c: (c["nodes"][0].update(host="203.0.113.5"), c["nodes"][1].update(host="203.0.113.5")), "duplicate host"),
+    ("backup as text", lambda c: c.update(backup="s3://bucket"), "backup must look like"),
+    ("backup without repository", lambda c: c.update(backup={"time": "02:00"}), "backup.repository is required"),
+    ("backup typo", lambda c: c.update(backup={"repository": "/mnt/b", "keep_days": 7}), "unknown setting backup.keep_days"),
+    ("s3 backup without keys", lambda c: c.update(backup={"repository": "s3:https://s3.example.com/b"}), "needs s3_access_key"),
+    ("backup time without quotes", lambda c: c.update(backup={"repository": "/mnt/b", "time": 120}), "must look like"),
+    ("backup keep as text", lambda c: c.update(backup={"repository": "/mnt/b", "keep_daily": "7"}), "must be a number"),
     ("wireguard with host same as ip",
      lambda c: (c.update(wireguard=True), [n.update(host=n["ip"]) for n in c["nodes"]]), "must differ from host"),
 ]
@@ -85,6 +91,9 @@ def with_wireguard(c):
 GOOD = [
     ("host on one node", lambda c: c["nodes"][0].update(host="203.0.113.5")),
     ("wireguard with host on every node", with_wireguard),
+    ("backup to S3", lambda c: c.update(backup={"repository": "s3:https://s3.example.com/b", "s3_access_key": "a",
+                                                 "s3_secret_key": "b", "time": "03:30", "keep_daily": 14})),
+    ("backup to a folder", lambda c: c.update(backup={"repository": "/mnt/backup"})),
 ]
 
 

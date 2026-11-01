@@ -1,0 +1,25 @@
+# Where the backups go, and the password. Used by backup (main.yml) and restore (restore.yml).
+
+- name: Create backup folder
+  ansible.builtin.file:
+    path: "{{ backup_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Write restic password
+  ansible.builtin.copy:
+    dest: "{{ backup_dir }}/password"
+    content: "{{ backup_password }}"
+    mode: "0600"
+  no_log: true
+
+- name: Write restic settings
+  ansible.builtin.copy:
+    dest: "{{ backup_dir }}/restic.env"
+    content: |
+      RESTIC_REPOSITORY='{{ backup.repository }}'
+      RESTIC_PASSWORD_FILE='{{ backup_dir }}/password'
+      AWS_ACCESS_KEY_ID='{{ backup.s3_access_key | default('') }}'
+      AWS_SECRET_ACCESS_KEY='{{ backup.s3_secret_key | default('') }}'
+    mode: "0600"
+  no_log: true

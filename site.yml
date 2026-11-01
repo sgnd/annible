@@ -60,6 +60,22 @@
           on a manager: sudo docker node {{ 'promote' if node_role == 'manager' else 'demote' }} {{ inventory_hostname }}
       when: inventory_hostname in groups['swarm'] and swarm_now.stdout is match('active')
 
+    # A restore is for new servers. On a running cluster it would replace the swarm and the data.
+    - name: Check a restore goes to new servers
+      ansible.builtin.assert:
+        that: swarm_now.stdout is not match('active')
+        fail_msg: >-
+          restore=true is only for new, empty servers, but {{ inventory_hostname }} is already in a swarm.
+          To go back to a backup, install new servers and restore there.
+      when: restore | bool and inventory_hostname in groups['swarm']
+
+    - name: Check a restore has a backup to read
+      ansible.builtin.assert:
+        that: backup is defined
+        fail_msg: "restore=true needs the backup settings (backup: in config.yml) that the old cluster used."
+      when: restore | bool
+      run_once: true
+
     # A swarm cannot change a node's address. This happens after a snapshot restore or a move
     # to a new server, or when ip in config.yml was changed.
     - name: Check each server's swarm address matches ip in config.yml
@@ -86,6 +102,16 @@
   hosts: all
   roles:
     - registry
+
+# Only with ./install.sh -e restore=true: put the newest backup back before the swarm and apps start.
+- name: Restore from backup
+  hosts: all
+  tasks:
+    - name: Put the newest backup back
+      ansible.builtin.include_role:
+        name: backup
+        tasks_from: restore
+      when: restore | bool
 
 - name: Swarm
   hosts: swarm
@@ -121,6 +147,14 @@
       loop: "{{ swarm_apps }}"
       loop_control:
         loop_var: app
+
+- name: Backup
+  hosts: all
+  tasks:
+    - name: Set up the nightly backup
+      ansible.builtin.include_role:
+        name: backup
+      when: backup is defined
 
 - name: Summary
   hosts: managers[0]

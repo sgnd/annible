@@ -39,3 +39,9 @@
     tasks_from: compose
   vars:
     docker_compose_app: postgres
+
+# Restore (./install.sh -e restore=true): load the dump from the backup into the new, empty database.
+- name: Load PostgreSQL backup
+  ansible.builtin.shell: docker exec -i postgres psql -U postgres -q -f - < {{ apps_dir }}/backup/stage/dumps/postgres.sql
+  when: restore | bool
+  changed_when: true

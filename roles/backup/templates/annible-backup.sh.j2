@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Back up this server ({{ inventory_hostname }}) with restic. Made by annible, do not change it here.
+# Runs every night at {{ backup_time }} (annible-backup.timer).
+#
+#   sudo annible-backup              back up now
+#   sudo annible-backup snapshots    list the backups of all servers (add --json for a program)
+#
+# What it saves:
+#   - databases (PostgreSQL, MariaDB) as a dump, while they run
+#   - every other app folder in {{ apps_dir }}: the app is paused for a moment while its files are copied
+#   - big object storage (RustFS, Garage data) as it is, while it runs
+#   - first manager: the swarm (your stacks, secrets, networks), config.yml and state/
+# Not saved: the image registry (the installer fills it again; push your own images again).
+set -euo pipefail
+set -a
+. {{ backup_dir }}/restic.env
+set +a
+
+if [ "${1:-}" = "snapshots" ]; then
+  shift
+  exec restic snapshots "$@"
+fi
+
+stage={{ backup_dir }}/stage
+rm -rf "$stage"
+mkdir -p "$stage/apps" "$stage/dumps"
+
+# If the script stops in the middle, never leave an app paused.
+paused=""
+trap 'if [ -n "$paused" ]; then docker unpause $paused >/dev/null || true; fi' EXIT
+
+# Pause the containers of one app, copy its folder, unpause. $2 = a folder to leave out.
+copy_app() {
+  paused=$( (docker ps -q --filter "label=com.docker.compose.project=$1"
+             docker ps -q --filter "label=com.docker.stack.namespace=$1") | sort -u | tr '\n' ' ')
+  if [ -n "$paused" ]; then docker pause $paused >/dev/null; fi
+  mkdir -p "$stage/apps/$1"
+  find "{{ apps_dir }}/$1" -mindepth 1 -maxdepth 1 ! -name "${2:-.}" -exec cp -a {} "$stage/apps/$1/" \;
+  if [ -n "$paused" ]; then docker unpause $paused >/dev/null; fi
+  paused=""
+}
+
+# 1. Databases: a dump is consistent while the database runs.
+if docker ps -q --filter name=^postgres$ | grep -q .; then
+  docker exec postgres pg_dumpall -U postgres --clean --if-exists > "$stage/dumps/postgres.sql"
+fi
+if docker ps -q --filter name=^mariadb$ | grep -q .; then
+  docker exec mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb-dump -uroot --all-databases \
+    --single-transaction --routines --events --add-drop-database --flush-privileges' > "$stage/dumps/mariadb.sql"
+fi
+
+# 2. App folders.
+paths=("$stage")
+for dir in {{ apps_dir }}/*/; do
+  app=$(basename "$dir")
+  case "$app" in
+    backup | bundle | registry) ;;          # not saved
+    postgres | mariadb) ;;                  # saved as a dump above
+    rustfs) paths+=("$dir") ;;              # big: saved while it runs
+    garage) copy_app garage data            # settings and metadata paused, data while it runs
+            paths+=("{{ apps_dir }}/garage/data") ;;
+    *) copy_app "$app" ;;
+  esac
+done
+{% if inventory_hostname == swarm_leader %}
+
+# 3. First manager: the swarm state, and the installer files (config.yml, state/).
+cp -a /var/lib/docker/swarm "$stage/swarm"
+cp -a {{ backup_dir }}/installer "$stage/installer"
+{% endif %}
+
+# 4. Send it to the repository, then delete old backups of this server.
+restic backup --quiet --retry-lock 1h --host {{ inventory_hostname }} --tag annible "${paths[@]}"
+restic forget --quiet --retry-lock 1h --host {{ inventory_hostname }} --prune \
+  --keep-daily {{ backup_keep_daily }} --keep-weekly {{ backup_keep_weekly }} --keep-monthly {{ backup_keep_monthly }}
+
+rm -rf "$stage"
+date +%s > {{ backup_dir }}/last-success
+echo "Backup of {{ inventory_hostname }} done."

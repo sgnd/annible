@@ -184,6 +184,16 @@ def check_swarm():
                 check(f"packets of {int(mtu) + 50} bytes reach {node} (swarm MTU {mtu})", code == 0, out[-200:])
 
 
+def check_backup():
+    """Every server has a backup in the repository, and the nightly timer is on."""
+    code, out = on_leader(["sudo", "annible-backup", "snapshots", "--json"])
+    hosts = {s["hostname"] for s in json.loads(out)} if code == 0 else set()
+    for node in HOSTS:
+        check(f"backup of {node} in the repository", node in hosts, out[-200:] if code else "no backup")
+    code, out = on_leader(["systemctl", "is-active", "annible-backup.timer"])
+    check("nightly backup timer is on", out == "active", out)
+
+
 def check_wireguard():
     """Every other server has made a WireGuard handshake with the first manager in the last 3 minutes."""
     _, out = on_leader(["sudo", "wg", "show", "wg0", "latest-handshakes"])
@@ -334,6 +344,8 @@ if __name__ == "__main__":
     check_swarm()
     if CFG.get("wireguard"):
         check_wireguard()
+    if CFG.get("backup"):
+        check_backup()
     for app in APPS:
         try:
             CHECKS[app]()

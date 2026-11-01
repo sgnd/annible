@@ -57,4 +57,6 @@ If a `bundle/` folder is here, the check treats it as an offline install.
 - The `ip` of each node is its **private** IP. If the installer must SSH to another address (a public IP),
   put that in `host`. With `wireguard: true`, every node needs `host`, and `ip` is a new WireGuard address
   (for example 10.99.0.11); open UDP 51820 between the hosts in the cloud firewall.
+- Suggest `backup:` with storage outside the cluster (S3 or rest-server). The restic password is in
+  `state/secrets/restic`: keep `state/` safe outside the cluster. Restore on new servers: `./install.sh -e restore=true`.
 - Next step: run the installer (skill `annible-install`).

@@ -1,0 +1,53 @@
+# Restore: put the newest backup of this server back (./install.sh -e restore=true, on new servers).
+# Runs after Docker and the registry, before the swarm and the apps, so the apps start with their old files.
+# The databases are loaded from their dumps by their own roles (postgres, mariadb).
+
+- name: Write backup settings
+  ansible.builtin.import_tasks: settings.yml
+
+- name: Find the newest backup of this server
+  ansible.builtin.shell: set -a && . {{ backup_dir }}/restic.env && restic snapshots --json --latest 1 --host {{ inventory_hostname }}
+  register: backup_snapshots
+  changed_when: false
+
+- name: Stop if there is no backup of this server
+  ansible.builtin.assert:
+    that: backup_snapshots.stdout | from_json | length > 0
+    fail_msg: "No backup of {{ inventory_hostname }} in {{ backup.repository }}. Node names in config.yml must be the same as before."
+
+# restic puts the files back at their old paths: the stage folder, and the big storage folders.
+- name: Get the files back
+  ansible.builtin.shell: >-
+    set -a && . {{ backup_dir }}/restic.env &&
+    restic restore {{ (backup_snapshots.stdout | from_json)[0].short_id }} --target /
+  changed_when: true
+
+- name: Put the app folders back
+  ansible.builtin.command: cp -a {{ backup_dir }}/stage/apps/. {{ apps_dir }}/
+  changed_when: true
+
+# The swarm comes back on the first manager with its stacks, secrets and networks.
+# --force-new-cluster makes it a new swarm with this server as its only manager; the others join again.
+- name: Restore the swarm
+  when: inventory_hostname == swarm_leader
+  block:
+    - name: Stop Docker to put the swarm state back
+      ansible.builtin.service:
+        name: docker
+        state: stopped
+
+    - name: Put the swarm state back
+      ansible.builtin.shell: rm -rf /var/lib/docker/swarm && cp -a {{ backup_dir }}/stage/swarm /var/lib/docker/swarm
+      changed_when: true
+
+    - name: Start Docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+
+    - name: Start the swarm again on this server
+      ansible.builtin.command: >-
+        docker swarm init --force-new-cluster
+        --advertise-addr {{ node_ip }}
+        --listen-addr {{ node_ip }}:2377
+      changed_when: true

@@ -8,17 +8,17 @@
 - Server apps: postgres, mariadb, redis, valkey, rustfs, garage, rabbitmq, nats, uptimekuma, beszel
 - Offline install: `build-bundle.sh` makes one file with apt packages, Ansible and images
 - `host` per node (multi-IP servers), optional WireGuard network, swarm MTU, cloud-init hostname
+- Backup (restic, nightly) and restore of the whole cluster on new servers
 
 ## Next
 
-1. Back up and restore the whole cluster (restic): move a cluster to new servers
-2. Monitoring and alerts for every server and app
-3. HA: Traefik on all managers, a second registry, `tier=app` / `tier=data` labels
-4. Database HA (Postgres replica and failover, Garage on 3 servers, ...)
-5. Zero trust: encrypt `state/` (sops + age), SSO for admin pages, firewall per app, image scan in CI
-6. Secrets: OpenBao or Infisical
-7. Remove apps and nodes automatically (today: by hand, see README)
-8. Release bundles on GitHub (build in CI on each tag)
+1. Monitoring and alerts for every server and app
+2. HA: Traefik on all managers, a second registry, `tier=app` / `tier=data` labels
+3. Database HA (Postgres replica and failover, Garage on 3 servers, ...)
+4. Zero trust: encrypt `state/` (sops + age), SSO for admin pages, firewall per app, image scan in CI
+5. Secrets: OpenBao or Infisical
+6. Remove apps and nodes automatically (today: by hand, see README)
+7. Release bundles on GitHub (build in CI on each tag)
 
 ## Rules
 

@@ -64,6 +64,17 @@
     from_ip: "{{ item }}"
   loop: "{{ common_wireguard_hosts }}"
 
+# When the installer runs on a server, it talks to the others over SSH. The firewall lets their
+# replies in only while it remembers the connection, and it forgets when it starts or Docker starts.
+# Then the install hangs. So always let SSH replies from the other servers in.
+- name: Allow SSH replies from other cluster nodes
+  community.general.ufw:
+    rule: allow
+    proto: tcp
+    from_ip: "{{ item }}"
+    from_port: "{{ ansible_port | string }}"
+  loop: "{{ common_wireguard_hosts }}"
+
 # Containers on this server can reach apps that use the host network.
 - name: Allow traffic from local Docker networks
   community.general.ufw:

@@ -1,0 +1,98 @@
+# Nightly backup of every server with restic (backup: in config.yml).
+# The script /usr/local/bin/annible-backup says what it saves. See README "Back up and restore".
+
+- name: Write backup settings
+  ansible.builtin.import_tasks: settings.yml
+
+# The first manager also keeps a copy of config.yml and state/, so they are in the backup too.
+- name: Create folder for the installer files
+  ansible.builtin.file:
+    path: "{{ backup_dir }}/installer"
+    state: directory
+    mode: "0700"
+  when: inventory_hostname == swarm_leader
+
+- name: Copy config.yml for the backup
+  ansible.builtin.copy:
+    src: "{{ lookup('env', 'ANNIBLE_CONFIG') }}"
+    dest: "{{ backup_dir }}/installer/config.yml"
+    mode: "0600"
+  when: inventory_hostname == swarm_leader
+  diff: false  # may have keys
+
+- name: Copy state/ for the backup
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/state/"
+    dest: "{{ backup_dir }}/installer/state/"
+    mode: "0600"
+    directory_mode: "0700"
+  when: inventory_hostname == swarm_leader
+  diff: false  # has passwords
+
+- name: Check the backup repository exists
+  ansible.builtin.shell: set -a && . {{ backup_dir }}/restic.env && restic cat config
+  register: backup_repo
+  failed_when: false
+  changed_when: false
+  run_once: true
+  delegate_to: "{{ swarm_leader }}"
+
+- name: Create the backup repository
+  ansible.builtin.shell: set -a && . {{ backup_dir }}/restic.env && restic init
+  when: backup_repo.rc != 0
+  changed_when: true
+  run_once: true
+  delegate_to: "{{ swarm_leader }}"
+
+- name: Write the backup script
+  ansible.builtin.template:
+    src: annible-backup.sh.j2
+    dest: /usr/local/bin/annible-backup
+    mode: "0700"
+
+- name: Write the backup service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/annible-backup.service
+    content: |
+      [Unit]
+      Description=Annible backup
+      After=docker.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/annible-backup
+    mode: "0644"
+
+- name: Write the backup timer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/annible-backup.timer
+    content: |
+      [Unit]
+      Description=Annible backup every night
+
+      [Timer]
+      OnCalendar=*-*-* {{ backup_time }}:00
+      # If the server was off at that time, back up when it starts.
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+    mode: "0644"
+
+- name: Start the backup timer
+  ansible.builtin.systemd_service:
+    name: annible-backup.timer
+    state: started
+    enabled: true
+    daemon_reload: true
+
+# The first backup runs now, so a wrong repository or key shows up during the install.
+- name: Look for an earlier backup of this server
+  ansible.builtin.stat:
+    path: "{{ backup_dir }}/last-success"
+  register: backup_last
+
+- name: Run the first backup
+  ansible.builtin.command: /usr/local/bin/annible-backup
+  when: not backup_last.stat.exists
+  changed_when: true

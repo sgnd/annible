@@ -16,7 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GROUPS = {"manager": "managers", "worker": "workers", "standalone": "standalone"}
 CONFIG_KEYS = {
     "domain", "acme_email", "acme_server", "acme_ca_cert", "tls", "tls_cert", "tls_key", "timezone", "arch",
-    "ssh", "admin_allow_from", "firewall_allow", "wireguard", "nodes", "apps",
+    "ssh", "admin_allow_from", "firewall_allow", "wireguard", "backup", "nodes", "apps",
 }
 # Node names become hostnames, and must not clash with "swarm" or group names.
 NODE_NAME = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
@@ -24,6 +24,8 @@ RESERVED_NAMES = {"swarm", "all", "managers", "workers", "standalone", "localhos
 DOMAIN = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$")
 LABEL = re.compile(r"^[A-Za-z0-9._-]+$")
 SSH_KEYS = {"user", "key", "port", "allow_from"}
+BACKUP_KEYS = {"repository", "s3_access_key", "s3_secret_key", "time", "keep_daily", "keep_weekly", "keep_monthly"}
+TIME = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
 # Swarm's own networks use this range. Docker's default (10.0.0.0/8) often clashes with servers' IPs.
 SWARM_ADDRESS_POOL = "10.200.0.0/16"
 REGISTRY_PORT = 5000  # the local image registry on the first manager
@@ -84,6 +86,27 @@ def check_firewall_allow(rules):
             check_ip_list("firewall_allow from", [rule["from"]])
 
 
+def check_backup(backup):
+    """backup: where restic keeps the backups, and how long."""
+    if backup is None:
+        return
+    if not isinstance(backup, dict):
+        fail("backup must look like { repository: s3:https://s3.example.com/my-bucket }")
+    unknown = set(backup) - BACKUP_KEYS
+    if unknown:
+        fail(f"unknown setting backup.{', backup.'.join(sorted(unknown))} (typo?)")
+    if not backup.get("repository"):
+        fail("backup.repository is required, like s3:https://s3.example.com/my-bucket or /mnt/backup")
+    if str(backup["repository"]).startswith("s3:") and not (backup.get("s3_access_key") and backup.get("s3_secret_key")):
+        fail("backup: an s3: repository needs s3_access_key and s3_secret_key")
+    if not TIME.match(str(backup.get("time", "02:00"))):
+        fail(f"backup.time must look like \"02:00\" (in quotes), got {backup.get('time')}")
+    for key in ("keep_daily", "keep_weekly", "keep_monthly"):
+        value = backup.get(key, 1)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            fail(f"backup.{key} must be a number, got {value}")
+
+
 def check_settings(cfg, bundle):
     unknown = set(cfg) - CONFIG_KEYS
     if unknown:
@@ -112,6 +135,7 @@ def check_settings(cfg, bundle):
     check_ip_list("ssh.allow_from", (cfg.get("ssh") or {}).get("allow_from"))
     check_ip_list("admin_allow_from", cfg.get("admin_allow_from"))
     check_firewall_allow(cfg.get("firewall_allow"))
+    check_backup(cfg.get("backup"))
     if cfg.get("wireguard", False) not in (True, False):
         fail("wireguard must be true or false")
     if bundle and cfg.get("arch", "amd64") != bundle["arch"]:

@@ -40,3 +40,11 @@
     tasks_from: compose
   vars:
     docker_compose_app: mariadb
+
+# Restore (./install.sh -e restore=true): load the dump from the backup into the new, empty database.
+- name: Load MariaDB backup
+  ansible.builtin.shell: >-
+    docker exec -i mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot'
+    < {{ apps_dir }}/backup/stage/dumps/mariadb.sql
+  when: restore | bool
+  changed_when: true

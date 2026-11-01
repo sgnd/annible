@@ -3,6 +3,11 @@
 ## Unreleased
 
 New
+- `backup:` nightly backup of every server with restic (S3, rest-server or a mounted folder):
+  database dumps, app folders (paused for a moment while copied), RustFS/Garage data, and on the
+  first manager the swarm state, `config.yml` and `state/`. The install runs the first backup.
+- `./install.sh -e restore=true`: put the newest backup back on new servers. The swarm comes back
+  with your stacks, the databases are loaded from their dumps, and old servers leave the swarm.
 - `host` per node: the address the installer connects to over SSH, when it is not the node's `ip`.
   For servers with more than one IP, like a public IP for SSH and a private IP for the cluster.
 - `wireguard: true`: an encrypted WireGuard network between all servers. The swarm uses only the
@@ -12,6 +17,11 @@ New
 - On cloud servers, cloud-init keeps the hostname and `/etc/hosts` after a reboot.
 - The install stops with a clear message if a server's swarm address differs from its `ip` in `config.yml`
   (for example after a snapshot restore on a new IP).
+
+Fixes
+- With `wireguard: true` and the installer on one of the servers, the install could hang on new
+  servers when the firewall or Docker started. The firewall now always lets SSH replies from the
+  other servers in.
 
 ## 1.0.1
 
