@@ -38,7 +38,7 @@ firewall_allow: []
 # Open UDP port 51820 between the servers in your cloud firewall (security group).
 wireguard: false
 
-# The cluster: swarm (Docker Swarm, the default) or k3s (small Kubernetes). See README "Docker Swarm or k3s".
+# The cluster: swarm (Docker Swarm, the default) or k3s (small Kubernetes). See docs/k3s.md.
 # With k3s, write cluster instead of swarm for traefik, kong, portainer, keycloak and authelia.
 # swarmpit manages Docker Swarm only.
 # orchestrator: k3s

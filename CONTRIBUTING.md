@@ -3,6 +3,13 @@
 Thanks for helping. Ansibro stays small and simple on purpose:
 a beginner must be able to read every file. Use simple English.
 
+## Rules
+
+- Simple and easy to read. A beginner should be able to change it. Simple English.
+- Open-source apps only. At most two choices per category, the popular one first.
+- Pin every version. No `latest`.
+- Databases, caches, storage, queues and monitoring run on one server with Docker Compose.
+
 ## Suggest an app
 
 Open an issue with the [Suggest an app](https://github.com/sgnd/ansibro/issues/new?template=suggest-an-app.yml) form. An app fits when all of these are true:
