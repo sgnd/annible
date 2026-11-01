@@ -295,11 +295,21 @@ A new Docker version is installed one server at a time, so the swarm keeps runni
 with [Patroni](https://patroni.readthedocs.io): one server is the primary, the others are copies that
 follow it all the time. When the primary is down, another one becomes the primary by itself (in about
 30 seconds). Patroni keeps track of this in etcd, which runs on the managers. Cluster apps (kong,
-keycloak, authelia) connect through `postgres-proxy`, which always goes to the primary. Your own apps
-in the cluster: `postgres-proxy_haproxy:5432` (Swarm) or `postgres-proxy.ansibro.svc.cluster.local:5432`
+keycloak, authelia) connect through `database-proxy`, which always goes to the primary. Your own apps
+in the cluster: `database-proxy_haproxy:5432` (Swarm) or `database-proxy.ansibro.svc.cluster.local:5432`
 (k3s). See the servers: `sudo docker exec postgres patronictl list` on a database server. With 3
 managers etcd survives one down; with 1 manager, failover needs that manager. Alerts:
 `PostgresNoPrimary`, `PostgresReplicaBehind`.
+
+MariaDB on 3 servers (`mariadb: [m1, m2, m3]`) is a [Galera](https://mariadb.com/kb/en/galera-cluster/)
+cluster: every server has all the data. Cluster apps connect through `database-proxy` (port 3306),
+which uses the first server and the others when it is down. If all 3 servers stop at the same time,
+start the cluster again by hand, see [Galera: restarting the cluster](https://mariadb.com/kb/en/getting-started-with-mariadb-galera-cluster/#restarting-the-cluster).
+Alert: `MariadbClusterSmall`.
+
+Redis or Valkey on 3 servers (`valkey: [c1, c2, c3]`): one primary, two copies, and Sentinel
+(port 26379) on each server makes a copy the primary when the primary is down. Apps must ask
+Sentinel for the primary (name `ansibro`, the cache password); Authelia does. Alert: `CacheNoPrimary`.
 
 **Garage on 3 servers.** `garage: [s1, s2, s3]` keeps every file on all 3 servers, so one can
 go down. Set it on the first install: the number of copies cannot change later.

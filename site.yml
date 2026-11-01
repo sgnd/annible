@@ -217,11 +217,10 @@
 - name: Swarm apps
   hosts: managers[0]
   tasks:
-    - name: Deploy postgres-proxy (PostgreSQL with Patroni)
+    - name: Deploy database-proxy (the database on more servers)
       ansible.builtin.include_role:
-        name: postgres
-        tasks_from: proxy
-      when: postgres_patroni
+        name: database_proxy
+      when: database_ha
 
     - name: Deploy swarm apps
       ansible.builtin.include_role:

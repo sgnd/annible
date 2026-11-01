@@ -6,8 +6,15 @@ services:
     # Host network: the firewall decides who can connect.
     network_mode: host
     env_file: .env
+{% if mariadb_galera and mariadb_start_flag | default(false) %}
+    # Only while the cluster is new: this server starts it, then the installer restarts it without this.
+    command: ["mariadbd", "--wsrep-new-cluster"]
+{% endif %}
     volumes:
       - ./data:/var/lib/mysql
+{% if mariadb_galera %}
+      - ./galera.cnf:/etc/mysql/conf.d/galera.cnf:ro
+{% endif %}
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s

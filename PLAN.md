@@ -12,7 +12,7 @@
 - Backup (restic, nightly) and restore of the whole cluster on new servers
 - Monitoring and alerts: prometheus or victoria, agents on every server, Uptime Kuma watches the monitoring server
 - HA: registry and Traefik on every manager, tier labels
-- PostgreSQL on more servers with automatic failover (Patroni, etcd, postgres-proxy), Garage on 3 servers
+- Databases on more servers with automatic failover: PostgreSQL (Patroni), MariaDB (Galera), Redis/Valkey (Sentinel); Garage on 3 servers
 - Zero trust: per-port firewall between servers, Authelia (2FA) for admin pages, encrypted `state/`, image scan in CI
 - Secrets: OpenBao
 - Admin pages behind Authelia or Keycloak (both with a second factor)
@@ -24,7 +24,6 @@
 ## Next
 
 1. Test everything above on real servers (DigitalOcean), see "Not tested yet" in CHANGELOG
-2. MariaDB and Valkey on more servers (replicas, failover)
 
 ## Rules
 

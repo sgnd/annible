@@ -60,18 +60,21 @@ postgres:
 mariadb:
   category: database
   runs_on: node
+  servers: [1, 3]  # 3: a Galera cluster, every server has all the data
   license: GPL-2.0
   info: "<ip>:3306 (user root, password state/secrets/mariadb)"
 
 redis:
   category: cache
   runs_on: node
+  servers: [1, 3]  # 3: one primary, two copies, Sentinel picks a new primary by itself
   license: AGPL-3.0 (Redis 8 is tri-licensed, used under AGPL)
   info: "<ip>:6379 (password state/secrets/redis)"
 
 valkey:
   category: cache
   runs_on: node
+  servers: [1, 3]  # 3: one primary, two copies, Sentinel picks a new primary by itself
   license: BSD-3-Clause
   info: "<ip>:6379 (password state/secrets/valkey)"
 

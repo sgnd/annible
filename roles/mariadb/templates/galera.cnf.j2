@@ -1,0 +1,14 @@
+# MariaDB Galera: every server has all the data and takes writes. Made by ansibro.
+[galera]
+wsrep_on = ON
+wsrep_provider = /usr/lib/galera/libgalera_smm.so
+wsrep_cluster_name = ansibro
+wsrep_cluster_address = gcomm://{{ app_nodes.mariadb | map('extract', hostvars, 'node_ip') | join(',') }}
+wsrep_node_address = {{ node_ip }}
+wsrep_node_name = {{ inventory_hostname }}
+# A new server gets all the data with mariabackup, logged in as root.
+wsrep_sst_method = mariabackup
+wsrep_sst_auth = root:{{ mariadb_password }}
+binlog_format = ROW
+default_storage_engine = InnoDB
+innodb_autoinc_lock_mode = 2

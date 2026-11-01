@@ -1,4 +1,4 @@
-# postgres-proxy on Docker Swarm: cluster apps connect to postgres-proxy_haproxy:5432. Made by ansibro.
+# database-proxy on Docker Swarm: cluster apps connect to database-proxy_haproxy (5432 or 3306). Made by ansibro.
 services:
   haproxy:
     image: {{ registry_addr }}/haproxy:{{ images.haproxy.tag }}
@@ -12,7 +12,7 @@ services:
 configs:
   # The name changes with the file, so a new list of servers reaches the proxy.
   haproxy:
-    name: postgres-proxy-{{ postgres_proxy_config.checksum[:12] }}
+    name: database-proxy-{{ database_proxy_config.checksum[:12] }}
     file: ./haproxy.cfg
 
 networks:

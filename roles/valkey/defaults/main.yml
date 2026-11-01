@@ -2,3 +2,8 @@ valkey_dir: "{{ apps_dir }}/valkey"
 
 # Generated once and saved in state/secrets/ on the installer machine.
 valkey_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/valkey', chars=['ascii_letters', 'digits'], length=24) }}"
+
+# On 3 servers (valkey: [c1, c2, c3]): one primary and two copies (replicas). Sentinel runs on each
+# server and makes a copy the primary when the primary is down (when most Sentinels agree).
+valkey_ha: "{{ app_nodes.valkey | length > 1 }}"
+valkey_quorum: "{{ (app_nodes.valkey | length // 2) + 1 }}"

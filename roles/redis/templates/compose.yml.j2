@@ -17,3 +17,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+{% if redis_ha %}
+
+  # Watches the primary and picks a new one when it is down. Apps can ask it where the primary is.
+  redis-sentinel:
+    image: {{ registry_addr }}/redis:{{ images.redis.tag }}
+    container_name: redis-sentinel
+    restart: always
+    network_mode: host
+    command: ["redis-server", "/etc/sentinel/sentinel.conf", "--sentinel"]
+    environment:
+      REDISCLI_AUTH: "{{ redis_password }}"
+    volumes:
+      - ./sentinel:/etc/sentinel  # Sentinel writes to its file
+{% endif %}

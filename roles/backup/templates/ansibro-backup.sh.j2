@@ -52,10 +52,13 @@ if docker ps -q --filter name=^postgres$ | grep -q .; then
   docker exec postgres pg_dumpall -U postgres --clean --if-exists > "$stage/dumps/postgres.sql"
 fi
 {% endif %}
+{% if apps.mariadb | default('') == inventory_hostname %}
+# (Only on the first server: with Galera every server has the same data.)
 if docker ps -q --filter name=^mariadb$ | grep -q .; then
   docker exec mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb-dump -uroot --all-databases \
     --single-transaction --routines --events --add-drop-database --flush-privileges' > "$stage/dumps/mariadb.sql"
 fi
+{% endif %}
 
 # 2. App folders.
 paths=("$stage")

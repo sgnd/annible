@@ -31,9 +31,9 @@ common_wireguard_hosts: "{{ groups['all'] | difference([inventory_hostname]) | m
 # An app on its own server (Docker Compose) and the ports it needs:
 common_app_ports:
   postgres: [5432, 8008]                    # 8008: Patroni (PostgreSQL on more servers)
-  mariadb: [3306]
-  redis: [6379]
-  valkey: [6379]
+  mariadb: [3306, 4444, 4567, 4568]          # 4444, 4567, 4568: Galera (on 3 servers)
+  redis: [6379, 26379]                      # 26379: Sentinel (on 3 servers)
+  valkey: [6379, 26379]
   rustfs: [9000, 9001]
   garage: [3900, 3901]                      # S3, and Garage servers talking to each other
   rabbitmq: [5672, 15672, 15692]            # AMQP, web page, metrics

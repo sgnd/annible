@@ -47,7 +47,8 @@ CASES = [
     ("authelia without cache",
      lambda c: (c["apps"].update(authelia="swarm"), c["apps"].pop("redis")), "needs a cache (redis or valkey)"),
     ("long app form", lambda c: c["apps"].update(postgres={"on": "data1"}), "write it as"),
-    ("list for a one-server app", lambda c: c["apps"].update(redis=["data1", "swarm1"]), "runs on one server only"),
+    ("list for a one-server app", lambda c: c["apps"].update(rustfs=["data1", "swarm1"]), "runs on one server only"),
+    ("cache on 2 servers", lambda c: c["apps"].update(redis=["data1", "swarm1"]), "list 1 or 3 servers"),
     ("garage on 2 servers", lambda c: c["apps"].update(rustfs=None) or c["apps"].pop("rustfs")
      or c["apps"].update(garage=["data1", "swarm1"]), "list 1 or 3 servers"),
     ("replica on unknown node", lambda c: c["apps"].update(postgres=["data1", "nowhere"]), "nowhere is not a node name"),
@@ -145,6 +146,8 @@ GOOD = [
      [c["apps"].pop(a) for a in list(c["apps"]) if a not in ("traefik", "postgres", "redis", "rustfs")])),
     ("k3s with portainer, kong and authelia", lambda c: (c.update(orchestrator="k3s"),
      c["apps"].update(portainer="cluster", kong="cluster", authelia="cluster"))),
+    ("redis and mariadb on 3 servers", lambda c: (c["apps"].pop("postgres"), [c["apps"].pop(a, None) for a in ("kong",)],
+     c["apps"].update(redis=["data1", "swarm1", "swarm2"], mariadb=["data1", "swarm1", "swarm2"]))),
     ("postgres with a replica", lambda c: c["apps"].update(postgres=["data1", "swarm2"])),
 ]
 

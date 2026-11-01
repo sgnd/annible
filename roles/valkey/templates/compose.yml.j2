@@ -17,3 +17,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+{% if valkey_ha %}
+
+  # Watches the primary and picks a new one when it is down. Apps can ask it where the primary is.
+  valkey-sentinel:
+    image: {{ registry_addr }}/valkey:{{ images.valkey.tag }}
+    container_name: valkey-sentinel
+    restart: always
+    network_mode: host
+    command: ["valkey-server", "/etc/sentinel/sentinel.conf", "--sentinel"]
+    environment:
+      REDISCLI_AUTH: "{{ valkey_password }}"
+    volumes:
+      - ./sentinel:/etc/sentinel  # Sentinel writes to its file
+{% endif %}

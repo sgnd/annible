@@ -1,7 +1,7 @@
 # PostgreSQL. Apps connect to <server ip>:5432 as user "postgres".
 # On 2 or more servers (postgres: [db1, db2, db3]) it runs with Patroni: one primary, the others
 # follow it, and when the primary is down another one becomes the primary by itself. Cluster apps
-# then connect through postgres-proxy, which always goes to the primary. See README "Database replicas".
+# then connect through database-proxy, which always goes to the primary. See README "Database replicas".
 
 - name: Create PostgreSQL folder
   ansible.builtin.file:

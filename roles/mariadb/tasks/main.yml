@@ -1,4 +1,6 @@
 # MariaDB. Apps connect to <server ip>:3306 as user "root".
+# On 3 servers (mariadb: [m1, m2, m3]) it runs as a Galera cluster: every server has all the data.
+# Cluster apps connect through database-proxy. See docs "Database replicas".
 
 # The app in the container runs as user 999, so it must own its data folder.
 - name: Create MariaDB folders
@@ -28,23 +30,82 @@
   vars:
     registry_mirror_images: [mariadb]
 
+- name: Write Galera config
+  ansible.builtin.template:
+    src: galera.cnf.j2
+    dest: "{{ mariadb_dir }}/galera.cnf"
+    mode: "0644"
+  diff: false  # has the root password
+  when: mariadb_galera
+
+# Galera: a new cluster is started by the first server alone. "grastate.dat" exists once a
+# server has been in the cluster.
+- name: Look for Galera state
+  ansible.builtin.stat:
+    path: "{{ mariadb_dir }}/data/grastate.dat"
+  register: mariadb_grastate
+  when: mariadb_galera
+
+- name: Decide if the Galera cluster is new
+  ansible.builtin.set_fact:
+    mariadb_new_cluster: >-
+      {{ mariadb_galera and inventory_hostname == apps.mariadb
+      and not (app_nodes.mariadb | map('extract', hostvars, ['mariadb_grastate', 'stat', 'exists']) | select | list) }}
+
+- name: Start a new cluster on this server (Galera)
+  ansible.builtin.set_fact:
+    mariadb_start_flag: "{{ mariadb_new_cluster }}"
+
 - name: Write MariaDB compose file
   ansible.builtin.template:
     src: compose.yml.j2
     dest: "{{ mariadb_dir }}/compose.yml"
     mode: "0600"
 
-- name: Start MariaDB
+- name: Start MariaDB on the first server
   ansible.builtin.include_role:
     name: docker
     tasks_from: compose
   vars:
     docker_compose_app: mariadb
+  when: inventory_hostname == apps.mariadb
+
+# One at a time: each new server copies all the data from a running one.
+- name: Start MariaDB on the other servers
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+    apply:
+      throttle: 1
+  vars:
+    docker_compose_app: mariadb
+  when: inventory_hostname != apps.mariadb
+
+# The cluster runs now, so the first server joins it like the others from now on.
+- name: Restart the first server as a normal member
+  when: mariadb_new_cluster
+  block:
+    - name: Drop the start flag
+      ansible.builtin.set_fact:
+        mariadb_start_flag: false
+
+    - name: Write MariaDB compose file without the start flag
+      ansible.builtin.template:
+        src: compose.yml.j2
+        dest: "{{ mariadb_dir }}/compose.yml"
+        mode: "0600"
+
+    - name: Restart MariaDB on the first server
+      ansible.builtin.include_role:
+        name: docker
+        tasks_from: compose
+      vars:
+        docker_compose_app: mariadb
 
 # Restore (./install.sh -e restore=true): load the dump from the backup into the new, empty database.
 - name: Load MariaDB backup
   ansible.builtin.shell: >-
     docker exec -i mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot'
     < {{ apps_dir }}/backup/stage/dumps/mariadb.sql
-  when: restore | bool
+  when: restore | bool and inventory_hostname == apps.mariadb  # Galera copies it to the others
   changed_when: true

@@ -1,0 +1,8 @@
+# Sentinel for Redis. Made by ansibro the first time; after that Sentinel keeps it up to date itself.
+port 26379
+sentinel announce-ip {{ node_ip }}
+requirepass {{ redis_password }}
+sentinel monitor ansibro {{ redis_primary_ip }} 6379 {{ redis_quorum }}
+sentinel auth-pass ansibro {{ redis_password }}
+sentinel down-after-milliseconds ansibro 5000
+sentinel failover-timeout ansibro 60000

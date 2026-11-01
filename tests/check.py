@@ -364,6 +364,47 @@ def check_mariadb():
             check(f"mariadb database for {app}", out.strip() == "1", out[-200:])
 
 
+def check_cache_replicas(app):
+    """3 cache servers: one primary, copies get its data, and Sentinel knows the primary."""
+    cli = "redis-cli" if app == "redis" else "valkey-cli"
+    env = [f"REDISCLI_AUTH={secret(app)}"]
+    nodes = CFG["app_nodes"][app]
+    roles = {}
+    for node in nodes:
+        _, out = client(app, cli, "-h", HOSTS[node]["node_ip"], "INFO", "replication", env=env)
+        roles[node] = "master" if "role:master" in out else "replica" if "role:slave" in out else "?"
+    primary = [n for n, r in roles.items() if r == "master"]
+    check(f"{app} has exactly one primary", len(primary) == 1, str(roles))
+    if len(primary) != 1:
+        return
+    _, out = client(app, cli, "-h", HOSTS[nodes[0]]["node_ip"], "-p", "26379", "SENTINEL", "get-master-addr-by-name", "ansibro", env=env)
+    check(f"{app} Sentinel knows the primary", HOSTS[primary[0]]["node_ip"] in out, out[-120:])
+    stamp = str(int(time.time()))
+    client(app, cli, "-h", HOSTS[primary[0]]["node_ip"], "SET", "ansibro-check", stamp, env=env)
+    for node in nodes:
+        if node != primary[0]:
+            time.sleep(1)
+            _, out = client(app, cli, "-h", HOSTS[node]["node_ip"], "GET", "ansibro-check", env=env)
+            check(f"{app} copy on {node} has the new value", stamp in out, out[-80:])
+
+
+def check_galera():
+    """3 MariaDB servers: one Galera cluster, every server synced, and data written on one is on all."""
+    env = [f"MYSQL_PWD={secret('mariadb')}"]
+    nodes = CFG["app_nodes"]["mariadb"]
+    stamp = str(int(time.time()))
+    client("mariadb", "mariadb", "-h", HOSTS[nodes[0]]["node_ip"], "-uroot", "-e",
+           f"CREATE DATABASE IF NOT EXISTS ansibro_check; CREATE TABLE IF NOT EXISTS ansibro_check.t (v varchar(20) PRIMARY KEY); "
+           f"INSERT INTO ansibro_check.t VALUES ('{stamp}')", env=env)
+    for node in nodes:
+        ip = HOSTS[node]["node_ip"]
+        _, out = client("mariadb", "mariadb", "-h", ip, "-uroot", "-N", "-e",
+                        "SHOW STATUS WHERE Variable_name IN ('wsrep_cluster_size', 'wsrep_local_state_comment')", env=env)
+        check(f"mariadb on {node} is synced in a cluster of {len(nodes)}", f"wsrep_cluster_size\t{len(nodes)}" in out and "Synced" in out, out[-160:])
+        _, out = client("mariadb", "mariadb", "-h", ip, "-uroot", "-N", "-e", f"SELECT count(*) FROM ansibro_check.t WHERE v = '{stamp}'", env=env)
+        check(f"mariadb on {node} has the new row", out.strip() == "1", out[-120:])
+
+
 def check_cache(app):
     cli = "redis-cli" if app == "redis" else "valkey-cli"
     _, out = client(app, cli, "-h", ip_of(app), "ping", env=[f"REDISCLI_AUTH={secret(app)}"])
@@ -480,6 +521,11 @@ if __name__ == "__main__":
         check_backup()
     if len(CFG["app_nodes"].get("postgres", [])) > 1:
         check_postgres_replicas()
+    if len(CFG["app_nodes"].get("mariadb", [])) > 1:
+        check_galera()
+    for cache in ("redis", "valkey"):
+        if len(CFG["app_nodes"].get(cache, [])) > 1:
+            check_cache_replicas(cache)
     for app in APPS:
         try:
             CHECKS[app]()
