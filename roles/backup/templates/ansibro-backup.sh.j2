@@ -55,11 +55,12 @@ fi
 {% if apps.mariadb | default('') == inventory_hostname %}
 # (Only on the first server: with Galera every server has the same data.)
 if docker ps -q --filter name=^mariadb$ | grep -q .; then
+  # Users as CREATE USER and GRANT, not the "mysql" database itself: its tables belong to this
+  # server (and to Galera), and loading them on a new server breaks it. The image's own users
+  # (healthcheck, mariadb.sys) have new passwords on a new server, so they are left out.
   docker exec mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb-dump -uroot --all-databases \
-    --single-transaction --routines --events --add-drop-database --flush-privileges \
-    --ignore-table=mysql.wsrep_cluster --ignore-table=mysql.wsrep_cluster_members \
-    --ignore-table=mysql.wsrep_streaming_log' > "$stage/dumps/mariadb.sql"
-  # (The wsrep_ tables belong to Galera and the old cluster; a restore must not load them.)
+    --ignore-database=mysql --system=users --replace --single-transaction --routines --events \
+    --add-drop-database' | grep -a -v -E "[\`']?(healthcheck|mariadb\.sys)[\`']?@" > "$stage/dumps/mariadb.sql"
 fi
 {% endif %}
 

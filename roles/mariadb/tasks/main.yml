@@ -71,8 +71,7 @@
   when: inventory_hostname == apps.mariadb
 
 # Restore (./install.sh -e restore=true): load the dump from the backup into the new, empty database.
-# With Galera before the other servers join: the users are in tables Galera does not copy, so the
-# others must get them with the full copy they make when they join.
+# With Galera before the other servers join, so they get it all with the full copy they make then.
 - name: Load MariaDB backup
   ansible.builtin.shell: >-
     docker exec -i mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot'
