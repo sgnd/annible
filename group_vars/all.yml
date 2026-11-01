@@ -45,6 +45,13 @@ secrets_dir: "{{ playbook_dir }}/state/secrets"
 # Where the database and cache run, for apps that need them (empty if not installed).
 database_app: "{{ 'postgres' if 'postgres' in apps else 'mariadb' if 'mariadb' in apps else '' }}"
 database_ip: "{{ hostvars[apps[database_app]].node_ip if database_app else '' }}"
+# PostgreSQL on 2 or more servers runs with Patroni (automatic failover, see roles/postgres).
+postgres_patroni: "{{ app_nodes.postgres | default([]) | length > 1 }}"
+# Where cluster apps (kong, keycloak, authelia) reach the database. With Patroni: postgres-proxy,
+# which always goes to the primary.
+database_host: >-
+  {{ ('postgres-proxy_haproxy' if orchestrator == 'swarm' else 'postgres-proxy.ansibro.svc.cluster.local')
+  if database_app == 'postgres' and postgres_patroni else database_ip }}
 cache_app: "{{ 'redis' if 'redis' in apps else 'valkey' if 'valkey' in apps else '' }}"
 cache_ip: "{{ hostvars[apps[cache_app]].node_ip if cache_app else '' }}"
 cache_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/' ~ cache_app, chars=['ascii_letters', 'digits'], length=24) if cache_app else '' }}"

@@ -15,7 +15,7 @@ Tested on DigitalOcean (Ubuntu 24.04, amd64), with `tests/check.py` passing and 
 - The release workflow builds all four bundles.
 
 Not tested yet (test before the next release):
-- The Keycloak login for admin pages; portainer, kong, keycloak, authelia and restore on k3s.
+- PostgreSQL with Patroni (automatic failover); the Keycloak login for admin pages; portainer, kong, keycloak, authelia and restore on k3s.
 - Mixed amd64 + arm64 clusters (DigitalOcean has no arm64 servers), GPU servers, Telegram alerts,
   a restore of a cluster with monitoring, offline installs with k3s, uploading bundles to a release.
 
@@ -46,8 +46,9 @@ New
   - `state/` can be kept encrypted as `state.age` (with [age](https://age-encryption.org)):
     create a key in `~/.config/ansibro/age.key` and the installer does the rest. `scripts/state.sh`.
   - CI scans every pinned image for known security problems (`scripts/scan-images.sh`), each Monday.
-- PostgreSQL replicas: `postgres: [db1, db2]`. The first server is the primary, the others follow
-  it (streaming replication). Failover is one command (see README), not automatic yet.
+- PostgreSQL on 2 or more servers (`postgres: [db1, db2, db3]`) runs with Patroni (Spilo image) and
+  etcd on the managers: automatic failover. Cluster apps connect through postgres-proxy (HAProxy),
+  which always goes to the primary. Alert `PostgresNoPrimary`.
 - Garage on 3 servers: `garage: [s1, s2, s3]` keeps 3 copies of every file.
 - HA: every manager runs the image registry with the same images (apps use the name
   `registry.ansibro`), so images can be pulled when a manager is down. Traefik runs on every

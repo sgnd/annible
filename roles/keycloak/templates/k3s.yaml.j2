@@ -26,7 +26,7 @@ spec:
           envFrom: [{ secretRef: { name: keycloak } }]
           env:
             - { name: KC_DB, value: "{{ database_app }}" }
-            - { name: KC_DB_URL_HOST, value: "{{ database_ip }}" }
+            - { name: KC_DB_URL_HOST, value: "{{ database_host }}" }
             - { name: KC_DB_URL_DATABASE, value: keycloak }
             - { name: KC_DB_USERNAME, value: keycloak }
             - { name: KC_HOSTNAME, value: "https://{{ keycloak_host }}" }

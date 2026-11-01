@@ -165,6 +165,15 @@
         tasks_from: k3s
       when: "'traefik' in apps and orchestrator == 'k3s'"
 
+# etcd on the managers, for PostgreSQL with Patroni (postgres on 2 or more servers).
+- name: PostgreSQL cluster store
+  hosts: managers
+  tasks:
+    - name: Run etcd for Patroni
+      ansible.builtin.include_role:
+        name: etcd
+      when: postgres_patroni
+
 # Apps that run on one server with Docker Compose, like databases.
 - name: Server apps
   hosts: all
@@ -208,6 +217,12 @@
 - name: Swarm apps
   hosts: managers[0]
   tasks:
+    - name: Deploy postgres-proxy (PostgreSQL with Patroni)
+      ansible.builtin.include_role:
+        name: postgres
+        tasks_from: proxy
+      when: postgres_patroni
+
     - name: Deploy swarm apps
       ansible.builtin.include_role:
         name: "{{ app }}"

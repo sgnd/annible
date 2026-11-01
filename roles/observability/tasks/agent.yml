@@ -63,11 +63,16 @@
 - name: Create the monitor user in PostgreSQL
   ansible.builtin.command:
     cmd: docker exec -i postgres psql -U postgres -q -v ON_ERROR_STOP=1
+    # Only on the primary (writes); replicas get it from there. With Patroni the primary can move.
     stdin: |
+      SELECT pg_is_in_recovery() AS replica \gset
+      \if :replica
+      \else
       SELECT 'CREATE ROLE monitor LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'monitor') \gexec
       ALTER ROLE monitor WITH LOGIN PASSWORD '{{ observability_monitor_password }}';
       GRANT pg_monitor TO monitor;
-  when: apps.postgres | default('') == inventory_hostname  # the primary; replicas get it from there
+      \endif
+  when: "'postgres' in node_apps"
   changed_when: false
   no_log: true
 

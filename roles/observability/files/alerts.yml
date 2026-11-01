@@ -246,6 +246,13 @@ groups:
         annotations:
           summary: "PostgreSQL on {{ $labels.node }} uses {{ $value | humanizePercentage }} of its connections."
 
+      - alert: PostgresNoPrimary
+        expr: count(patroni_postgres_running) > 0 and sum(patroni_primary) == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "No PostgreSQL server is the primary: apps cannot write. Check: sudo docker exec postgres patronictl list"
+
       - alert: PostgresReplicaBehind
         expr: pg_replication_lag_seconds > 300
         for: 10m

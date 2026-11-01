@@ -53,7 +53,7 @@ authelia:
 postgres:
   category: database
   runs_on: node
-  servers: [1, 2, 3]  # the first is the primary, the others are read-only copies (replicas)
+  servers: [1, 2, 3]  # 2 or more: Patroni, one primary and copies, automatic failover
   license: PostgreSQL
   info: "<ip>:5432 (user postgres, password state/secrets/postgres)"
 

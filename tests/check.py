@@ -41,6 +41,8 @@ LEADER_HOST = HOSTS[LEADER]["node_host"]  # where SSH connects
 REGISTRY = f"{LEADER_IP}:{CFG['registry_port']}"
 IMAGES = CFG["images"]
 WEB = "traefik" in APPS  # web pages only exist with traefik
+# psql comes from the PostgreSQL image in the registry: spilo with Patroni (2 or more servers).
+PG_IMAGE = "spilo" if len(CFG["app_nodes"].get("postgres", [])) > 1 else "postgres"
 ON_LEADER = socket.gethostname() == LEADER  # the installer sets each server's hostname to its name
 results = []
 
@@ -302,27 +304,34 @@ def check_authelia():
 
 
 def check_postgres():
-    _, out = client("postgres", "psql", "-h", ip_of("postgres"), "-U", "postgres", "-tAc", "select 1", env=[f"PGPASSWORD={secret('postgres')}"])
+    _, out = client(PG_IMAGE, "psql", "-h", ip_of("postgres"), "-U", "postgres", "-tAc", "select 1", env=[f"PGPASSWORD={secret('postgres')}"])
     check("postgres login", out.strip() == "1", out[-200:])
     for app in ("kong", "keycloak", "authelia"):
         if app in APPS:
-            _, out = client("postgres", "psql", "-h", ip_of("postgres"), "-U", app, "-tAc", "select 1",
+            _, out = client(PG_IMAGE, "psql", "-h", ip_of("postgres"), "-U", app, "-tAc", "select 1",
                             env=[f"PGPASSWORD={secret(app + '_db')}"])
             check(f"postgres database for {app}", out.strip() == "1", out[-200:])
 
 
 def check_postgres_replicas():
-    """Each replica follows the primary: a row written on the primary shows up there."""
+    """Patroni: one primary, and a row written there shows up on every replica."""
+    nodes = CFG["app_nodes"]["postgres"]
+    primary = [n for n in nodes if curl(f"http://{HOSTS[n]['node_ip']}:8008/primary")[0] == "200"]
+    check("postgres has exactly one primary (Patroni)", len(primary) == 1, str(primary))
+    if len(primary) != 1:
+        return
     stamp = str(int(time.time()))
     env = [f"PGPASSWORD={secret('postgres')}"]
-    _, out = client("postgres", "psql", "-h", ip_of("postgres"), "-U", "postgres", "-tAc",
-                    f"CREATE TABLE IF NOT EXISTS ansibro_check (v text); INSERT INTO ansibro_check VALUES ('{stamp}')", env=env)
-    for node in CFG["app_nodes"]["postgres"][1:]:
+    client(PG_IMAGE, "psql", "-h", HOSTS[primary[0]]["node_ip"], "-U", "postgres", "-tAc",
+           f"CREATE TABLE IF NOT EXISTS ansibro_check (v text); INSERT INTO ansibro_check VALUES ('{stamp}')", env=env)
+    for node in nodes:
+        if node == primary[0]:
+            continue
         ip = HOSTS[node]["node_ip"]
-        _, out = client("postgres", "psql", "-h", ip, "-U", "postgres", "-tAc", "SELECT pg_is_in_recovery()", env=env)
+        _, out = client(PG_IMAGE, "psql", "-h", ip, "-U", "postgres", "-tAc", "SELECT pg_is_in_recovery()", env=env)
         check(f"postgres on {node} is a replica", out.strip() == "t", out[-200:])
         for _ in range(10):
-            _, out = client("postgres", "psql", "-h", ip, "-U", "postgres", "-tAc",
+            _, out = client(PG_IMAGE, "psql", "-h", ip, "-U", "postgres", "-tAc",
                             f"SELECT count(*) FROM ansibro_check WHERE v = '{stamp}'", env=env)
             if out.strip() == "1":
                 break

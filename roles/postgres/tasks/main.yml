@@ -1,25 +1,31 @@
 # PostgreSQL. Apps connect to <server ip>:5432 as user "postgres".
-# With more servers (postgres: [db1, db2]) the first is the primary and the others are replicas:
-# read-only copies that follow it all the time. See README "Database replicas".
+# On 2 or more servers (postgres: [db1, db2, db3]) it runs with Patroni: one primary, the others
+# follow it, and when the primary is down another one becomes the primary by itself. Cluster apps
+# then connect through postgres-proxy, which always goes to the primary. See README "Database replicas".
 
-# The app in the container runs as user 999, so it must own its data folder.
-- name: Create PostgreSQL folders
+- name: Create PostgreSQL folder
   ansible.builtin.file:
-    path: "{{ item.path }}"
+    path: "{{ postgres_dir }}"
     state: directory
-    owner: "{{ item.owner }}"
-    group: "{{ item.owner }}"
     mode: "0700"
-  loop:
-    - { path: "{{ postgres_dir }}", owner: root }
-    - { path: "{{ postgres_dir }}/data", owner: "999" }
 
-- name: Write PostgreSQL password
+# The app in the container runs as user 999 (one server), Spilo sets its own owner (Patroni).
+- name: Create PostgreSQL data folder
+  ansible.builtin.file:
+    path: "{{ postgres_dir }}/data"
+    state: directory
+    owner: "{{ omit if postgres_patroni else '999' }}"
+    group: "{{ omit if postgres_patroni else '999' }}"
+    mode: "0700"
+
+- name: Write PostgreSQL passwords
   ansible.builtin.copy:
     dest: "{{ postgres_dir }}/.env"
     content: |
       POSTGRES_PASSWORD={{ postgres_password }}
-      REPLICATION_PASSWORD={{ postgres_replication_password }}
+      PGPASSWORD_SUPERUSER={{ postgres_password }}
+      PGPASSWORD_STANDBY={{ postgres_replication_password }}
+      PGPASSWORD_ADMIN={{ postgres_password }}
     mode: "0600"
   no_log: true
 
@@ -28,11 +34,11 @@
     name: registry
     tasks_from: mirror
   vars:
-    registry_mirror_images: [postgres]
+    registry_mirror_images: ["{{ 'spilo' if postgres_patroni else 'postgres' }}"]
 
 - name: Write PostgreSQL compose file
   ansible.builtin.template:
-    src: compose.yml.j2
+    src: "{{ 'patroni-compose.yml.j2' if postgres_patroni else 'compose.yml.j2' }}"
     dest: "{{ postgres_dir }}/compose.yml"
     mode: "0600"
 
@@ -42,63 +48,15 @@
     tasks_from: compose
   vars:
     docker_compose_app: postgres
-  when: postgres_primary
+
+# With Patroni the servers agree on a primary first; then this finds it (postgres_primary_node).
+- name: Find the PostgreSQL primary
+  ansible.builtin.include_tasks: find_primary.yml
 
 # Restore (./install.sh -e restore=true): load the dump from the backup into the new, empty database.
 - name: Load PostgreSQL backup
-  ansible.builtin.shell: docker exec -i postgres psql -U postgres -q -f - < {{ apps_dir }}/backup/stage/dumps/postgres.sql
-  when: restore | bool and postgres_primary
+  ansible.builtin.shell: >-
+    docker exec -i postgres psql -U postgres -q -f -
+    < {{ apps_dir }}/backup/stage/dumps/postgres.sql
+  when: restore | bool and inventory_hostname == postgres_primary_node
   changed_when: true
-
-# Replicas log in as "replicator", a user that can only copy the database.
-- name: Create the replication user
-  ansible.builtin.command:
-    cmd: docker exec -i postgres psql -U postgres -q -v ON_ERROR_STOP=1
-    stdin: |
-      SELECT 'CREATE ROLE replicator REPLICATION LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'replicator') \gexec
-      ALTER ROLE replicator WITH REPLICATION LOGIN PASSWORD '{{ postgres_replication_password }}';
-  when: postgres_primary and postgres_replicas | length > 0
-  changed_when: false
-  no_log: true
-
-# A replica copies with a "replication" login, which the default rules do not allow.
-- name: Let the replicas connect
-  ansible.builtin.lineinfile:
-    path: "{{ postgres_dir }}/data/{{ postgres_data_subdir }}/pg_hba.conf"
-    line: "host replication replicator {{ hostvars[item].node_ip }}/32 scram-sha-256"
-  loop: "{{ postgres_replicas }}"
-  when: postgres_primary
-  register: postgres_hba
-
-- name: Reload PostgreSQL rules
-  ansible.builtin.command: docker exec postgres psql -U postgres -q -c "SELECT pg_reload_conf()"
-  when: postgres_hba.changed  # noqa: no-handler
-  changed_when: true
-
-- name: Look for the replica's data
-  ansible.builtin.stat:
-    path: "{{ postgres_dir }}/data/{{ postgres_data_subdir }}/PG_VERSION"
-  register: postgres_data
-  when: not postgres_primary
-
-# The first copy of the whole database. -R makes it a replica that keeps following the primary,
-# -C -S keeps a slot on the primary, so it waits for this replica when it is behind.
-- name: Copy the primary to the replica
-  ansible.builtin.command:
-    cmd: >-
-      docker run --rm --network host --user 999:999
-      --env-file {{ postgres_dir }}/.env
-      -v {{ postgres_dir }}/data:/var/lib/postgresql
-      --entrypoint sh {{ registry_addr }}/postgres:{{ images.postgres.tag }}
-      -c 'PGPASSWORD="$REPLICATION_PASSWORD" pg_basebackup -h {{ postgres_primary_ip }} -U replicator
-      -D /var/lib/postgresql/{{ postgres_data_subdir }} -R -X stream -C -S {{ inventory_hostname | replace("-", "_") }}'
-  when: not postgres_primary and not postgres_data.stat.exists
-  changed_when: true
-
-- name: Start the PostgreSQL replica
-  ansible.builtin.include_role:
-    name: docker
-    tasks_from: compose
-  vars:
-    docker_compose_app: postgres
-  when: not postgres_primary

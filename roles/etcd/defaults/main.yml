@@ -1,0 +1,5 @@
+etcd_dir: "{{ apps_dir }}/etcd"
+# Not 2379/2380: k3s servers use those for their own etcd.
+etcd_client_port: 12379
+etcd_peer_port: 12380
+etcd_token: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/etcd_token', chars=['ascii_letters', 'digits'], length=24) }}"

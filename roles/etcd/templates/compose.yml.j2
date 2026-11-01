@@ -1,0 +1,23 @@
+# etcd: Patroni (PostgreSQL on more servers) keeps here which server is the primary.
+# One member on each manager. Made by ansibro.
+services:
+  etcd:
+    image: {{ registry_addr }}/etcd:{{ images.etcd.tag }}
+    container_name: etcd
+    restart: always
+    # Host network: the firewall decides who can connect.
+    network_mode: host
+    command:
+      - etcd
+      - --name={{ inventory_hostname }}
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://{{ node_ip }}:{{ etcd_client_port }},http://127.0.0.1:{{ etcd_client_port }}
+      - --advertise-client-urls=http://{{ node_ip }}:{{ etcd_client_port }}
+      - --listen-peer-urls=http://{{ node_ip }}:{{ etcd_peer_port }}
+      - --initial-advertise-peer-urls=http://{{ node_ip }}:{{ etcd_peer_port }}
+      - --initial-cluster={% for host in groups['managers'] %}{{ host }}=http://{{ hostvars[host].node_ip }}:{{ etcd_peer_port }}{{ ',' if not loop.last }}{% endfor %}
+
+      - --initial-cluster-token={{ etcd_token }}
+      - --initial-cluster-state=new
+    volumes:
+      - ./data:/etcd-data

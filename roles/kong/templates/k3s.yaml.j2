@@ -24,7 +24,7 @@ spec:
           envFrom: [{ secretRef: { name: kong } }]
           env:
             - { name: KONG_DATABASE, value: postgres }
-            - { name: KONG_PG_HOST, value: "{{ database_ip }}" }
+            - { name: KONG_PG_HOST, value: "{{ database_host }}" }
             - { name: KONG_PG_DATABASE, value: kong }
             - { name: KONG_PG_USER, value: kong }
             - { name: KONG_PROXY_LISTEN, value: "0.0.0.0:8000" }

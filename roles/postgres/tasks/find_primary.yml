@@ -1,0 +1,20 @@
+# Sets postgres_primary_node: the server where PostgreSQL takes writes now.
+# One server: that one. Patroni: the one whose Patroni answers 200 on /primary.
+- name: Ask Patroni which server is the primary
+  ansible.builtin.uri:
+    url: "http://{{ hostvars[item].node_ip }}:8008/primary"
+    status_code: [200, 503]
+  loop: "{{ app_nodes.postgres }}"
+  register: postgres_patroni_roles
+  until: postgres_patroni_roles.status in [200, 503]
+  retries: 30
+  delay: 5
+  run_once: true
+  when: postgres_patroni
+
+- name: Remember the primary
+  ansible.builtin.set_fact:
+    postgres_primary_node: >-
+      {{ (postgres_patroni_roles.results | selectattr('status', 'equalto', 200) | map(attribute='item') | list
+      + [apps.postgres])[0] if postgres_patroni else apps.postgres }}
+  run_once: true

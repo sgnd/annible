@@ -1,0 +1,37 @@
+# etcd on every manager, for Patroni (PostgreSQL on 2 or more servers). Only these servers and the
+# PostgreSQL servers can reach it (firewall). It holds no app data.
+
+- name: Create etcd folders
+  ansible.builtin.file:
+    path: "{{ etcd_dir }}/data"
+    state: directory
+    mode: "0700"
+
+- name: Mirror etcd image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [etcd]
+
+- name: Write etcd compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ etcd_dir }}/compose.yml"
+    mode: "0600"
+
+# All members at once: each waits for the others to form the cluster.
+- name: Start etcd
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ etcd_dir }}"
+  register: etcd_up
+  changed_when: "'Started' in etcd_up.stderr or 'Recreated' in etcd_up.stderr"
+
+- name: Wait for etcd
+  ansible.builtin.command: docker exec etcd etcdctl --endpoints=http://127.0.0.1:{{ etcd_client_port }} endpoint health
+  register: etcd_health
+  until: etcd_health.rc == 0
+  retries: 30
+  delay: 5
+  changed_when: false

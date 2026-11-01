@@ -1,0 +1,26 @@
+# PostgreSQL with Patroni (Spilo image), on {{ app_nodes.postgres | join(', ') }}. Made by ansibro.
+services:
+  postgres:
+    image: {{ registry_addr }}/spilo:{{ images.spilo.tag }}
+    container_name: postgres
+    restart: always
+    # Host network: the firewall decides who can connect.
+    network_mode: host
+    env_file: .env
+    environment:
+      SCOPE: ansibro                       # the same on every server of this cluster
+      PGVERSION: "{{ images.postgres.tag.split('.')[0] }}"
+      ETCD3_HOSTS: "{{ postgres_etcd_hosts }}"
+      SPILO_PROVIDER: local
+      ALLOW_NOSSL: "true"                  # apps may connect without SSL, like the one-server PostgreSQL
+      PATRONI_NAME: {{ inventory_hostname }}
+      PATRONI_POSTGRESQL_CONNECT_ADDRESS: "{{ node_ip }}:5432"
+      PATRONI_RESTAPI_CONNECT_ADDRESS: "{{ node_ip }}:8008"
+    volumes:
+      - ./data:/home/postgres/pgdata
+    healthcheck:
+      # Patroni's API answers on every server (primary or replica) when PostgreSQL runs.
+      test: ["CMD", "curl", "-sf", "http://localhost:8008/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30

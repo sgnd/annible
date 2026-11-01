@@ -329,17 +329,15 @@ A new Docker version is installed one server at a time, so the swarm keeps runni
 Commands on the servers need `sudo`: the installer does not add users to the `docker` group,
 and the passwords and data in `/opt/ansibro/` are readable by root only.
 
-**Database replicas.** Give PostgreSQL a list of servers: `postgres: [db1, db2]`. The first is
-the primary; apps use it. The others are replicas: read-only copies that follow it all the time
-(alert `PostgresReplicaBehind` if one falls behind). If the primary dies, make a replica the new primary:
-
-```bash
-sudo docker exec -u postgres postgres pg_ctl promote -D /var/lib/postgresql/18/docker   # on the replica
-```
-
-Then put that server first in the list, take the old primary out of it (delete its
-`/opt/ansibro/postgres` folder before you add it back, so it comes back as a replica), and run
-`./install.sh` so the apps use the new primary. This is not automatic yet.
+**Database replicas.** Give PostgreSQL a list of servers: `postgres: [db1, db2, db3]`. It then runs
+with [Patroni](https://patroni.readthedocs.io): one server is the primary, the others are copies that
+follow it all the time. When the primary is down, another one becomes the primary by itself (in about
+30 seconds). Patroni keeps track of this in etcd, which runs on the managers. Cluster apps (kong,
+keycloak, authelia) connect through `postgres-proxy`, which always goes to the primary. Your own apps
+in the cluster: `postgres-proxy_haproxy:5432` (Swarm) or `postgres-proxy.ansibro.svc.cluster.local:5432`
+(k3s). See the servers: `sudo docker exec postgres patronictl list` on a database server. With 3
+managers etcd survives one down; with 1 manager, failover needs that manager. Alerts:
+`PostgresNoPrimary`, `PostgresReplicaBehind`.
 
 **Garage on 3 servers.** `garage: [s1, s2, s3]` keeps every file on all 3 servers, so one can
 go down. Set it on the first install: the number of copies cannot change later.
