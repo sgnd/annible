@@ -70,6 +70,16 @@
     docker_compose_app: mariadb
   when: inventory_hostname == apps.mariadb
 
+# Restore (./install.sh -e restore=true): load the dump from the backup into the new, empty database.
+# With Galera before the other servers join: the users are in tables Galera does not copy, so the
+# others must get them with the full copy they make when they join.
+- name: Load MariaDB backup
+  ansible.builtin.shell: >-
+    docker exec -i mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot'
+    < {{ apps_dir }}/backup/stage/dumps/mariadb.sql
+  when: restore | bool and inventory_hostname == apps.mariadb  # Galera copies it to the others
+  changed_when: true
+
 # One at a time: each new server copies all the data from a running one.
 - name: Start MariaDB on the other servers
   ansible.builtin.include_role:
@@ -101,11 +111,3 @@
         tasks_from: compose
       vars:
         docker_compose_app: mariadb
-
-# Restore (./install.sh -e restore=true): load the dump from the backup into the new, empty database.
-- name: Load MariaDB backup
-  ansible.builtin.shell: >-
-    docker exec -i mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot'
-    < {{ apps_dir }}/backup/stage/dumps/mariadb.sql
-  when: restore | bool and inventory_hostname == apps.mariadb  # Galera copies it to the others
-  changed_when: true
