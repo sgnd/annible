@@ -33,10 +33,18 @@
 
     # Before anything changes: does config.yml still match the swarm? (No Docker yet = a new server.)
     - name: Read swarm state
-      ansible.builtin.command: docker info --format '{% raw %}{{ .Swarm.LocalNodeState }} {{ .Swarm.ControlAvailable }} {{ .Swarm.NodeAddr }}{% endraw %}'
+      ansible.builtin.command: docker info --format '{% raw %}{{ json .Swarm }}{% endraw %}'
       register: swarm_now
       failed_when: false
       changed_when: false
+      when: inventory_hostname in groups['swarm']
+
+    # swarm_state.LocalNodeState: "active" when the server is in a swarm.
+    # swarm_state.ControlAvailable: true on a manager. swarm_state.NodeAddr: its swarm address.
+    # No Docker yet (a new server): the command fails, so the state is empty.
+    - name: Remember swarm state
+      ansible.builtin.set_fact:
+        swarm_state: "{{ swarm_now.stdout | from_json if swarm_now.rc == 0 else {} }}"
       when: inventory_hostname in groups['swarm']
 
     # The registry started on the first manager. If another manager has it and the first one does not,
@@ -61,16 +69,16 @@
 
     - name: Check each server's role matches the swarm
       ansible.builtin.assert:
-        that: swarm_now.stdout.split()[1] == ('true' if node_role == 'manager' else 'false')
+        that: swarm_state.ControlAvailable == (node_role == 'manager')
         fail_msg: >-
           {{ inventory_hostname }} is {{ node_role }} in config.yml but not in the swarm. Change it by hand
           on a manager: sudo docker node {{ 'promote' if node_role == 'manager' else 'demote' }} {{ inventory_hostname }}
-      when: inventory_hostname in groups['swarm'] and swarm_now.stdout is match('active')
+      when: inventory_hostname in groups['swarm'] and swarm_state.LocalNodeState | default('') == 'active'
 
     # A restore is for new servers. On a running cluster it would replace the swarm and the data.
     - name: Check a restore goes to new servers
       ansible.builtin.assert:
-        that: swarm_now.stdout is not match('active')
+        that: swarm_state.LocalNodeState | default('') != 'active'
         fail_msg: >-
           restore=true is only for new, empty servers, but {{ inventory_hostname }} is already in a swarm.
           To go back to a backup, install new servers and restore there.
@@ -101,12 +109,12 @@
     # to a new server, or when ip in config.yml was changed.
     - name: Check each server's swarm address matches ip in config.yml
       ansible.builtin.assert:
-        that: swarm_now.stdout.split()[2] == node_ip
+        that: swarm_state.NodeAddr == node_ip
         fail_msg: >-
-          {{ inventory_hostname }} is in the swarm with address {{ swarm_now.stdout.split()[2] }},
-          but its ip in config.yml is {{ node_ip }}. Put {{ swarm_now.stdout.split()[2] }} back as ip.
+          {{ inventory_hostname }} is in the swarm with address {{ swarm_state.NodeAddr }},
+          but its ip in config.yml is {{ node_ip }}. Put {{ swarm_state.NodeAddr }} back as ip.
           If the server's real address changed, set the new one as host (with wireguard: true, ip never has to change).
-      when: inventory_hostname in groups['swarm'] and swarm_now.stdout is match('active')
+      when: inventory_hostname in groups['swarm'] and swarm_state.LocalNodeState | default('') == 'active'
 
 # Servers removed from config.yml leave the swarm (only with -e remove_nodes=true).
 - name: Removed servers
