@@ -3,28 +3,51 @@
 [![Validate](https://github.com/sgnd/ansibro/actions/workflows/validate.yml/badge.svg)](https://github.com/sgnd/ansibro/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Set up a production-ready Docker Swarm or k3s (small Kubernetes) cluster with one command.
+Set up your servers to run apps, with one command.
 
-- Docker Swarm (default) or k3s: `orchestrator: k3s` in `config.yml`.
-- Works on 1 server or many.
-- You pick the apps and the server each app runs on.
-- Every version is pinned in [`versions.yml`](versions.yml). Nothing uses `latest`.
-- Only open-source apps.
-- amd64 (Intel/AMD) and arm64, also mixed in one cluster.
+## What is it?
+
+You have one or more Linux servers, and you want to run apps on them: your own apps, and the
+usual helpers like a web gateway, a database and monitoring. By hand that is a lot of work:
+install Docker, join the servers into a cluster, set up a firewall, HTTPS, passwords, backups and alerts.
+
+Ansibro does all of that for you. You write what you want in one file, `config.yml`, and run
+`./install.sh`. At the end you get the web address and password of every app.
+
+**Who is it for?** Anyone who can use a terminal and log in to a server with SSH.
+You do not need to know Ansible, Docker Swarm or Kubernetes.
+
+**New to this?** Start with [Getting started](docs/getting-started.md): a step-by-step first install,
+from renting a server to opening your first app. Words you do not know are explained in
+[Words](docs/getting-started.md#words).
+
+**What you get:**
+
+- A Docker Swarm cluster (the default), or k3s (a small Kubernetes).
+- 1 server or many. You pick the apps and the server each app runs on.
+- A firewall, HTTPS, and a password for every app, made for you.
+- Optional: backups each night, monitoring with alerts, an encrypted network between servers.
+- Only open-source apps. Every version is pinned in [`versions.yml`](versions.yml), nothing uses `latest`.
+- Intel/AMD (amd64) and ARM (arm64) servers, also mixed in one cluster.
 - Works without internet, with an offline bundle.
 
 ## Requirements
 
-- Ubuntu 24.04 or 26.04 on every server. Servers can be amd64 or arm64; the installer finds out
-  which. With internet they can mix. The offline bundle needs one CPU type for all servers.
-- SSH key login with passwordless sudo.
-- Python 3.12 or newer on the machine that runs the installer: the first manager, or your laptop.
-  It must reach every server over SSH: its `host`, or its `ip` if it has no `host` (for example over a VPN).
-- Internet on the servers and on the machine that runs the installer (it uses PyPI and Ansible Galaxy), or an offline bundle
-  (see [Offline install](#offline-install)).
-- With `tls: letsencrypt`: DNS for `*.<domain>` already points to the public IP of the first manager.
+- **Servers** with Ubuntu 24.04 or 26.04. They can be Intel/AMD (amd64) or ARM (arm64);
+  the installer finds out which. With internet they can mix; an offline bundle is for one CPU type.
+- **At least 2 CPUs and 4 GB of memory** on each server (a server for monitoring needs 2 GB more).
+- **SSH login with a key**, and a user that can use `sudo` without a password.
+- **A computer to run the installer**, with Python 3.12 or newer: your laptop (macOS or Linux),
+  or the first manager server. It logs in to every server with SSH. It uses the server's `host`
+  address, or its `ip` if `host` is not set.
+- **Internet** on the servers and on that computer (it downloads Ansible from PyPI and Ansible Galaxy),
+  or an [offline bundle](#offline-install).
+- **A domain**, for HTTPS with Let's Encrypt (`tls: letsencrypt`): DNS for `*.<domain>` must already point
+  to the public IP of the first manager.
 
 ## Quick start
+
+First time? Follow [Getting started](docs/getting-started.md) instead. It shows every step.
 
 ```bash
 git clone https://github.com/sgnd/ansibro.git
@@ -34,8 +57,8 @@ cp config.example.yml config.yml   # edit: servers, ssh key, domain, apps
 ```
 
 Point DNS for `*.<domain>` to the public IP of the first manager **before** you run it, so
-Let's Encrypt can check the domain. (If DNS came later: `sudo docker service update --force traefik_traefik`
-on the first manager asks for the certificates again.)
+Let's Encrypt can check the domain. (Did you set DNS later? Then run `sudo docker service update --force traefik_traefik`
+on the first manager. It asks Let's Encrypt for the certificates again.)
 
 At the end it prints how to reach each app, and saves it with all passwords in `state/summary.md`.
 
@@ -48,78 +71,14 @@ Check mode (`--check`) is not supported.
 > the next run makes new passwords that do not match your running databases.
 > Always run the installer from the same machine, or copy `state/` with it.
 
-## Docker Swarm or k3s
-
-`orchestrator: swarm` (the default) or `orchestrator: k3s` in `config.yml`. Everything around the
-cluster is the same: firewall, WireGuard, registry, server apps (databases, storage, monitoring...),
-backup, monitoring and alerts, offline bundle.
-
-With k3s:
-- Managers are k3s servers (3 managers = the cluster survives one down), workers are k3s agents.
-  Standalone servers run server apps and are not in the cluster. The pinned k3s version is in `versions.yml`.
-- Use `kubectl` on a manager: `sudo k3s kubectl get nodes`. To use it from your laptop, copy
-  `/etc/rancher/k3s/k3s.yaml` from a manager and change `127.0.0.1` in it to the manager's address.
-- Traefik is k3s's built-in one: `traefik: cluster` in `apps`. Server apps get their web pages through it
-  like with Swarm. Point DNS to any cluster server. Your own apps: an `Ingress` or Traefik `IngressRoute`.
-- Pods pull from the cluster's registry: `registry.ansibro:5000/<image>:<tag>` (push your images there).
-- For now these apps are Swarm only: kong, portainer, swarmpit, keycloak, authelia.
-- The backup has a k3s (etcd) snapshot. `-e restore=true` is Swarm only for now; to restore k3s, see
-  [k3s backup and restore](https://docs.k3s.io/datastore/backup-restore).
-
-## Offline install
-
-For servers with no internet (for example only VPN access).
-
-**1. Get a bundle.** Each release on GitHub has them, for both CPU types and Ubuntu versions.
-They come in parts (GitHub allows 2 GB per file); put the parts back together and check them:
-
-```bash
-cat ansibro-24.04-amd64.tar.gz.part* > ansibro-24.04-amd64.tar.gz
-sha256sum -c ansibro-24.04-amd64.tar.gz.sha256   # on a Mac: shasum -a 256 -c ...
-```
-
-Or build one yourself: **on a machine with internet and Docker**, build a bundle for the CPU and Ubuntu version
-of your servers. A Mac (Docker Desktop or OrbStack) can build both CPU types. On Linux,
-building for the other CPU type needs QEMU (`docker run --privileged --rm tonistiigi/binfmt --install all`).
-
-```bash
-./build-bundle.sh amd64          # Intel/AMD servers, Ubuntu 24.04
-./build-bundle.sh arm64 26.04    # ARM servers, Ubuntu 26.04
-```
-
-This makes `dist/ansibro-<ubuntu>-<arch>.tar.gz` (about 2.5 GB). It holds this project, apt packages,
-Ansible and all Docker images from `versions.yml`. Your project folder is not changed.
-
-**2. Copy it to the first manager**, together with your SSH private key and, if you use them,
-your `tls_cert`/`tls_key`/`acme_ca_cert` files (the bundle leaves out keys and certificates).
-The installer connects over SSH to every server, the first manager itself too, so that key must
-be allowed on all servers. Then run the installer there:
-
-```bash
-tar -xzf ansibro-24.04-amd64.tar.gz
-cd ansibro
-cp config.example.yml config.yml   # set tls: selfsigned (or custom), and ssh.key
-./install.sh
-```
-
-The installer sees the `bundle/` folder and uses it instead of the internet.
-The servers' own apt settings are not changed.
-
-Notes:
-- Every server must run the bundle's Ubuntu version and CPU type.
-- Let's Encrypt needs internet. Use `tls: selfsigned`, `tls: custom`, or an ACME server
-  in your network (`acme_server`, see `config.example.yml`).
-- Time sync (chrony) needs a time server. Without internet, use one in your network: on each server
-  put `server <time server ip> iburst` in `/etc/chrony/sources.d/local.sources`, then run
-  `sudo chronyc reload sources`.
-
 ## Examples
 
-**One server.** Everything on one machine:
+**One server.** Everything on one machine. `ip` is the private IP, `host` the public IP where the
+installer connects (no private IP? Use the public IP for both):
 
 ```yaml
 nodes:
-  - { name: server1, ip: 10.0.0.10, role: manager }
+  - { name: server1, ip: 10.0.0.10, host: 203.0.113.10, role: manager }
 apps:
   traefik: swarm
   portainer: swarm
@@ -170,7 +129,9 @@ See [`config.example.yml`](config.example.yml) for every setting.
 
 ## Apps
 
-Pick one per category. Server apps run with Docker Compose on the server you name.
+Pick one per category. In `config.yml`, a swarm app gets `swarm` (for example `traefik: swarm`).
+A server app gets the name of the server it runs on (for example `postgres: server1`);
+it runs there with Docker Compose.
 Click a name to open its official website.
 
 | Category | App | Runs on | Port | Web page |
@@ -202,7 +163,7 @@ From then on `state/` is kept as `state.age`, encrypted with [age](https://age-e
 `scripts/state.sh open`, and `scripts/state.sh close` when you are done.
 
 Some apps need others:
-- Every app with a web page needs traefik (for rabbitmq, nats and rustfs only the web page does).
+- Every app with a web page needs traefik. (rabbitmq, nats and rustfs work without it, but then have no web page.)
 - kong needs postgres. keycloak needs a database. authelia needs a database and a cache.
   The installer creates their databases for them.
 
@@ -250,6 +211,71 @@ network, but if you want only up-to-date software, choose Portainer.
 for a swarm app in `roles/<app>/templates/stack.yml.j2` (the `...middlewares` label, comma-separated),
 for a server app with a web page set `traefik_route_middleware: authelia@file` in `roles/<app>/tasks/main.yml`.
 A server app has one middleware, so this replaces its `admin_allow_from` limit.
+
+## Offline install
+
+For servers with no internet (for example only VPN access).
+
+**1. Get a bundle.** Each release on GitHub has them, for both CPU types and Ubuntu versions.
+They come in parts (GitHub allows 2 GB per file); put the parts back together and check them:
+
+```bash
+cat ansibro-24.04-amd64.tar.gz.part* > ansibro-24.04-amd64.tar.gz
+sha256sum -c ansibro-24.04-amd64.tar.gz.sha256   # on a Mac: shasum -a 256 -c ...
+```
+
+Or build one yourself: **on a machine with internet and Docker**, build a bundle for the CPU and Ubuntu version
+of your servers. A Mac (Docker Desktop or OrbStack) can build both CPU types. On Linux,
+building for the other CPU type needs QEMU (`docker run --privileged --rm tonistiigi/binfmt --install all`).
+
+```bash
+./build-bundle.sh amd64          # Intel/AMD servers, Ubuntu 24.04
+./build-bundle.sh arm64 26.04    # ARM servers, Ubuntu 26.04
+```
+
+This makes `dist/ansibro-<ubuntu>-<arch>.tar.gz` (about 2.5 GB). It holds this project, apt packages,
+Ansible and all Docker images from `versions.yml`. Your project folder is not changed.
+
+**2. Copy it to the first manager**, together with your SSH private key and, if you use them,
+your `tls_cert`/`tls_key`/`acme_ca_cert` files (the bundle leaves out keys and certificates).
+The installer connects over SSH to every server, the first manager itself too, so that key must
+be allowed on all servers. Then run the installer there:
+
+```bash
+tar -xzf ansibro-24.04-amd64.tar.gz
+cd ansibro
+cp config.example.yml config.yml   # set tls: selfsigned (or custom), and ssh.key
+./install.sh
+```
+
+The installer sees the `bundle/` folder and uses it instead of the internet.
+The servers' own apt settings are not changed.
+
+Notes:
+- Every server must run the bundle's Ubuntu version and CPU type.
+- Let's Encrypt needs internet. Use `tls: selfsigned`, `tls: custom`, or an ACME server
+  in your network (`acme_server`, see `config.example.yml`).
+- Time sync (chrony) needs a time server. Without internet, use one in your network: on each server
+  put `server <time server ip> iburst` in `/etc/chrony/sources.d/local.sources`, then run
+  `sudo chronyc reload sources`.
+
+## Docker Swarm or k3s
+
+`orchestrator: swarm` (the default) or `orchestrator: k3s` in `config.yml`. Everything around the
+cluster is the same: firewall, WireGuard, registry, server apps (databases, storage, monitoring...),
+backup, monitoring and alerts, offline bundle.
+
+With k3s:
+- Managers are k3s servers (3 managers = the cluster survives one down), workers are k3s agents.
+  Standalone servers run server apps and are not in the cluster. The pinned k3s version is in `versions.yml`.
+- Use `kubectl` on a manager: `sudo k3s kubectl get nodes`. To use it from your laptop, copy
+  `/etc/rancher/k3s/k3s.yaml` from a manager and change `127.0.0.1` in it to the manager's address.
+- Traefik is k3s's built-in one: `traefik: cluster` in `apps`. Server apps get their web pages through it
+  like with Swarm. Point DNS to any cluster server. Your own apps: an `Ingress` or Traefik `IngressRoute`.
+- Pods pull from the cluster's registry: `registry.ansibro:5000/<image>:<tag>` (push your images there).
+- For now these apps are Swarm only: kong, portainer, swarmpit, keycloak, authelia.
+- The backup has a k3s (etcd) snapshot. `-e restore=true` is Swarm only for now; to restore k3s, see
+  [k3s backup and restore](https://docs.k3s.io/datastore/backup-restore).
 
 ## How it works
 
