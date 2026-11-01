@@ -59,3 +59,50 @@ spec:
       kind: Rule
       services: [{ name: keycloak, port: 8080 }]
   tls: {}
+{% if admin_sso == 'keycloak' %}
+---
+# The Keycloak login in front of the admin pages (Traefik middleware "oauth").
+apiVersion: v1
+kind: Secret
+metadata: { name: oauth2-proxy, namespace: ansibro }
+stringData:
+  OAUTH2_PROXY_CLIENT_SECRET: "{{ keycloak_oauth_client_secret }}"
+  OAUTH2_PROXY_COOKIE_SECRET: "{{ keycloak_oauth_cookie_secret }}"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: oauth2-proxy, namespace: ansibro }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: oauth2-proxy } }
+  template:
+    metadata: { labels: { app: oauth2-proxy } }
+    spec:
+      containers:
+        - name: oauth2-proxy
+          image: {{ registry_addr }}/oauth2-proxy:{{ images['oauth2-proxy'].tag }}
+          args:
+{% for arg in keycloak_oauth_args %}
+            - "{{ arg }}"
+{% endfor %}
+          envFrom: [{ secretRef: { name: oauth2-proxy } }]
+          ports: [{ containerPort: 4180 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: oauth2-proxy, namespace: ansibro }
+spec:
+  selector: { app: oauth2-proxy }
+  ports: [{ port: 4180 }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: oauth2-proxy, namespace: ansibro }
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`{{ keycloak_oauth_host }}`)
+      kind: Rule
+      services: [{ name: oauth2-proxy, port: 4180 }]
+  tls: {}
+{% endif %}

@@ -15,10 +15,13 @@ Tested on DigitalOcean (Ubuntu 24.04, amd64), with `tests/check.py` passing and 
 - The release workflow builds all four bundles.
 
 Not tested yet (test before the next release):
+- The Keycloak login for admin pages; portainer, kong, keycloak, authelia and restore on k3s.
 - Mixed amd64 + arm64 clusters (DigitalOcean has no arm64 servers), GPU servers, Telegram alerts,
   a restore of a cluster with monitoring, offline installs with k3s, uploading bundles to a release.
 
 New
+- Keycloak as the login for admin pages (when Authelia is not installed): realm `ansibro`, user
+  `admin` with a second factor, through oauth2-proxy. Works on Swarm and k3s.
 - k3s: `orchestrator: k3s` makes a k3s (Kubernetes) cluster instead of Docker Swarm: managers are
   k3s servers (embedded etcd), workers agents. Pinned version, offline bundle, WireGuard, registry
   mirror, firewall, built-in Traefik with routes to server apps, metrics and alerts (K3sNodeDown,

@@ -109,11 +109,15 @@ def python_on_leader(code, data):
 
 
 def admin_login(name, sub, path="/", ok=("200",)):
-    """An admin page needs a login: the Traefik password, or Authelia (with a second factor) when installed.
-    Returns (status, body) after logging in with the Traefik password, or None with Authelia."""
-    check(f"{name} needs a login", https(sub, path)[0] in ("401", "302"))
-    if "authelia" in APPS:
-        print(f"SKIP  {name} opens after login  (Authelia login with a second factor)")
+    """An admin page needs a login: the Traefik password, or Authelia or Keycloak (with a second factor)
+    when installed. Returns (status, body) after logging in with the Traefik password, or None with SSO."""
+    sso = "Authelia" if "authelia" in APPS else "Keycloak" if "keycloak" in APPS else ""
+    code, body = https(sub, path)
+    check(f"{name} needs a login", code in ("401", "302", "403"), code)
+    if sso == "Keycloak":
+        check(f"{name} sends you to the Keycloak login", f"keycloak.{DOMAIN}/realms/ansibro" in body or code == "302", body[-120:])
+    if sso:
+        print(f"SKIP  {name} opens after login  ({sso} login with a second factor)")
         return None
     code, body = https(sub, path, user="admin:" + secret("traefik_admin"))
     check(f"{name} opens with the password", code in ok, code)
@@ -285,6 +289,8 @@ def check_keycloak():
     form = f"grant_type=password&client_id=admin-cli&username=admin&password={secret('keycloak_admin')}"
     code, body = https("keycloak", "/realms/master/protocol/openid-connect/token", data=form)
     check("keycloak admin login", code == "200" and "access_token" in body, code)
+    if "authelia" not in APPS:
+        check("keycloak has the ansibro realm for admin pages", https("keycloak", "/realms/ansibro")[0] == "200")
 
 
 def check_authelia():

@@ -15,6 +15,7 @@
 - PostgreSQL replicas (manual failover), Garage on 3 servers
 - Zero trust: per-port firewall between servers, Authelia (2FA) for admin pages, encrypted `state/`, image scan in CI
 - Secrets: OpenBao
+- Admin pages behind Authelia or Keycloak (both with a second factor)
 - Remove apps and servers that are no longer in `config.yml`
 - Offline bundles built in CI for each release
 - GPU servers (NVIDIA)
@@ -24,7 +25,6 @@
 
 1. Test everything above on real servers (DigitalOcean), see "Not tested yet" in CHANGELOG
 2. Automatic PostgreSQL failover (Patroni), MariaDB and Valkey replicas
-3. SSO for admin pages with Keycloak (today: Authelia only)
 
 ## Rules
 

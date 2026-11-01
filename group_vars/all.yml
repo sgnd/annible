@@ -20,8 +20,11 @@ traefik_nodes: >-
   {{ groups['swarm'] if orchestrator == 'k3s'
   else [swarm_leader] if tls | default('letsencrypt') == 'letsencrypt' else groups['managers'] }}
 
-# k3s: the login on admin pages (a Traefik middleware in the "ansibro" namespace).
-k3s_admin_login: "{{ 'authelia' if 'authelia' in apps else 'admin-auth' }}"
+# The login on admin pages: Authelia, or Keycloak (through oauth2-proxy), or else the Traefik
+# dashboard password. Authelia and Keycloak ask for a second factor (an authenticator app).
+admin_sso: "{{ 'authelia' if 'authelia' in apps else 'keycloak' if 'keycloak' in apps else '' }}"
+# k3s: that login as a Traefik middleware in the "ansibro" namespace.
+k3s_admin_login: "{{ {'authelia': 'authelia', 'keycloak': 'oauth'}[admin_sso] | default('admin-auth') }}"
 
 # Swarm apps without data run on servers with the label tier=app, if there are any
 # (servers without server apps get it; see inventory.py).

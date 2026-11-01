@@ -65,6 +65,10 @@ images:
     repo: nvcr.io/nvidia/k8s/dcgm-exporter
     tag: 4.5.2-4.8.1-ubuntu22.04
     digest: sha256:17e9d49093f2d86d90260eec3c07b18b3f78fc5eadef3c8ab26a24fa5a9c1b2c
+  oauth2-proxy:
+    repo: quay.io/oauth2-proxy/oauth2-proxy
+    tag: v7.15.5
+    digest: sha256:8498b0d0ef0a7b29686414000a08aee467f02d0299c9ed1e006a8f33fc017916
   openbao:
     repo: docker.io/openbao/openbao
     tag: 2.7.2
