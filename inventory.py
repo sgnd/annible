@@ -37,7 +37,7 @@ URL = re.compile(r"^https?://\S+$")
 TIME = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
 # Swarm's own networks use this range. Docker's default (10.0.0.0/8) often clashes with servers' IPs.
 SWARM_ADDRESS_POOL = "10.200.0.0/16"
-REGISTRY_PORT = 5000  # the local image registry on the first manager
+REGISTRY_PORT = 5000  # the local image registry, on every manager
 KONG_SUBNET = "10.200.255.0/24"  # Kong's own network, inside the pool
 NODE_KEYS = {"name", "ip", "host", "role", "labels", "gpu"}
 WIREGUARD_PORT = 51820  # UDP port of the WireGuard network between the servers
@@ -368,6 +368,7 @@ def build(cfg, base_dir):
 
     ssh = cfg.get("ssh") or {}
     all_vars = {k: v for k, v in cfg.items() if k not in ("nodes", "apps")}
+    all_vars.setdefault("tls", "letsencrypt")  # so roles can use tls without a default
     for key in ("tls_cert", "tls_key", "acme_ca_cert"):
         if key in cfg:
             all_vars[key] = from_config_dir(cfg[key])
