@@ -43,7 +43,7 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
 fi
 rm -rf "$root"
 mkdir -p "$bundle/images"
-# --no-xattrs and COPYFILE_DISABLE: do not add macOS file attributes (Linux tar warns about them).
+# COPYFILE_DISABLE (and --no-xattrs further down): do not add macOS file attributes (Linux tar warns about them).
 export COPYFILE_DISABLE=1
 git archive HEAD | tar -C "$work" -xf -
 

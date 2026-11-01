@@ -3,14 +3,14 @@
 
 - name: Create NATS folders
   ansible.builtin.file:
-    path: "{{ item.path }}"
+    path: "{{ item }}"
     state: directory
-    owner: "{{ item.owner }}"
-    group: "{{ item.owner }}"
+    owner: root
+    group: root
     mode: "0700"
   loop:
-    - { path: "{{ nats_dir }}", owner: root }
-    - { path: "{{ nats_dir }}/data", owner: "root" }
+    - "{{ nats_dir }}"
+    - "{{ nats_dir }}/data"
 
 - name: Write NATS config
   ansible.builtin.template:

@@ -14,6 +14,8 @@ observability_alertmanager_port: 9093
 observability_grafana_port: 3000
 
 # Ports of the agents on every server.
+# The firewall opens these ports too: if you change one, change it in
+# common_app_ports (roles/common/defaults/main.yml) as well.
 observability_node_exporter_port: 9100
 observability_cadvisor_port: 9280
 observability_vector_port: 9598
@@ -24,6 +26,7 @@ observability_dcgm_exporter_port: 9400
 observability_traefik_metrics_port: 8082
 
 # The port of each server app. Every minute, each server checks that its apps answer there.
+# These are the same ports as in common_app_ports (roles/common/defaults/main.yml), for the firewall.
 observability_app_ports:
   postgres: 5432
   mariadb: 3306
