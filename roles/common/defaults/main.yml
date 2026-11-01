@@ -40,6 +40,7 @@ common_app_ports:
   nats: [4222, 8222]
   uptimekuma: [3001]
   beszel: [8090]
+  openbao: [8200, 8201]
   prometheus: [9090, 3100, 9093, 3000]      # metrics, logs, alerts, Grafana
   victoria: [8428, 9428, 8880, 9093, 3000]  # metrics, logs, rules, alerts, Grafana
 common_cluster_tcp_ports: >-

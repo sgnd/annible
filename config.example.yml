@@ -107,4 +107,5 @@ apps:
   rustfs: data1            # or garage. 3 copies of every file: garage: [data1, data2, data3]
   rabbitmq: data1          # or nats
   # uptimekuma: swarm2     # or beszel; with monitoring, on another server than it
+  # openbao: data1          # secrets for your apps (passwords, API keys)
   # victoria: data1        # metrics, logs and alerts, or prometheus (needs monitoring: above)

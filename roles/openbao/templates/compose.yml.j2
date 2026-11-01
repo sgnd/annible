@@ -1,0 +1,19 @@
+services:
+  openbao:
+    image: {{ registry_addr }}/openbao:{{ images.openbao.tag }}
+    container_name: openbao
+    restart: always
+    command: server
+    # Host network: the firewall decides who can connect.
+    network_mode: host
+    environment:
+      SKIP_SETCAP: "true"  # memory locking is off (disable_mlock)
+    volumes:
+      - ./config:/openbao/config:ro
+      - ./data:/openbao/file
+    healthcheck:
+      # Healthy when it answers, also while it is sealed (the installer unseals it).
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "{{ openbao_url }}/v1/sys/health?sealedcode=200&uninitcode=200"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

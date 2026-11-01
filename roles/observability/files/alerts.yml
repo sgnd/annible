@@ -263,3 +263,12 @@ groups:
         labels: { severity: warning }
         annotations:
           summary: "{{ $labels.job }} on {{ $labels.node }} refused connections (too many clients)."
+
+  - name: secrets
+    rules:
+      - alert: OpenBaoSealed
+        expr: ansibro_openbao_sealed == 1
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "OpenBao on {{ $labels.node }} is sealed: apps cannot read their secrets. Run ./install.sh again, or unseal it at https://openbao.<domain>."

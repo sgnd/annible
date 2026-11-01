@@ -13,6 +13,11 @@ tmp=$(mktemp "$out.XXXXXX")
   up=0; timeout 3 bash -c '</dev/tcp/{{ node_ip }}/{{ observability_app_ports[app] }}' 2>/dev/null && up=1
   echo "ansibro_app_up{app=\"{{ app }}\",port=\"{{ observability_app_ports[app] }}\"} $up"
 {% endfor %}
+{% if 'openbao' in node_apps %}
+  # OpenBao answers, but can only give out secrets when it is unsealed.
+  sealed=$(curl -s -m 3 http://{{ node_ip }}:8200/v1/sys/seal-status | jq -r 'if .sealed then 1 else 0 end' 2>/dev/null)
+  echo "ansibro_openbao_sealed ${sealed:-1}"
+{% endif %}
 
   # 2. Containers started with docker compose (server apps, agents): running, restarts, out of memory.
 {% raw %}

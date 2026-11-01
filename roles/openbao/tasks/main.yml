@@ -1,0 +1,126 @@
+# OpenBao: keeps secrets (passwords, API keys, certificates) for your apps.
+# Apps use http://<server ip>:8200, people use https://openbao.<domain>. Log in with the root token
+# in state/secrets/openbao_root_token, then make users and policies for your apps.
+#
+# OpenBao keeps its data encrypted and starts "sealed": it needs the unseal key before it works.
+# The installer sets it up once, saves the unseal key in state/secrets/openbao_unseal_key,
+# and unseals it on every run. After a server restart, run ./install.sh again (or unseal it on the web page).
+
+- name: Create OpenBao folders
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0700"
+  loop:
+    - "{{ openbao_dir }}"
+    - "{{ openbao_dir }}/config"
+    - "{{ openbao_dir }}/data"
+
+- name: Write OpenBao config
+  ansible.builtin.template:
+    src: config.hcl.j2
+    dest: "{{ openbao_dir }}/config/config.hcl"
+    mode: "0644"
+  register: openbao_config
+
+- name: Mirror OpenBao image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [openbao]
+
+- name: Write OpenBao compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ openbao_dir }}/compose.yml"
+    mode: "0600"
+
+- name: Start OpenBao
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: openbao
+    docker_compose_restart: "{{ openbao_config.changed }}"
+
+- name: Check if OpenBao is set up
+  ansible.builtin.uri:
+    url: "{{ openbao_url }}/v1/sys/init"
+  register: openbao_init
+
+# One key and one root token. Saved right away: without the key the data cannot be read.
+- name: Set up OpenBao
+  ansible.builtin.uri:
+    url: "{{ openbao_url }}/v1/sys/init"
+    method: PUT
+    body_format: json
+    body: { secret_shares: 1, secret_threshold: 1 }
+  register: openbao_keys
+  when: not openbao_init.json.initialized
+  changed_when: true
+  no_log: true
+
+- name: Save the OpenBao unseal key and root token in state/secrets/
+  ansible.builtin.copy:
+    dest: "{{ secrets_dir }}/openbao_{{ item.name }}"
+    content: "{{ item.value }}"
+    mode: "0600"
+  loop:
+    - { name: unseal_key, value: "{{ openbao_keys.json.keys_base64[0] | default('') }}" }
+    - { name: root_token, value: "{{ openbao_keys.json.root_token | default('') }}" }
+  loop_control:
+    label: "{{ item.name }}"
+  when: openbao_keys.changed  # noqa: no-handler (must be saved right away)
+  delegate_to: localhost
+  become: false
+  no_log: true
+
+- name: Check if OpenBao is sealed
+  ansible.builtin.uri:
+    url: "{{ openbao_url }}/v1/sys/seal-status"
+  register: openbao_seal
+
+- name: Unseal OpenBao
+  ansible.builtin.uri:
+    url: "{{ openbao_url }}/v1/sys/unseal"
+    method: PUT
+    body_format: json
+    body:
+      key: "{{ lookup('ansible.builtin.file', secrets_dir ~ '/openbao_unseal_key') }}"
+  when: openbao_seal.json.sealed
+  changed_when: true
+  no_log: true
+
+# A place for your secrets: secret/<path>, with versions (KV version 2).
+- name: Check OpenBao secret engines
+  ansible.builtin.uri:
+    url: "{{ openbao_url }}/v1/sys/mounts"
+    headers:
+      X-Vault-Token: "{{ lookup('ansible.builtin.file', secrets_dir ~ '/openbao_root_token') }}"
+  register: openbao_mounts
+  retries: 10  # just after unsealing it may need a moment
+  delay: 3
+  until: openbao_mounts.status == 200
+  no_log: true
+
+- name: Turn on the secret/ engine
+  ansible.builtin.uri:
+    url: "{{ openbao_url }}/v1/sys/mounts/secret"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ lookup('ansible.builtin.file', secrets_dir ~ '/openbao_root_token') }}"
+    body_format: json
+    body: { type: kv, options: { version: "2" } }
+    status_code: [200, 204]
+  when: "'secret/' not in openbao_mounts.json.data | default({})"
+  changed_when: true
+  no_log: true
+
+- name: Add OpenBao to Traefik
+  ansible.builtin.include_role:
+    name: traefik
+    tasks_from: route
+  vars:
+    traefik_route_name: openbao
+    traefik_route_port: 8200

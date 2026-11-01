@@ -34,6 +34,7 @@ observability_app_ports:
   nats: 4222
   uptimekuma: 3001
   beszel: 8090
+  openbao: 8200
   prometheus: 9090
   victoria: 8428
 

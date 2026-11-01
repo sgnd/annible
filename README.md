@@ -157,6 +157,7 @@ Click a name to open its official website.
 | storage (S3) | [rustfs](https://rustfs.com) / [garage](https://garagehq.deuxfleurs.fr) | server | 9000 / 3900 | `rustfs.<domain>/rustfs/console/` |
 | queue | [rabbitmq](https://www.rabbitmq.com) / [nats](https://nats.io) | server | 5672 / 4222 | `rabbitmq.<domain>` / `nats.<domain>` |
 | monitoring | [uptimekuma](https://uptime.kuma.pet) / [beszel](https://beszel.dev) | server | | `uptimekuma.<domain>` / `beszel.<domain>` |
+| secrets | [openbao](https://openbao.org) | server | 8200 | `openbao.<domain>` |
 | observability (metrics, logs, alerts) | [prometheus](https://prometheus.io) (+ Loki) / [victoria](https://victoriametrics.com) (VictoriaMetrics + VictoriaLogs), both with Alertmanager and Grafana | server | | `grafana.<domain>`, `alertmanager.<domain>`, `metrics.<domain>` (+ `logs.<domain>` for victoria) |
 
 Users and password files are listed in [`catalog.yml`](catalog.yml), and printed at the end of
@@ -187,6 +188,12 @@ Manager, Alertmanager and the other pages that ask for the Traefik login then as
 login instead (user `admin`, password in `state/secrets/authelia_admin`), with a second factor (an
 authenticator app). The first time, Authelia asks for a code that it writes to
 `/opt/ansibro/authelia/config/notification.txt` on the first manager.
+
+**OpenBao** keeps secrets for your apps. Log in at `https://openbao.<domain>` with the root token
+(`state/secrets/openbao_root_token`), and make a token or user with a policy for each app; apps read
+secrets from `http://<server ip>:8200/v1/secret/data/<path>`. OpenBao starts sealed after a restart:
+run `./install.sh` again (it unseals it with `state/secrets/openbao_unseal_key`), or unseal it on
+the web page. With monitoring, the alert `OpenBaoSealed` tells you.
 
 **Kong** runs on its own network, `kong`, shared only with Traefik. Put your API services on that
 network too (`networks: [kong]`, external) so Kong can reach them. Other apps cannot reach Kong's admin API.

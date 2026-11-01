@@ -1,0 +1,2 @@
+openbao_dir: "{{ apps_dir }}/openbao"
+openbao_url: "http://{{ node_ip }}:8200"

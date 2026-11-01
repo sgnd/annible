@@ -264,6 +264,40 @@ def check_postgres():
             check(f"postgres database for {app}", out.strip() == "1", out[-200:])
 
 
+def check_postgres_replicas():
+    """Each replica follows the primary: a row written on the primary shows up there."""
+    stamp = str(int(time.time()))
+    env = [f"PGPASSWORD={secret('postgres')}"]
+    _, out = client("postgres", "psql", "-h", ip_of("postgres"), "-U", "postgres", "-tAc",
+                    f"CREATE TABLE IF NOT EXISTS ansibro_check (v text); INSERT INTO ansibro_check VALUES ('{stamp}')", env=env)
+    for node in CFG["app_nodes"]["postgres"][1:]:
+        ip = HOSTS[node]["node_ip"]
+        _, out = client("postgres", "psql", "-h", ip, "-U", "postgres", "-tAc", "SELECT pg_is_in_recovery()", env=env)
+        check(f"postgres on {node} is a replica", out.strip() == "t", out[-200:])
+        for _ in range(10):
+            _, out = client("postgres", "psql", "-h", ip, "-U", "postgres", "-tAc",
+                            f"SELECT count(*) FROM ansibro_check WHERE v = '{stamp}'", env=env)
+            if out.strip() == "1":
+                break
+            time.sleep(2)
+        check(f"postgres replica on {node} has the new row", out.strip() == "1", out[-200:])
+
+
+def check_openbao():
+    base = f"http://{ip_of('openbao')}:8200"
+    code, body = curl(base + "/v1/sys/seal-status")
+    check("openbao is unsealed", code == "200" and '"sealed":false' in body.replace(" ", ""), body[-200:])
+    token = "X-Vault-Token: " + secret("openbao_root_token")
+    code, _ = curl(base + "/v1/secret/data/ansibro-check", data='{"data": {"hello": "world"}}', headers=[token])
+    check("openbao saves a secret", code in ("200", "204"), code)
+    code, body = curl(base + "/v1/secret/data/ansibro-check", headers=[token])
+    check("openbao reads the secret back", code == "200" and "world" in body, body[-200:])
+    code, _ = curl(base + "/v1/secret/data/ansibro-check")
+    check("openbao refuses without a token", code in ("400", "401", "403"), code)
+    if WEB:
+        check("openbao web page", https("openbao", "/ui/")[0] in ("200", "307"))
+
+
 def check_mariadb():
     _, out = client("mariadb", "mariadb", "-h", ip_of("mariadb"), "-uroot", "-N", "-e", "select 1", env=[f"MYSQL_PWD={secret('mariadb')}"])
     check("mariadb login", out.strip() == "1", out[-200:])
@@ -378,6 +412,7 @@ def check_monitoring(app):
 CHECKS = {
     "traefik": check_traefik, "kong": check_kong, "portainer": check_portainer, "swarmpit": check_swarmpit,
     "keycloak": check_keycloak, "authelia": check_authelia, "postgres": check_postgres, "mariadb": check_mariadb,
+    "openbao": check_openbao,
     "redis": lambda: check_cache("redis"), "valkey": lambda: check_cache("valkey"),
     "rustfs": check_rustfs, "garage": check_garage, "rabbitmq": check_rabbitmq, "nats": check_nats,
     "uptimekuma": check_uptimekuma, "beszel": check_beszel,
@@ -391,6 +426,8 @@ if __name__ == "__main__":
         check_wireguard()
     if CFG.get("backup"):
         check_backup()
+    if len(CFG["app_nodes"].get("postgres", [])) > 1:
+        check_postgres_replicas()
     for app in APPS:
         try:
             CHECKS[app]()

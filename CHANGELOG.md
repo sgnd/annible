@@ -15,8 +15,12 @@ Not tested yet (test before the next release):
 - PostgreSQL replicas and Garage on 3 servers.
 - Zero trust: the per-port firewall between servers, the Authelia login for admin pages,
   `state.age` encryption (only tried on a Mac), the image scan in CI.
+- OpenBao.
 
 New
+- `openbao` app: secrets for your apps. The installer sets it up, saves the unseal key and root
+  token in `state/secrets/`, unseals it on every run, and turns on `secret/` (KV version 2).
+  Alert `OpenBaoSealed` when it needs unsealing after a restart.
 - Zero trust:
   - Between your servers, only the ports in use are open (swarm, registry, each server's apps,
     monitoring agents). Before, servers could reach every port of each other.
