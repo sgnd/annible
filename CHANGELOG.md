@@ -17,8 +17,11 @@ Not tested yet (test before the next release):
   `state.age` encryption (only tried on a Mac), the image scan in CI.
 - OpenBao.
 - Removing apps and servers.
+- The release workflow (bundles built by GitHub Actions on each tag).
 
 New
+- Each GitHub release gets the offline bundles for amd64 and arm64, Ubuntu 24.04 and 26.04,
+  built by GitHub Actions (`.github/workflows/release.yml`).
 - Remove an app: take it out of `config.yml` and run `./install.sh`. It stops (data kept).
 - Remove a server: take it out of `config.yml` and run `./install.sh -e remove_nodes=true`.
   Without that option the installer stops and lists the servers it would remove.

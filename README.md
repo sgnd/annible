@@ -51,7 +51,15 @@ Check mode (`--check`) is not supported.
 
 For servers with no internet (for example only VPN access).
 
-**1. On a machine with internet and Docker**, build a bundle for the CPU and Ubuntu version
+**1. Get a bundle.** Each release on GitHub has them, for both CPU types and Ubuntu versions.
+They come in parts (GitHub allows 2 GB per file); put the parts back together and check them:
+
+```bash
+cat ansibro-24.04-amd64.tar.gz.part* > ansibro-24.04-amd64.tar.gz
+sha256sum -c ansibro-24.04-amd64.tar.gz.sha256   # on a Mac: shasum -a 256 -c ...
+```
+
+Or build one yourself: **on a machine with internet and Docker**, build a bundle for the CPU and Ubuntu version
 of your servers. A Mac (Docker Desktop or OrbStack) can build both CPU types. On Linux,
 building for the other CPU type needs QEMU (`docker run --privileged --rm tonistiigi/binfmt --install all`).
 
