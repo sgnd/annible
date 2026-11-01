@@ -1,0 +1,101 @@
+# Monitoring agents on {{ inventory_hostname }}. The monitoring server ({{ monitoring_ip }}) collects from them.
+# Host network: the firewall decides who can connect. They listen on {{ node_ip }} only.
+services:
+  node-exporter:
+    image: {{ registry_addr }}/node-exporter:{{ images['node-exporter'].tag }}
+    container_name: node-exporter
+    restart: always
+    network_mode: host
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --web.listen-address={{ node_ip }}:{{ observability_node_exporter_port }}
+      # Metrics written by annible-metrics every minute.
+      - --collector.textfile.directory=/host/var/lib/annible-metrics
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|run|sys|var/lib/docker/.+|var/lib/containerd/.+)($|/)
+    volumes:
+      - /:/host:ro,rslave
+
+  cadvisor:
+    image: {{ registry_addr }}/cadvisor:{{ images.cadvisor.tag }}
+    container_name: cadvisor
+    restart: always
+    network_mode: host
+    privileged: true
+    devices: [/dev/kmsg]
+    command:
+      - --listen_ip={{ node_ip }}
+      - --port={{ observability_cadvisor_port }}
+      - --docker_only=true
+      - --housekeeping_interval=30s
+      - --store_container_labels=false
+      - --whitelisted_container_labels=com.docker.compose.project,com.docker.swarm.service.name
+      # Fewer metrics: less memory and disk on the monitoring server.
+      - --disable_metrics=advtcp,cpu_topology,cpuset,hugetlb,memory_numa,percpu,process,referenced_memory,resctrl,sched,tcp,udp
+    # The image checks localhost:8080; cAdvisor listens on this server's ip instead.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://{{ node_ip }}:{{ observability_cadvisor_port }}/healthz"]
+      interval: 30s
+      timeout: 5s
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+
+  vector:
+    image: {{ registry_addr }}/vector:{{ images.vector.tag }}
+    container_name: vector
+    restart: always
+    network_mode: host
+    command: [--config, /etc/vector/vector.yaml]
+    volumes:
+      - ./vector.yaml:/etc/vector/vector.yaml:ro
+      # Logs wait here while the monitoring server is down, and are sent later.
+      - ./vector-data:/var/lib/vector
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log/journal:/var/log/journal:ro
+      - /run/log/journal:/run/log/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
+{% if 'postgres' in node_apps %}
+
+  postgres-exporter:
+    image: {{ registry_addr }}/postgres-exporter:{{ images['postgres-exporter'].tag }}
+    container_name: postgres-exporter
+    restart: always
+    network_mode: host
+    environment:
+      DATA_SOURCE_URI: "{{ node_ip }}:5432/postgres?sslmode=disable"
+      DATA_SOURCE_USER: monitor
+      DATA_SOURCE_PASS: ${MONITOR_PASSWORD}  # from .env
+    command: [--web.listen-address={{ node_ip }}:{{ observability_postgres_exporter_port }}]
+{% endif %}
+{% if 'mariadb' in node_apps %}
+
+  mysqld-exporter:
+    image: {{ registry_addr }}/mysqld-exporter:{{ images['mysqld-exporter'].tag }}
+    container_name: mysqld-exporter
+    restart: always
+    network_mode: host
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: ${MONITOR_PASSWORD}  # from .env
+    command:
+      - --mysqld.address={{ node_ip }}:3306
+      - --mysqld.username=monitor
+      - --web.listen-address={{ node_ip }}:{{ observability_mysqld_exporter_port }}
+{% endif %}
+{% if node_apps | intersect(['redis', 'valkey']) %}
+
+  # Works for Redis and Valkey.
+  redis-exporter:
+    image: {{ registry_addr }}/redis-exporter:{{ images['redis-exporter'].tag }}
+    container_name: redis-exporter
+    restart: always
+    network_mode: host
+    environment:
+      REDIS_PASSWORD: ${CACHE_PASSWORD}  # from .env
+    command:
+      - -redis.addr=redis://{{ node_ip }}:6379
+      - -web.listen-address={{ node_ip }}:{{ observability_redis_exporter_port }}
+{% endif %}

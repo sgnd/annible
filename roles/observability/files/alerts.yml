@@ -1,0 +1,258 @@
+# Alert rules. The same file works for Prometheus and vmalert.
+# severity: critical = something is down now, warning = look at it soon.
+# The annible_* metrics come from /usr/local/bin/annible-metrics on every server (every minute).
+
+groups:
+  - name: monitoring
+    rules:
+      # Always firing. Uptime Kuma on another server checks that it is (or a heartbeat service gets it).
+      # When it is gone, the monitoring itself is down.
+      - alert: Watchdog
+        expr: vector(1)
+        labels: { severity: none }
+        annotations:
+          summary: Always firing. It shows that the monitoring and alerts work.
+
+      - alert: TargetDown
+        expr: up == 0
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.job }} on {{ $labels.node }} ({{ $labels.instance }}) does not answer."
+
+      - alert: AlertsNotSent
+        expr: increase(alertmanager_notifications_failed_total[10m]) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "Alertmanager could not send alerts to {{ $labels.integration }}. Check monitoring: in config.yml."
+
+      - alert: AlertRulesFailing
+        expr: increase(prometheus_rule_evaluation_failures_total[10m]) > 0 or increase(vmalert_execution_errors_total[10m]) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: Some alert rules cannot be checked, so their alerts would not fire.
+
+      - alert: MetricsScriptNotRunning
+        expr: time() - node_textfile_mtime_seconds > 300 or node_textfile_scrape_error == 1
+        labels: { severity: warning }
+        annotations:
+          summary: "annible-metrics did not run on {{ $labels.node }} for 5 minutes. App, backup and swarm checks there are blind."
+
+      - alert: LogsNotSent
+        expr: increase(vector_component_errors_total{component_kind="sink"}[10m]) > 0 or vector_buffer_byte_size > 100e6
+        labels: { severity: warning }
+        annotations:
+          summary: "The log agent on {{ $labels.node }} cannot send logs to the monitoring server."
+
+  - name: servers
+    rules:
+      - alert: NodeDown
+        expr: up{job="node"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Server {{ $labels.node }} is down or cannot be reached."
+
+      # Uptime, not the boot time: in VMs the boot time moves by a second when the clock is fixed.
+      - alert: NodeRebooted
+        expr: node_time_seconds - node_boot_time_seconds < 600
+        labels: { severity: warning }
+        annotations:
+          summary: "Server {{ $labels.node }} restarted."
+
+      - alert: DiskAlmostFull
+        expr: (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"} / node_filesystem_size_bytes) > 0.85
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Disk {{ $labels.mountpoint }} on {{ $labels.node }} is {{ $value | humanizePercentage }} full."
+
+      - alert: DiskFull
+        expr: (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"} / node_filesystem_size_bytes) > 0.95
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Disk {{ $labels.mountpoint }} on {{ $labels.node }} is {{ $value | humanizePercentage }} full."
+
+      - alert: DiskFillsSoon
+        expr: >-
+          predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"}[6h], 24 * 3600) < 0
+          and (1 - node_filesystem_avail_bytes / node_filesystem_size_bytes) > 0.6
+        for: 30m
+        labels: { severity: warning }
+        annotations:
+          summary: "At this speed, disk {{ $labels.mountpoint }} on {{ $labels.node }} is full within a day."
+
+      - alert: InodesAlmostFull
+        expr: (1 - node_filesystem_files_free{fstype!~"tmpfs|overlay|squashfs|ramfs"} / node_filesystem_files) > 0.9
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Disk {{ $labels.mountpoint }} on {{ $labels.node }} has almost no free inodes (too many small files)."
+
+      - alert: MemoryAlmostFull
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 0.9
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Memory on {{ $labels.node }} is {{ $value | humanizePercentage }} used."
+
+      - alert: OutOfMemoryKill
+        expr: increase(node_vmstat_oom_kill[10m]) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "Linux stopped a program on {{ $labels.node }} because memory was full."
+
+      - alert: CpuBusy
+        expr: (1 - avg by (node) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 0.9
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "CPU on {{ $labels.node }} is {{ $value | humanizePercentage }} busy for 15 minutes."
+
+      - alert: ClockNotSynced
+        expr: node_timex_sync_status == 0 or abs(node_timex_offset_seconds) > 0.05
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "The clock on {{ $labels.node }} is not in sync. Certificates, logins and the swarm need the right time."
+
+      - alert: SystemdServiceFailed
+        expr: annible_systemd_failed_units > 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $value }} system service(s) failed on {{ $labels.node }}. Run: systemctl --failed"
+
+  - name: apps
+    rules:
+      - alert: AppDown
+        expr: annible_app_up == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.app }} on {{ $labels.node }} does not answer on port {{ $labels.port }}."
+
+      - alert: ContainerDown
+        expr: annible_container_running == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Container {{ $labels.container }} on {{ $labels.node }} is not running."
+
+      - alert: ContainerRestarting
+        expr: increase(annible_container_restarts_total[15m]) > 2
+        labels: { severity: warning }
+        annotations:
+          summary: "Container {{ $labels.container }} on {{ $labels.node }} restarted {{ $value }} times in 15 minutes."
+
+      - alert: ContainerOutOfMemory
+        expr: annible_container_oom_killed == 1
+        labels: { severity: warning }
+        annotations:
+          summary: "Container {{ $labels.container }} on {{ $labels.node }} was stopped because it used too much memory."
+
+      - alert: SwarmServiceDown
+        expr: annible_swarm_service_running < annible_swarm_service_desired
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "Swarm service {{ $labels.service }} runs {{ $value }} of its tasks. Run: docker service ps {{ $labels.service }}"
+
+      - alert: SwarmNodeDown
+        expr: annible_swarm_node_ready == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Swarm says server {{ $labels.swarm_node }} is not ready."
+
+      - alert: WebAppDown
+        expr: traefik_service_server_up == 0
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: "Traefik cannot reach {{ $labels.service }} ({{ $labels.url }})."
+
+      - alert: WebAppErrors
+        expr: >-
+          sum by (service) (rate(traefik_service_requests_total{code=~"5.."}[5m]))
+          / sum by (service) (rate(traefik_service_requests_total[5m])) > 0.05
+          and sum by (service) (rate(traefik_service_requests_total[5m])) > 0.1
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $value | humanizePercentage }} of the requests to {{ $labels.service }} fail with a 5xx error."
+
+      - alert: CertificateEndsSoon
+        expr: (traefik_tls_certs_not_after - time()) / 86400 < 14
+        labels: { severity: warning }
+        annotations:
+          summary: "The certificate for {{ $labels.sans }} ends in {{ $value | humanize }} days."
+
+  - name: backup
+    rules:
+      - alert: BackupTooOld
+        expr: annible_backup_enabled == 1 and time() - annible_backup_last_success_timestamp_seconds > 26 * 3600
+        for: 30m  # a new server: the install runs the first backup a few minutes after the agents start
+        labels: { severity: critical }
+        annotations:
+          summary: "The last good backup of {{ $labels.node }} is older than 26 hours. Run: journalctl -u annible-backup"
+
+  - name: wireguard
+    rules:
+      - alert: WireGuardPeerDown
+        expr: time() - annible_wireguard_last_handshake_seconds > 300
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.node }} cannot reach {{ $labels.peer }} over WireGuard. Check UDP port 51820."
+
+  - name: databases
+    rules:
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "PostgreSQL on {{ $labels.node }} does not answer the exporter."
+
+      - alert: PostgresTooManyConnections
+        expr: sum by (node) (pg_stat_activity_count) / max by (node) (pg_settings_max_connections) > 0.8
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "PostgreSQL on {{ $labels.node }} uses {{ $value | humanizePercentage }} of its connections."
+
+      - alert: MariadbDown
+        expr: mysql_up == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "MariaDB on {{ $labels.node }} does not answer the exporter."
+
+      - alert: MariadbTooManyConnections
+        expr: mysql_global_status_threads_connected / mysql_global_variables_max_connections > 0.8
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "MariaDB on {{ $labels.node }} uses {{ $value | humanizePercentage }} of its connections."
+
+      - alert: CacheDown
+        expr: redis_up == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.job }} on {{ $labels.node }} does not answer the exporter."
+
+      - alert: CacheMemoryFull
+        expr: redis_memory_max_bytes > 0 and redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.job }} on {{ $labels.node }} uses {{ $value | humanizePercentage }} of its memory limit."
+
+      - alert: CacheRejectsConnections
+        expr: increase(redis_rejected_connections_total[5m]) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.job }} on {{ $labels.node }} refused connections (too many clients)."

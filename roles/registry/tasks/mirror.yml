@@ -1,14 +1,16 @@
 # Copy pinned images into the local registry as <registry>/<name>:<tag>.
-# Images come from the internet, or from the bundle when installing offline.
+# Online: copied straight from the internet, for every CPU type in the cluster (amd64, arm64).
+# Offline: loaded from the bundle (one CPU type).
 # Runs on the first manager, where the registry is.
 # Input: registry_mirror_images (list of keys in versions.yml images).
 
 - name: Check images in registry
   ansible.builtin.uri:
     url: "https://{{ registry_addr }}/v2/{{ item }}/manifests/{{ images[item].tag }}"
-    method: HEAD
     headers:
       Accept: >-
+        application/vnd.oci.image.index.v1+json,
+        application/vnd.docker.distribution.manifest.list.v2+json,
         application/vnd.oci.image.manifest.v1+json,
         application/vnd.docker.distribution.manifest.v2+json
     ca_path: "/etc/docker/certs.d/{{ registry_addr }}/ca.crt"
@@ -26,20 +28,22 @@
       set -e
       {% if offline %}
       docker load -q -i {{ bundle_dir }}/images/{{ item.item }}.tar.gz
-      {% else %}
-      docker pull -q {{ image.repo }}@{{ image.digest }}
-      docker tag {{ image.repo }}@{{ image.digest }} {{ local }}
-      {% endif %}
-      docker tag {{ local }} {{ dst }}
+      docker tag {{ image.repo }}:{{ image.tag }} {{ dst }}
       docker push -q {{ dst }}
+      {% else %}
+      docker buildx imagetools create {{ registry_platforms | map('regex_replace', '^', '--platform linux/') | join(' ') }} \
+        --tag {{ dst }} {{ image.repo }}@{{ image.digest }}
+      {% endif %}
     executable: /bin/bash
   vars:
     image: "{{ images[item.item] }}"
-    local: "{{ image.repo }}:{{ image.tag }}"
     dst: "{{ registry_addr }}/{{ item.item }}:{{ image.tag }}"
-  loop: "{{ registry_mirror_check.results | selectattr('status', 'eq', 404) }}"
+    # Online, the image must also be there for every CPU type (a new arm64 server, for example).
+    have: "{{ (item.json | default({})).manifests | default([]) | selectattr('platform', 'defined') | map(attribute='platform.architecture') }}"
+  loop: "{{ registry_mirror_check.results }}"
   loop_control:
     label: "{{ item.item }}"
+  when: item.status == 404 or (not offline and registry_platforms | difference(have) | length > 0)
   delegate_to: "{{ swarm_leader }}"
   changed_when: true
   # Downloads sometimes fail for a moment (DNS, network). Try again before giving up.

@@ -1,0 +1,10 @@
+# Load the dashboards in this folder. You can add your own in Grafana; they are kept in the backup.
+apiVersion: 1
+
+providers:
+  - name: annible
+    folder: Annible
+    type: file
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards

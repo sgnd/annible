@@ -1,0 +1,122 @@
+# Monitoring agents: run on every server. site.yml runs this after the monitoring server is up.
+#   node-exporter  the server: CPU, memory, disk, network, clock
+#   cadvisor       CPU and memory of each container
+#   vector         sends the logs of all containers and of the system to the monitoring server
+#   exporters      stats of the databases on this server
+#   annible-metrics (every minute) apps answer, containers run, swarm, backup, WireGuard
+
+- name: Create monitoring agent folders
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ observability_agent_dir }}", mode: "0700" }
+    - { path: "{{ observability_agent_dir }}/vector-data", mode: "0700" }
+    # node-exporter reads it as user nobody.
+    - { path: /var/lib/annible-metrics, mode: "0755" }
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Write the metrics script
+  ansible.builtin.template:
+    src: annible-metrics.sh.j2
+    dest: /usr/local/bin/annible-metrics
+    mode: "0700"
+
+- name: Write the metrics service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/annible-metrics.service
+    content: |
+      [Unit]
+      Description=Annible metrics for node-exporter
+      After=docker.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/annible-metrics
+    mode: "0644"
+
+- name: Write the metrics timer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/annible-metrics.timer
+    content: |
+      [Unit]
+      Description=Annible metrics every minute
+
+      [Timer]
+      OnCalendar=*-*-* *:*:00
+      AccuracySec=1s
+
+      [Install]
+      WantedBy=timers.target
+    mode: "0644"
+
+- name: Start the metrics timer
+  ansible.builtin.systemd_service:
+    name: annible-metrics.timer
+    state: started
+    enabled: true
+    daemon_reload: true
+
+# The exporters log in as "monitor", a user that can only read stats.
+- name: Create the monitor user in PostgreSQL
+  ansible.builtin.command:
+    cmd: docker exec -i postgres psql -U postgres -q -v ON_ERROR_STOP=1
+    stdin: |
+      SELECT 'CREATE ROLE monitor LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'monitor') \gexec
+      ALTER ROLE monitor WITH LOGIN PASSWORD '{{ observability_monitor_password }}';
+      GRANT pg_monitor TO monitor;
+  when: "'postgres' in node_apps"
+  changed_when: false
+  no_log: true
+
+- name: Create the monitor user in MariaDB
+  ansible.builtin.command:
+    cmd: docker exec -i mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot'
+    stdin: |
+      CREATE USER IF NOT EXISTS 'monitor'@'%' IDENTIFIED BY '{{ observability_monitor_password }}';
+      ALTER USER 'monitor'@'%' IDENTIFIED BY '{{ observability_monitor_password }}';
+      GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'monitor'@'%';
+  when: "'mariadb' in node_apps"
+  changed_when: false
+  no_log: true
+
+- name: Write exporter passwords
+  ansible.builtin.copy:
+    dest: "{{ observability_agent_dir }}/.env"
+    content: |
+      MONITOR_PASSWORD={{ observability_monitor_password if node_apps | intersect(['postgres', 'mariadb']) else '' }}
+      CACHE_PASSWORD={{ cache_password if node_apps | intersect(['redis', 'valkey']) else '' }}
+    mode: "0600"
+  no_log: true
+
+- name: Write log agent config
+  ansible.builtin.template:
+    src: vector.yaml.j2
+    dest: "{{ observability_agent_dir }}/vector.yaml"
+    mode: "0600"
+  register: observability_vector
+
+- name: Mirror monitoring agent images
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+    apply:
+      run_once: true
+  vars:
+    registry_mirror_images: [node-exporter, cadvisor, vector, postgres-exporter, mysqld-exporter, redis-exporter]
+
+- name: Write monitoring agent compose file
+  ansible.builtin.template:
+    src: agent-compose.yml.j2
+    dest: "{{ observability_agent_dir }}/compose.yml"
+    mode: "0600"
+
+- name: Start monitoring agents
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: monitoring-agent
+    docker_compose_restart: "{{ observability_vector.changed }}"

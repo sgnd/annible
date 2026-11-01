@@ -34,5 +34,12 @@ Their source code is at the links below and at https://launchpad.net/ubuntu (apt
 | Garage | AGPL-3.0 | https://git.deuxfleurs.fr/Deuxfleurs/garage |
 | RabbitMQ | MPL-2.0 | https://github.com/rabbitmq/rabbitmq-server |
 | NATS | Apache-2.0 | https://github.com/nats-io/nats-server |
+| Prometheus, Alertmanager, node-exporter, mysqld-exporter, postgres-exporter | Apache-2.0 | https://github.com/prometheus |
+| Loki | AGPL-3.0 | https://github.com/grafana/loki |
+| Grafana | AGPL-3.0 | https://github.com/grafana/grafana |
+| VictoriaMetrics, VictoriaLogs, vmalert | Apache-2.0 | https://github.com/VictoriaMetrics/VictoriaMetrics, https://github.com/VictoriaMetrics/VictoriaLogs |
+| cAdvisor | Apache-2.0 | https://github.com/google/cadvisor |
+| Vector | MPL-2.0 | https://github.com/vectordotdev/vector |
+| redis_exporter | MIT | https://github.com/oliver006/redis_exporter |
 
 Versions are in [`versions.yml`](versions.yml). We use the official images without changes.

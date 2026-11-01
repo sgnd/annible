@@ -54,7 +54,7 @@ The installer sees the `bundle/` folder and uses it instead of the internet.
 | Problem | Try |
 |---------|-----|
 | `config error: ...` | Fix `config.yml` as the message says. |
-| Wrong CPU or Ubuntu version | `arch` in config.yml must match the servers. Offline: rebuild the bundle for that version. |
+| Wrong CPU or Ubuntu version | Online, amd64 and arm64 servers may mix (leave `arch` out). Offline: the bundle has one CPU type and Ubuntu version; build one that matches. |
 | Locked out of SSH | Check `ssh.allow_from`. Use the provider's console to run `sudo ufw disable`. |
 | No HTTPS certificate | DNS must point to the first manager, and port 80 must be open. Then `sudo docker service update --force traefik_traefik`. Let's Encrypt has rate limits. |
 | Swarm app not starting | `sudo docker service ls`, `sudo docker service logs <stack>_<service>` on a manager. |
@@ -62,6 +62,8 @@ The installer sees the `bundle/` folder and uses it instead of the internet.
 | `toomanyrequests` | Docker Hub limit. Wait, or run `sudo docker login` on the first manager. |
 | `cannot reach ... over WireGuard` | Open UDP 51820 between the servers' `host` addresses in the cloud firewall (security group). Check each `host`. `sudo wg show` on a server shows the last handshake. |
 | Backup fails | `sudo annible-backup` on the server shows the error. Check `backup.repository` and the S3 keys. |
+| No alerts arrive | Check `https://alertmanager.<domain>`, then `sudo docker logs alertmanager` on the monitoring server. Telegram `chat_id` must be a number; email `smarthost` is `host:port`. |
+| `TargetDown` alert after the install | An agent or exporter does not answer. `sudo docker ps` on that server; the firewall must allow the monitoring server (it does for cluster servers). |
 | `restore=true is only for new, empty servers` | A restore replaces the swarm and data, so it only runs on new servers. |
 | `is in the swarm with address ...` | A swarm server cannot change its address. Put the old address back as `ip`. If the server's real address changed, set it as `host`. |
 

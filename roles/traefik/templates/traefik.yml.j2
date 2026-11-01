@@ -20,6 +20,12 @@ entryPoints:
       tls: {}
 {% endif %}
 
+{% if monitoring_app %}
+  # Only for the monitoring server (the firewall lets only the cluster servers in).
+  metrics:
+    address: ":8082"
+
+{% endif %}
 providers:
   swarm:
     exposedByDefault: false
@@ -49,6 +55,12 @@ api:
   dashboard: true
 
 ping: {}
+{% if monitoring_app %}
+
+metrics:
+  prometheus:
+    entryPoint: metrics
+{% endif %}
 
 log:
   level: {{ traefik_log_level }}

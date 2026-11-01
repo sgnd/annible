@@ -1,0 +1,63 @@
+{% set m = monitoring | default({}) %}
+{% set webhook = m.webhook | default('') %}
+# Where alerts go (monitoring: in config.yml). Made by annible, do not change it here.
+route:
+  receiver: team
+  group_by: [alertname, node]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # Watchdog always fires. Sent to the heartbeat URL about every 2 minutes, so a service outside
+    # the cluster knows that alerts still work. (Uptime Kuma instead reads it from the Alertmanager API.)
+    - matchers: ['alertname="Watchdog"']
+      receiver: heartbeat
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
+
+# When a server is down, its other alerts are only noise.
+inhibit_rules:
+  - source_matchers: ['alertname="NodeDown"']
+    target_matchers: ['alertname!="NodeDown"']
+    equal: [node]
+
+receivers:
+  - name: team
+{% if m.telegram is defined %}
+    telegram_configs:
+      - bot_token: "{{ m.telegram.bot_token }}"
+        chat_id: {{ m.telegram.chat_id | int }}
+        send_resolved: true
+{% endif %}
+{% if m.email is defined %}
+    email_configs:
+      - to: "{{ m.email.to }}"
+        from: "{{ m.email.from }}"
+        smarthost: "{{ m.email.smarthost }}"
+{% if m.email.username is defined %}
+        auth_username: "{{ m.email.username }}"
+        auth_password: "{{ m.email.password }}"
+{% endif %}
+        require_tls: {{ m.email.tls | default(true) | bool | lower }}
+        send_resolved: true
+{% endif %}
+{% if 'hooks.slack.com' in webhook %}
+    slack_configs:
+      - api_url: "{{ webhook }}"
+        send_resolved: true
+{% elif 'discord.com/api/webhooks' in webhook %}
+    discord_configs:
+      - webhook_url: "{{ webhook }}"
+        send_resolved: true
+{% elif webhook %}
+    webhook_configs:
+      - url: "{{ webhook }}"
+        send_resolved: true
+{% endif %}
+  - name: heartbeat
+{% if m.heartbeat_url | default('') %}
+    webhook_configs:
+      - url: "{{ m.heartbeat_url }}"
+        send_resolved: false
+{% endif %}

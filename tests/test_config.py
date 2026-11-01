@@ -77,7 +77,33 @@ CASES = [
     ("backup keep as text", lambda c: c.update(backup={"repository": "/mnt/b", "keep_daily": "7"}), "must be a number"),
     ("wireguard with host same as ip",
      lambda c: (c.update(wireguard=True), [n.update(host=n["ip"]) for n in c["nodes"]]), "must differ from host"),
+    ("monitoring app without monitoring", lambda c: c["apps"].update(victoria="data1"), "needs monitoring: in config.yml"),
+    ("monitoring without the app", lambda c: c.update(monitoring={"webhook": "https://x.example.com"}), "no monitoring app"),
+    ("two monitoring apps", lambda c: (monitored(c), c["apps"].update(prometheus="swarm2")), "both observability"),
+    ("monitoring with no place for alerts", lambda c: (monitored(c), c.update(monitoring={"keep_days": 30})), "at least one place"),
+    ("monitoring typo", lambda c: (monitored(c), c["monitoring"].update(slack="x")), "unknown setting monitoring.slack"),
+    ("telegram chat_id as text",
+     lambda c: (monitored(c), c["monitoring"].update(telegram={"bot_token": "1:A", "chat_id": "abc"})), "must be a number"),
+    ("telegram without chat_id", lambda c: (monitored(c), c["monitoring"].update(telegram={"bot_token": "1:A"})), "must look like"),
+    ("email without smarthost",
+     lambda c: (monitored(c), c["monitoring"].update(email={"to": "a@x.com", "from": "b@x.com"})), "email.smarthost is required"),
+    ("email smarthost without port",
+     lambda c: (monitored(c), c["monitoring"].update(email={"to": "a@x.com", "from": "b@x.com", "smarthost": "smtp.x.com"})),
+     "must be host:port"),
+    ("email user without password",
+     lambda c: (monitored(c), c["monitoring"].update(email={"to": "a@x.com", "from": "b@x.com", "smarthost": "s:25", "username": "u"})),
+     "both username and password"),
+    ("webhook not a URL", lambda c: (monitored(c), c["monitoring"].update(webhook="hooks.slack.com/x")), "must be a URL"),
+    ("keep_days as text", lambda c: (monitored(c), c["monitoring"].update(keep_days="30d")), "must be a number of days"),
+    ("uptimekuma on the monitoring server",
+     lambda c: (monitored(c), c["apps"].update(uptimekuma="data1")), "put it on another server"),
 ]
+
+
+def monitored(c):
+    """Victoria on data1, alerts to a webhook."""
+    c["apps"]["victoria"] = "data1"
+    c["monitoring"] = {"webhook": "https://hooks.example.com/alerts"}
 
 
 def with_wireguard(c):
@@ -94,6 +120,16 @@ GOOD = [
     ("backup to S3", lambda c: c.update(backup={"repository": "s3:https://s3.example.com/b", "s3_access_key": "a",
                                                  "s3_secret_key": "b", "time": "03:30", "keep_daily": 14})),
     ("backup to a folder", lambda c: c.update(backup={"repository": "/mnt/backup"})),
+    ("victoria with a webhook", monitored),
+    ("prometheus with every alert channel", lambda c: (
+        c["apps"].update(prometheus="data1", uptimekuma="swarm2"),
+        c.update(monitoring={
+            "telegram": {"bot_token": "123:ABC", "chat_id": -1001234},
+            "email": {"to": "ops@example.com", "from": "alerts@example.com", "smarthost": "smtp.example.com:587",
+                      "username": "u", "password": "p", "tls": True},
+            "webhook": "https://hooks.slack.com/services/x",
+            "heartbeat_url": "https://hc-ping.com/abc",
+            "keep_days": 14}))),
 ]
 
 

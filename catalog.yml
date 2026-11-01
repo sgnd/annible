@@ -110,3 +110,19 @@ beszel:
   requires: [traefik]
   license: MIT
   info: "https://beszel.<domain> (user admin@<domain>, password state/secrets/beszel_admin). Agents run on every server"
+
+prometheus:
+  category: observability
+  runs_on: node
+  requires: [traefik]
+  license: Apache-2.0 (Prometheus, Alertmanager), AGPL-3.0 (Loki, Grafana)
+  info: "Grafana https://grafana.<domain> (user admin, password state/secrets/grafana_admin). With the Traefik login:
+    alerts https://alertmanager.<domain>, Prometheus https://metrics.<domain>. Logs: Grafana > Explore > Logs"
+
+victoria:
+  category: observability
+  runs_on: node
+  requires: [traefik]
+  license: Apache-2.0 (VictoriaMetrics, VictoriaLogs, Alertmanager), AGPL-3.0 (Grafana)
+  info: "Grafana https://grafana.<domain> (user admin, password state/secrets/grafana_admin). With the Traefik login:
+    alerts https://alertmanager.<domain>, metrics https://metrics.<domain>/vmui, logs https://logs.<domain>/select/vmui"

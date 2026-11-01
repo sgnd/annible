@@ -1,0 +1,65 @@
+# What to collect, every 30 seconds. Each target has a "node" label: the server it runs on.
+# The same file works for Prometheus and VictoriaMetrics.
+global:
+  scrape_interval: 30s
+{% if monitoring_app == 'prometheus' %}
+  evaluation_interval: 30s
+
+rule_files: [/etc/prometheus/alerts.yml]
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["{{ node_ip }}:{{ observability_alertmanager_port }}"]
+{% endif %}
+
+scrape_configs:
+  # On every server: the server itself (node-exporter), its containers (cAdvisor), the log agent (Vector).
+{% for job, port in {'node': observability_node_exporter_port, 'cadvisor': observability_cadvisor_port, 'vector': observability_vector_port}.items() %}
+  - job_name: {{ job }}
+    static_configs:
+{% for host in groups['all'] %}
+      - targets: ["{{ hostvars[host].node_ip }}:{{ port }}"]
+        labels: { node: {{ host }} }
+{% endfor %}
+{% endfor %}
+
+  # Database exporters, on the server where the database runs.
+{% for app, job, port in [
+     ('postgres', 'postgres', observability_postgres_exporter_port),
+     ('mariadb', 'mariadb', observability_mysqld_exporter_port),
+     ('redis', 'redis', observability_redis_exporter_port),
+     ('valkey', 'valkey', observability_redis_exporter_port)] if app in apps %}
+  - job_name: {{ job }}
+    static_configs:
+      - targets: ["{{ hostvars[apps[app]].node_ip }}:{{ port }}"]
+        labels: { node: {{ apps[app] }} }
+{% endfor %}
+{% if 'traefik' in apps %}
+
+  # Traefik: requests, backends that are down, and when the certificates end.
+  - job_name: traefik
+    static_configs:
+      - targets: ["{{ hostvars[swarm_leader].node_ip }}:{{ observability_traefik_metrics_port }}"]
+        labels: { node: {{ swarm_leader }} }
+{% endif %}
+{% if 'rabbitmq' in apps %}
+
+  - job_name: rabbitmq
+    static_configs:
+      - targets: ["{{ hostvars[apps.rabbitmq].node_ip }}:15692"]
+        labels: { node: {{ apps.rabbitmq }} }
+{% endif %}
+
+  # The monitoring apps watch each other too.
+  - job_name: monitoring
+    static_configs:
+      - targets:
+          - "{{ node_ip }}:{{ observability_metrics_port }}"
+          - "{{ node_ip }}:{{ observability_logs_port }}"
+          - "{{ node_ip }}:{{ observability_alertmanager_port }}"
+          - "{{ node_ip }}:{{ observability_grafana_port }}"
+{% if monitoring_app == 'victoria' %}
+          - "{{ node_ip }}:{{ observability_vmalert_port }}"
+{% endif %}
+        labels: { node: {{ inventory_hostname }} }

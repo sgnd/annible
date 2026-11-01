@@ -3,6 +3,12 @@
 ## Unreleased
 
 New
+- Monitoring and alerts: `prometheus` (Prometheus + Loki) or `victoria` (VictoriaMetrics + VictoriaLogs),
+  both with Alertmanager and Grafana. Agents on every server collect the server, its containers, all
+  logs and the database stats. Alerts for servers, apps, containers, swarm services, disks, memory,
+  clock, backups, WireGuard, certificates, databases and the monitoring itself, sent to Telegram,
+  email or a webhook (`monitoring:` in `config.yml`). An always-firing `Watchdog` alert, checked by
+  Uptime Kuma on another server (or a heartbeat service), tells you when the monitoring itself is down.
 - `backup:` nightly backup of every server with restic (S3, rest-server or a mounted folder):
   database dumps, app folders (paused for a moment while copied), RustFS/Garage data, and on the
   first manager the swarm state, `config.yml` and `state/`. The install runs the first backup.
@@ -14,6 +20,9 @@ New
   WireGuard addresses (`ip`), so a server's real address (`host`) can change.
 - Swarm networks get the right MTU (smallest server MTU minus 50), so big requests do not hang on
   WireGuard or on clouds with a smaller network MTU. New networks only.
+- The installer finds each server's CPU type itself; `arch:` in `config.yml` is now optional.
+  With internet, amd64 and arm64 servers can be in one cluster: the local registry keeps every
+  image for each CPU type in use.
 - On cloud servers, cloud-init keeps the hostname and `/etc/hosts` after a reboot.
 - The install stops with a clear message if a server's swarm address differs from its `ip` in `config.yml`
   (for example after a snapshot restore on a new IP).
@@ -22,6 +31,9 @@ Fixes
 - With `wireguard: true` and the installer on one of the servers, the install could hang on new
   servers when the firewall or Docker started. The firewall now always lets SSH replies from the
   other servers in.
+- The local registry kept only one CPU type of each image. It now copies the image for every
+  CPU type in the cluster (`docker buildx imagetools`). The first manager trusts the registry
+  certificate for this.
 
 ## 1.0.1
 

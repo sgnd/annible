@@ -20,10 +20,16 @@
           Build one with: ./build-bundle.sh {{ node_arch }} {{ ansible_distribution_version }}
       when: offline
 
+    # Servers may mix amd64 and arm64 (online). An offline bundle has one CPU type.
     - name: Check CPU architecture
       ansible.builtin.assert:
-        that: node_arch == arch | default('amd64')
-        fail_msg: "config.yml arch is {{ arch | default('amd64') }} but this node is {{ node_arch }}. All nodes must match it (amd64 or arm64)."
+        that:
+          - node_arch in ['amd64', 'arm64']
+          - arch is not defined or node_arch == arch
+          - not offline or node_arch == bundle.arch
+        fail_msg: >-
+          {{ inventory_hostname }} is {{ node_arch }}. Annible runs on amd64 and arm64.
+          Check arch in config.yml (if set) and the offline bundle's CPU type (if offline).
 
     # Before anything changes: does config.yml still match the swarm? (No Docker yet = a new server.)
     - name: Read swarm state
@@ -137,6 +143,16 @@
         name: beszel
         tasks_from: agent
       when: "'beszel' in apps"
+
+# Monitoring agents on every server (metrics, logs, database stats), after the monitoring server.
+- name: Monitoring agents
+  hosts: all
+  tasks:
+    - name: Deploy monitoring agents on every server
+      ansible.builtin.include_role:
+        name: observability
+        tasks_from: agent
+      when: monitoring_app != ''
 
 - name: Swarm apps
   hosts: managers[0]

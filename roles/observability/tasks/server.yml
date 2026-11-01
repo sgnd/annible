@@ -1,0 +1,157 @@
+# Monitoring server: keeps metrics and logs, checks the alert rules, sends alerts, shows Grafana.
+# Used by the prometheus and victoria roles. The agents on every server are in agent.yml.
+#
+#   {{ observability_dir }}/config/  settings (made by the installer)
+#   {{ observability_dir }}/data/    metrics and logs (big, not in the backup)
+#   {{ observability_dir }}/grafana/ and alertmanager/  users, dashboards you saved, silences
+
+# Each app in the containers runs as its own user, so it must own its folder.
+- name: Create monitoring folders
+  ansible.builtin.file:
+    path: "{{ observability_dir }}/{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "{{ item.mode | default('0700') }}"
+  loop:
+    - { path: "", owner: root }
+    # The apps read their config as their own user.
+    - { path: config, owner: root, mode: "0755" }
+    - { path: config/grafana, owner: root, mode: "0755" }
+    - { path: config/grafana/datasources, owner: root, mode: "0755" }
+    - { path: config/grafana/dashboards, owner: root, mode: "0755" }
+    - { path: data, owner: root }
+    # Prometheus and Alertmanager run as user 65534 (nobody), Loki as 10001, Grafana as 472.
+    - { path: data/metrics, owner: "{{ '65534' if monitoring_app == 'prometheus' else 'root' }}" }
+    - { path: data/logs, owner: "{{ '10001' if monitoring_app == 'prometheus' else 'root' }}" }
+    - { path: alertmanager, owner: "65534" }
+    - { path: grafana, owner: "472" }
+  loop_control:
+    label: "{{ item.path or observability_dir }}"
+
+- name: Write which servers and apps to watch
+  ansible.builtin.template:
+    src: scrape.yml.j2
+    dest: "{{ observability_dir }}/config/scrape.yml"
+    mode: "0644"
+  register: observability_scrape
+
+- name: Write alert rules
+  ansible.builtin.copy:
+    src: alerts.yml
+    dest: "{{ observability_dir }}/config/alerts.yml"
+    mode: "0644"
+  register: observability_alerts
+
+- name: Write Loki config
+  ansible.builtin.template:
+    src: loki.yml.j2
+    dest: "{{ observability_dir }}/config/loki.yml"
+    mode: "0644"
+  register: observability_loki
+  when: monitoring_app == 'prometheus'
+
+# Has the Telegram token and email password: only Alertmanager (user 65534) may read it.
+- name: Write where alerts go
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ observability_dir }}/config/alertmanager.yml"
+    owner: "65534"
+    mode: "0600"
+  register: observability_alertmanager
+  diff: false
+
+- name: Write Grafana data sources
+  ansible.builtin.template:
+    src: grafana-datasources.yml.j2
+    dest: "{{ observability_dir }}/config/grafana/datasources/annible.yml"
+    mode: "0644"
+  register: observability_datasources
+
+- name: Write Grafana dashboards
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ observability_dir }}/config/grafana/dashboards/"
+    mode: "0644"
+  loop:
+    - dashboards.yml
+    - dashboards/annible.json
+
+- name: Write Grafana admin password
+  ansible.builtin.copy:
+    dest: "{{ observability_dir }}/.env"
+    content: |
+      GF_SECURITY_ADMIN_PASSWORD={{ observability_grafana_password }}
+    mode: "0600"
+  no_log: true
+
+- name: Mirror monitoring images
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: "{{ observability_server_images[monitoring_app] }}"
+
+- name: Write monitoring compose file
+  ansible.builtin.template:
+    src: server-compose.yml.j2
+    dest: "{{ observability_dir }}/compose.yml"
+    mode: "0600"
+
+# The apps read their config only when they start.
+- name: Start monitoring
+  ansible.builtin.include_role:
+    name: docker
+    tasks_from: compose
+  vars:
+    docker_compose_app: "{{ monitoring_app }}"
+    docker_compose_restart: >-
+      {{ observability_scrape.changed or observability_alerts.changed or observability_loki.changed
+         or observability_alertmanager.changed or observability_datasources.changed }}
+
+- name: Add Grafana to Traefik
+  ansible.builtin.include_role:
+    name: traefik
+    tasks_from: route
+  vars:
+    traefik_route_name: grafana
+    traefik_route_port: "{{ observability_grafana_port }}"
+
+# Alertmanager and the metrics and logs pages have no login of their own: the Traefik password first.
+- name: Add Alertmanager to Traefik
+  ansible.builtin.include_role:
+    name: traefik
+    tasks_from: route
+  vars:
+    traefik_route_name: alertmanager
+    traefik_route_port: "{{ observability_alertmanager_port }}"
+    traefik_route_middleware: admin
+
+- name: Add the metrics page to Traefik
+  ansible.builtin.include_role:
+    name: traefik
+    tasks_from: route
+  vars:
+    traefik_route_name: metrics
+    traefik_route_port: "{{ observability_metrics_port }}"
+    traefik_route_middleware: admin
+
+# Loki has no web page; with Prometheus, you read logs in Grafana (Explore).
+- name: Add the logs page to Traefik
+  ansible.builtin.include_role:
+    name: traefik
+    tasks_from: route
+  vars:
+    traefik_route_name: logs
+    traefik_route_port: "{{ observability_logs_port }}"
+    traefik_route_middleware: admin
+  when: monitoring_app == 'victoria'
+
+# If this server stops, it cannot send an alert. Something on another server must watch it.
+- name: Show how to watch the monitoring server
+  ansible.builtin.debug:
+    msg: >-
+      Watch this monitoring server from another server: in Uptime Kuma add a monitor of type
+      "HTTP(s) - Keyword", URL http://{{ node_ip }}:{{ observability_alertmanager_port }}/api/v2/alerts?filter=alertname=Watchdog,
+      keyword Watchdog. Or set monitoring.heartbeat_url to a service outside the cluster (healthchecks.io).
+  when: not (monitoring | default({})).heartbeat_url | default('')

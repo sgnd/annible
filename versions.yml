@@ -99,3 +99,56 @@ images:
     repo: docker.io/henrygd/beszel-agent
     tag: 0.21.1
     digest: sha256:cb6868012964d7a68debaa2c84bb72285e5f08531e81f506bd4c493bf052e41c
+  # Monitoring (observability: prometheus or victoria). Agents and exporters run on every server.
+  prometheus:
+    repo: docker.io/prom/prometheus
+    tag: v3.15.1
+    digest: sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
+  loki:
+    repo: docker.io/grafana/loki
+    tag: 3.7.9
+    digest: sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
+  victoriametrics:
+    repo: docker.io/victoriametrics/victoria-metrics
+    tag: v1.155.0
+    digest: sha256:f60dc268b54ecf87f6e09d740c2b732838aa9193090cc741417c9f6386a130df
+  victorialogs:
+    repo: docker.io/victoriametrics/victoria-logs
+    tag: v1.53.0
+    digest: sha256:251121fa882af99b95ba0c230a4a2f412ea602d2698c64a96c58dc9842bb755d
+  vmalert:
+    repo: docker.io/victoriametrics/vmalert
+    tag: v1.155.0
+    digest: sha256:3256cba5ddaca5974eae6141105cec4ce37871f1c213f0a5c267ec0111bc68e1
+  alertmanager:
+    repo: docker.io/prom/alertmanager
+    tag: v0.34.2
+    digest: sha256:39d8bb3966c694a124428a3a88fbcffd40bd069129ecd47c059f8a3f17c55f3b
+  grafana:
+    repo: docker.io/grafana/grafana
+    tag: 13.2.5
+    digest: sha256:9f7aa1e1e3246aade5792d35a738049f7f32f89cd51d1956cf426a4e86268a84
+  node-exporter:
+    repo: docker.io/prom/node-exporter
+    tag: v1.12.1
+    digest: sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
+  cadvisor:
+    repo: gcr.io/cadvisor/cadvisor
+    tag: v0.55.1
+    digest: sha256:3de2bd5203120b866d74a9b283b2ffb8ec382fbf9dc321814700c6ea6f44ec57
+  vector:
+    repo: docker.io/timberio/vector
+    tag: 0.61.0-debian
+    digest: sha256:f6c23b5a7e16fb2838d33619ef7acf4bad2289a7cf22bc90efc2371f520c4ea2
+  postgres-exporter:
+    repo: docker.io/prometheuscommunity/postgres-exporter
+    tag: v0.20.1
+    digest: sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
+  mysqld-exporter:
+    repo: docker.io/prom/mysqld-exporter
+    tag: v0.21.0
+    digest: sha256:afad0c59a154fea24ca5ea0e6f95f2b0b168601b111266963dc8a347715b5318
+  redis-exporter:
+    repo: docker.io/oliver006/redis_exporter
+    tag: v1.96.0
+    digest: sha256:3d57b9eb142a62ffc600063606a41cd471cd53d81bed10be5b56b3a8918f2c26

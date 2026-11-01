@@ -24,6 +24,21 @@
     content: "{{ registry_ca.content | b64decode }}"
     mode: "0644"
 
+# The first manager copies images into the registry with "docker buildx imagetools", which reads
+# only the system's CA list. Only this server trusts the registry CA system-wide (its key is here anyway).
+- name: Trust registry CA on the first manager
+  ansible.builtin.copy:
+    dest: /usr/local/share/ca-certificates/annible-registry.crt
+    content: "{{ registry_ca.content | b64decode }}"
+    mode: "0644"
+  register: registry_system_ca
+  when: inventory_hostname == swarm_leader
+
+- name: Update the system CA list
+  ansible.builtin.command: update-ca-certificates
+  when: registry_system_ca.changed  # noqa: no-handler
+  changed_when: true
+
 - name: Check registry is reachable
   ansible.builtin.uri:
     url: "https://{{ registry_addr }}/v2/"

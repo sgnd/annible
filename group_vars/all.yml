@@ -1,6 +1,8 @@
 node_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_architecture] | default(ansible_architecture) }}"
 swarm_leader: "{{ groups['managers'][0] }}"
 registry_addr: "{{ hostvars[swarm_leader].node_ip }}:{{ registry_port }}"
+# The CPU types of the servers (amd64, arm64). The registry keeps each image for all of them.
+registry_platforms: "{{ groups['all'] | map('extract', hostvars, 'node_arch') | unique | sort }}"
 # The registry needs a login, so a container cannot push a fake image into it.
 registry_user: annible
 registry_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/registry', chars=['ascii_letters', 'digits'], length=32) }}"
@@ -24,3 +26,7 @@ cache_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/' ~ cache
 
 # ./install.sh -e restore=true puts the newest backup back on new servers (see roles/backup).
 restore: false
+
+# The monitoring app (prometheus or victoria), and the server it runs on. Empty if not installed.
+monitoring_app: "{{ 'prometheus' if 'prometheus' in apps else 'victoria' if 'victoria' in apps else '' }}"
+monitoring_ip: "{{ hostvars[apps[monitoring_app]].node_ip if monitoring_app else '' }}"

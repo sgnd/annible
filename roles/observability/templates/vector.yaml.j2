@@ -1,0 +1,63 @@
+# Log agent on {{ inventory_hostname }}: sends the logs of every container and of the system
+# to the monitoring server. Each log line gets the labels node, app and container.
+data_dir: /var/lib/vector
+
+sources:
+  containers:
+    type: docker_logs
+  system:
+    type: journald
+    # First start: from now, not the whole old journal. Later: go on where it stopped.
+    since_now: true
+  vector_metrics:
+    type: internal_metrics
+
+transforms:
+  container_labels:
+    type: remap
+    inputs: [containers]
+    source: |
+      .node = "{{ inventory_hostname }}"
+{% raw %}
+      # app: the compose app or swarm stack. container: the service name, the same after a restart.
+      .app = .label."com.docker.compose.project" || .label."com.docker.stack.namespace" || .container_name || "other"
+      .container = .label."com.docker.swarm.service.name" || .container_name || "other"
+{% endraw %}
+  system_labels:
+    type: remap
+    inputs: [system]
+    source: |
+      .node = "{{ inventory_hostname }}"
+      .app = "system"
+      .container = ._SYSTEMD_UNIT || .SYSLOG_IDENTIFIER || "kernel"
+
+sinks:
+  # Loki and VictoriaLogs both take logs in the Loki format.
+  logs:
+    type: loki
+    inputs: [container_labels, system_labels]
+{% if monitoring_app == 'prometheus' %}
+    endpoint: http://{{ monitoring_ip }}:{{ observability_logs_port }}
+{% else %}
+    endpoint: http://{{ monitoring_ip }}:{{ observability_logs_port }}/insert
+{% endif %}
+    encoding:
+      codec: text
+    labels:
+{% raw %}
+      node: "{{ node }}"
+      app: "{{ app }}"
+      container: "{{ container }}"
+{% endraw %}
+    out_of_order_action: accept
+    # While the monitoring server is down, keep up to 1 GB of logs on disk and send them later.
+    buffer:
+      type: disk
+      max_size: 1073741824
+      when_full: drop_newest
+
+  # The monitoring server checks that this agent works (LogsNotSent alert).
+  metrics:
+    type: prometheus_exporter
+    inputs: [vector_metrics]
+    address: {{ node_ip }}:{{ observability_vector_port }}

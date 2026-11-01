@@ -16,7 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GROUPS = {"manager": "managers", "worker": "workers", "standalone": "standalone"}
 CONFIG_KEYS = {
     "domain", "acme_email", "acme_server", "acme_ca_cert", "tls", "tls_cert", "tls_key", "timezone", "arch",
-    "ssh", "admin_allow_from", "firewall_allow", "wireguard", "backup", "nodes", "apps",
+    "ssh", "admin_allow_from", "firewall_allow", "wireguard", "backup", "monitoring", "nodes", "apps",
 }
 # Node names become hostnames, and must not clash with "swarm" or group names.
 NODE_NAME = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
@@ -25,6 +25,9 @@ DOMAIN = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-
 LABEL = re.compile(r"^[A-Za-z0-9._-]+$")
 SSH_KEYS = {"user", "key", "port", "allow_from"}
 BACKUP_KEYS = {"repository", "s3_access_key", "s3_secret_key", "time", "keep_daily", "keep_weekly", "keep_monthly"}
+MONITORING_KEYS = {"telegram", "email", "webhook", "heartbeat_url", "keep_days"}
+MONITORING_APPS = ("prometheus", "victoria")
+URL = re.compile(r"^https?://\S+$")
 TIME = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
 # Swarm's own networks use this range. Docker's default (10.0.0.0/8) often clashes with servers' IPs.
 SWARM_ADDRESS_POOL = "10.200.0.0/16"
@@ -107,6 +110,44 @@ def check_backup(backup):
             fail(f"backup.{key} must be a number, got {value}")
 
 
+def check_monitoring(monitoring):
+    """monitoring: where alerts go. Only used with the prometheus or victoria app."""
+    if monitoring is None:
+        return
+    if not isinstance(monitoring, dict):
+        fail("monitoring must look like { telegram: { bot_token: ..., chat_id: ... } }")
+    unknown = set(monitoring) - MONITORING_KEYS
+    if unknown:
+        fail(f"unknown setting monitoring.{', monitoring.'.join(sorted(unknown))} (typo?)")
+    if not any(monitoring.get(key) for key in ("telegram", "email", "webhook")):
+        fail("monitoring needs at least one place for alerts: telegram, email or webhook")
+    telegram = monitoring.get("telegram")
+    if telegram is not None:
+        if not isinstance(telegram, dict) or set(telegram) != {"bot_token", "chat_id"}:
+            fail("monitoring.telegram must look like { bot_token: \"123:ABC\", chat_id: -1001234 }")
+        if not isinstance(telegram["chat_id"], int) or isinstance(telegram["chat_id"], bool):
+            fail(f"monitoring.telegram.chat_id must be a number, got {telegram['chat_id']}")
+    email = monitoring.get("email")
+    if email is not None:
+        if not isinstance(email, dict) or set(email) - {"to", "from", "smarthost", "username", "password", "tls"}:
+            fail("monitoring.email must look like { to: ops@example.com, from: alerts@example.com, smarthost: smtp.example.com:587 }")
+        for key in ("to", "from", "smarthost"):
+            if not email.get(key):
+                fail(f"monitoring.email.{key} is required")
+        if not re.match(r"^\S+:[0-9]+$", str(email["smarthost"])):
+            fail(f"monitoring.email.smarthost must be host:port, like smtp.example.com:587, got {email['smarthost']}")
+        if bool(email.get("username")) != bool(email.get("password")):
+            fail("monitoring.email: set both username and password, or neither")
+        if email.get("tls", True) not in (True, False):
+            fail("monitoring.email.tls must be true or false")
+    for key in ("webhook", "heartbeat_url"):
+        if monitoring.get(key) and not URL.match(str(monitoring[key])):
+            fail(f"monitoring.{key} must be a URL like https://..., got {monitoring[key]}")
+    days = monitoring.get("keep_days", 30)
+    if not isinstance(days, int) or isinstance(days, bool) or days < 1:
+        fail(f"monitoring.keep_days must be a number of days, got {days}")
+
+
 def check_settings(cfg, bundle):
     unknown = set(cfg) - CONFIG_KEYS
     if unknown:
@@ -130,16 +171,17 @@ def check_settings(cfg, bundle):
              "or set acme_server to an ACME server in your network")
     if cfg.get("acme_ca_cert") and not cfg.get("acme_server"):
         fail("acme_ca_cert is only used with acme_server")
-    if cfg.get("arch", "amd64") not in ("amd64", "arm64"):
-        fail("arch must be amd64 or arm64")
+    if cfg.get("arch") is not None and cfg["arch"] not in ("amd64", "arm64"):
+        fail("arch must be amd64 or arm64 (or leave it out: the installer finds each server's CPU type)")
     check_ip_list("ssh.allow_from", (cfg.get("ssh") or {}).get("allow_from"))
     check_ip_list("admin_allow_from", cfg.get("admin_allow_from"))
     check_firewall_allow(cfg.get("firewall_allow"))
     check_backup(cfg.get("backup"))
+    check_monitoring(cfg.get("monitoring"))
     if cfg.get("wireguard", False) not in (True, False):
         fail("wireguard must be true or false")
-    if bundle and cfg.get("arch", "amd64") != bundle["arch"]:
-        fail(f"the bundle is for {bundle['arch']}, but config.yml arch is {cfg.get('arch', 'amd64')}")
+    if bundle and cfg.get("arch") and cfg["arch"] != bundle["arch"]:
+        fail(f"the bundle is for {bundle['arch']}, but config.yml arch is {cfg['arch']}")
 
 
 def build_nodes(nodes, wireguard):
@@ -210,7 +252,7 @@ def build_nodes(nodes, wireguard):
     return groups, hostvars
 
 
-def build_apps(apps, catalog, hostvars):
+def build_apps(apps, catalog, hostvars, monitoring=None):
     """Return {app: "swarm" or node name} in catalog order, after checking it."""
     apps = apps or {}
     for name, target in apps.items():
@@ -240,6 +282,15 @@ def build_apps(apps, catalog, hostvars):
                 what = f"a {dep} ({' or '.join(choices)})" if choices else dep
                 fail(f"{name} needs {what}, add it to apps")
 
+    # Monitoring sends alerts, so it needs to know where; and someone must watch the monitoring server.
+    monitoring_app = next((name for name in MONITORING_APPS if name in apps), None)
+    if monitoring_app and not monitoring:
+        fail(f"{monitoring_app} needs monitoring: in config.yml, to know where to send alerts (telegram, email or webhook)")
+    if monitoring and not monitoring_app:
+        fail("monitoring: is set, but no monitoring app is installed. Add prometheus or victoria to apps")
+    if monitoring_app and apps.get("uptimekuma") == apps[monitoring_app]:
+        fail(f"uptimekuma watches the monitoring server, so put it on another server than {monitoring_app}")
+
     ordered = {name: apps[name] for name in catalog if name in apps}
     for name, target in ordered.items():
         if target != "swarm":
@@ -252,7 +303,7 @@ def build(cfg, base_dir):
     check_settings(cfg, bundle)
     groups, hostvars = build_nodes(cfg.get("nodes"), cfg.get("wireguard", False))
     catalog = load_yaml(os.path.join(HERE, "catalog.yml"))
-    apps = build_apps(cfg.get("apps"), catalog, hostvars)
+    apps = build_apps(cfg.get("apps"), catalog, hostvars, cfg.get("monitoring"))
 
     def from_config_dir(path):
         return os.path.join(base_dir, os.path.expanduser(path))

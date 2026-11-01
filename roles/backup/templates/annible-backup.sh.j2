@@ -9,6 +9,7 @@
 #   - databases (PostgreSQL, MariaDB) as a dump, while they run
 #   - every other app folder in {{ apps_dir }}: the app is paused for a moment while its files are copied
 #   - big object storage (RustFS, Garage data) as it is, while it runs
+#   - monitoring: Grafana and Alertmanager, but not the metrics and logs history
 #   - first manager: the swarm (your stacks, secrets, networks), config.yml and state/
 # Not saved: the image registry (the installer fills it again; push your own images again).
 set -euo pipefail
@@ -57,6 +58,8 @@ for dir in {{ apps_dir }}/*/; do
     backup | bundle | registry) ;;          # not saved
     postgres | mariadb) ;;                  # saved as a dump above
     rustfs) paths+=("$dir") ;;              # big: saved while it runs
+    prometheus | victoria) copy_app "$app" data ;;  # metrics and logs history: not saved
+    monitoring-agent) copy_app "$app" vector-data ;;  # logs waiting to be sent: not saved
     garage) copy_app garage data            # settings and metadata paused, data while it runs
             paths+=("{{ apps_dir }}/garage/data") ;;
     *) copy_app "$app" ;;

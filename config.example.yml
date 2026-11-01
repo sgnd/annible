@@ -10,8 +10,8 @@ acme_email: admin@example.com      # for tls: letsencrypt
 # tls_cert: ./certs/fullchain.pem   # for tls: custom, a wildcard cert for *.example.com
 # tls_key: ./certs/privkey.pem      # paths are relative to this file
 timezone: Asia/Jakarta
-arch: amd64                # CPU of your servers (not your laptop): amd64 (Intel/AMD) | arm64.
-                           # All servers must use the same one.
+# arch: amd64              # Optional. The installer finds each server's CPU (amd64 or arm64); they may mix.
+                           # Set it only to make sure every server is that type. Offline: one type per bundle.
 
 ssh:
   user: ubuntu             # needs passwordless sudo
@@ -53,6 +53,20 @@ wireguard: false
 #   keep_weekly: 4
 #   keep_monthly: 6
 
+# Needed with the prometheus or victoria app: where alerts go. At least one of telegram, email, webhook.
+# monitoring:
+#   telegram: { bot_token: "123456:ABC...", chat_id: -1001234567890 }   # chat_id is a number
+#   email:
+#     to: ops@example.com
+#     from: alerts@example.com
+#     smarthost: smtp.example.com:587
+#     username: alerts@example.com
+#     password: ...
+#     tls: true            # false only for a server without TLS (STARTTLS)
+#   webhook: https://hooks.slack.com/services/...   # Slack, Discord, or any URL that takes Alertmanager's JSON
+#   heartbeat_url: https://hc-ping.com/your-uuid    # optional: a heartbeat service outside the cluster (takes POST)
+#   keep_days: 30          # how long metrics and logs are kept
+
 # Your servers.
 #   name: lowercase letters, numbers and -
 #   ip:   the private IPv4 the servers use to talk to each other (the swarm uses it).
@@ -92,4 +106,5 @@ apps:
   redis: data1             # or valkey
   rustfs: data1            # or garage
   rabbitmq: data1          # or nats
-  # uptimekuma: data1      # or beszel
+  # uptimekuma: swarm2     # or beszel; with monitoring, on another server than it
+  # victoria: data1        # metrics, logs and alerts, or prometheus (needs monitoring: above)

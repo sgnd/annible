@@ -1,0 +1,24 @@
+# Grafana reads metrics, logs and alerts from the monitoring apps on this server.
+apiVersion: 1
+
+datasources:
+  - name: Metrics
+    uid: metrics
+    type: prometheus
+    url: http://{{ node_ip }}:{{ observability_metrics_port }}
+    isDefault: true
+    editable: false
+{% if monitoring_app == 'prometheus' %}
+  - name: Logs
+    uid: logs
+    type: loki
+    url: http://{{ node_ip }}:{{ observability_logs_port }}
+    editable: false
+{% endif %}
+  - name: Alerts
+    uid: alerts
+    type: alertmanager
+    url: http://{{ node_ip }}:{{ observability_alertmanager_port }}
+    jsonData:
+      implementation: prometheus
+    editable: false

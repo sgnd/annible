@@ -331,12 +331,57 @@ def check_beszel():
     check("beszel page", https("beszel")[0] == "200")
 
 
+def check_monitoring(app):
+    ip = ip_of(app)
+    metrics = f"http://{ip}:{9090 if app == 'prometheus' else 8428}"
+    code, _ = curl(f"http://{ip}:3000/api/user", user="admin:" + secret("grafana_admin"))
+    check("grafana admin login", code == "200", code)
+    check("grafana page", https("grafana", path="/login")[0] == "200")
+    check("alertmanager needs the Traefik password", https("alertmanager")[0] == "401")
+    check("alertmanager opens with the password",
+          https("alertmanager", path="/-/healthy", user="admin:" + secret("traefik_admin"))[0] == "200")
+
+    # Every target answers: servers, containers, log agents, exporters, Traefik, the monitoring apps.
+    _, body = curl(metrics + "/api/v1/query?query=up")
+    up = json.loads(body)["data"]["result"]
+    down = [f"{r['metric'].get('job')}@{r['metric'].get('node')}" for r in up if r["value"][1] != "1"]
+    check(f"all {len(up)} metric targets answer", up and not down, ", ".join(down))
+    for host in HOSTS:
+        check(f"metrics script runs on {host}",
+              any(r["metric"].get("node") == host and r["metric"].get("job") == "node" for r in up))
+    _, body = curl(metrics + "/api/v1/query?query=annible_app_up")
+    apps = {r["metric"]["app"]: r["value"][1] for r in json.loads(body)["data"]["result"]}
+    check(f"every server app answers ({len(apps)})", apps and all(v == "1" for v in apps.values()), str(apps))
+
+    # The alert rules are loaded and Watchdog fires: alerts reach Alertmanager.
+    rules_url = metrics + "/api/v1/rules" if app == "prometheus" else f"http://{ip}:8880/api/v1/rules"
+    _, body = curl(rules_url)
+    rules = sum(len(g["rules"]) for g in json.loads(body)["data"]["groups"])
+    check(f"alert rules loaded ({rules})", rules >= 30, str(rules))
+    _, body = curl(f"http://{ip}:9093/api/v2/alerts")
+    names = {a["labels"]["alertname"] for a in json.loads(body)}
+    check("watchdog alert reaches alertmanager", "Watchdog" in names, str(names))
+    real = names - {"Watchdog"}
+    check("no other alerts firing", not real, ", ".join(sorted(real)))
+
+    # Logs arrive from every server.
+    if app == "prometheus":
+        _, body = curl(f"http://{ip}:3100/loki/api/v1/label/node/values")
+        nodes = set(json.loads(body).get("data", []))
+    else:
+        _, body = curl(f"http://{ip}:9428/select/logsql/field_values?query=_time:15m&field=node")
+        nodes = {v["value"] for v in json.loads(body).get("values", [])}
+    for host in HOSTS:
+        check(f"logs arrive from {host}", host in nodes, str(sorted(nodes)))
+
+
 CHECKS = {
     "traefik": check_traefik, "kong": check_kong, "portainer": check_portainer, "swarmpit": check_swarmpit,
     "keycloak": check_keycloak, "authelia": check_authelia, "postgres": check_postgres, "mariadb": check_mariadb,
     "redis": lambda: check_cache("redis"), "valkey": lambda: check_cache("valkey"),
     "rustfs": check_rustfs, "garage": check_garage, "rabbitmq": check_rabbitmq, "nats": check_nats,
     "uptimekuma": check_uptimekuma, "beszel": check_beszel,
+    "prometheus": lambda: check_monitoring("prometheus"), "victoria": lambda: check_monitoring("victoria"),
 }
 
 if __name__ == "__main__":

@@ -9,12 +9,13 @@ Set up a production-ready Docker Swarm with one command.
 - You pick the apps and the server each app runs on.
 - Every version is pinned in [`versions.yml`](versions.yml). Nothing uses `latest`.
 - Only open-source apps.
-- amd64 (Intel/AMD) and arm64.
+- amd64 (Intel/AMD) and arm64, also mixed in one cluster.
 - Works without internet, with an offline bundle.
 
 ## Requirements
 
-- Ubuntu 24.04 or 26.04 on every server. All servers use the same CPU type (all amd64 or all arm64).
+- Ubuntu 24.04 or 26.04 on every server. Servers can be amd64 or arm64; the installer finds out
+  which. With internet they can mix. The offline bundle needs one CPU type for all servers.
 - SSH key login with passwordless sudo.
 - Python 3.12 or newer on the machine that runs the installer: the first manager, or your laptop.
   It must reach every server over SSH: its `host`, or its `ip` if it has no `host` (for example over a VPN).
@@ -156,6 +157,7 @@ Click a name to open its official website.
 | storage (S3) | [rustfs](https://rustfs.com) / [garage](https://garagehq.deuxfleurs.fr) | server | 9000 / 3900 | `rustfs.<domain>/rustfs/console/` |
 | queue | [rabbitmq](https://www.rabbitmq.com) / [nats](https://nats.io) | server | 5672 / 4222 | `rabbitmq.<domain>` / `nats.<domain>` |
 | monitoring | [uptimekuma](https://uptime.kuma.pet) / [beszel](https://beszel.dev) | server | | `uptimekuma.<domain>` / `beszel.<domain>` |
+| observability (metrics, logs, alerts) | [prometheus](https://prometheus.io) (+ Loki) / [victoria](https://victoriametrics.com) (VictoriaMetrics + VictoriaLogs), both with Alertmanager and Grafana | server | | `grafana.<domain>`, `alertmanager.<domain>`, `metrics.<domain>` (+ `logs.<domain>` for victoria) |
 
 Users and password files are listed in [`catalog.yml`](catalog.yml), and printed at the end of
 the install. Passwords are in `state/secrets/`, and all together in `state/summary.md`.
@@ -272,6 +274,38 @@ loaded from their dumps. Old servers are removed from the swarm. A restore only 
 If you lost `state/` too, get it from the backup with the restic password (`state/secrets/restic`):
 `restic -r <repository> restore latest --host <first manager> --include /opt/annible/backup/stage/installer --target .`
 
+**Monitoring and alerts.** Add `prometheus` or `victoria` to `apps` (on a server with at least 2 GB
+of free memory), and `monitoring:` with where alerts go: Telegram, email or a webhook (Slack and Discord
+URLs are found by themselves). See [`config.example.yml`](config.example.yml). Both choices do the same;
+victoria uses less memory and disk.
+
+On every server, agents collect the server (CPU, memory, disk, clock), its containers, the logs of
+every container and of the system, and the stats of PostgreSQL, MariaDB, Redis and Valkey. Each minute,
+every server also checks that its apps answer on their port, and writes the state of the swarm, the
+last backup and WireGuard. Alerts are sent for:
+
+- a server, an app, a container or a swarm service that is down, or restarts again and again
+- a disk that is almost full (or fills up within a day), memory or CPU that stays high, a wrong clock
+- a backup older than 26 hours, a WireGuard link that is down, a certificate that ends within 14 days
+- a database or cache that is down or out of connections, web apps that answer with errors
+- the monitoring itself: an agent or exporter that does not answer, alerts that cannot be sent
+
+The rules are in [`roles/observability/files/alerts.yml`](roles/observability/files/alerts.yml).
+Grafana has an "Annible overview" dashboard. Logs: Grafana > Explore (prometheus), or
+`https://logs.<domain>/select/vmui` (victoria).
+
+**Who watches the monitoring?** If the monitoring server stops, it cannot send an alert. So the
+`Watchdog` alert is always firing, and something on another server checks that it still is:
+
+- Uptime Kuma (put `uptimekuma` on another server): add a monitor of type "HTTP(s) - Keyword",
+  URL `http://<monitoring server ip>:9093/api/v2/alerts?filter=alertname=Watchdog`, keyword `Watchdog`.
+  The install prints this URL. When the monitoring server, Alertmanager or the alert rules stop,
+  the keyword is gone and Uptime Kuma tells you. The monitoring server sends an alert when Uptime Kuma's
+  server is down, so the two watch each other.
+- Or a heartbeat service outside the cluster, like [healthchecks.io](https://healthchecks.io): put its URL
+  in `monitoring.heartbeat_url`. Alertmanager sends it a POST about every 2 minutes; set its period to 5 minutes.
+  (Uptime Kuma's "Push" monitor does not work here: it takes only GET.)
+
 **Remove an app.** Remove it from `config.yml`, then:
 
 ```bash
@@ -282,6 +316,8 @@ sudo docker compose -f /opt/annible/<app>/compose.yml down      # server app, on
 If you do not need the data: `sudo rm -rf /opt/annible/<app>` on its server, and
 `sudo rm -f /opt/annible/traefik/dynamic/<app>.yml` on the first manager.
 For beszel, also run `sudo docker compose -f /opt/annible/beszel-agent/compose.yml down` on every server.
+For prometheus or victoria, also run `sudo docker compose -f /opt/annible/monitoring-agent/compose.yml down`
+and `sudo systemctl disable --now annible-metrics.timer` on every server.
 Not removed by itself: the app's database (drop it in Postgres or MariaDB), its old images in the
 registry, a server in Beszel's list (delete it in Beszel), and ports 80/443 if you remove traefik.
 
@@ -307,6 +343,8 @@ shows the command: `sudo docker node promote <name>` or `sudo docker node demote
 | No HTTPS certificate | DNS must point to the first manager, and port 80 must be open. Then run `sudo docker service update --force traefik_traefik` on the first manager. Let's Encrypt has rate limits. |
 | App not starting | Swarm apps: `sudo docker service ls`, `sudo docker service logs <stack>_<service>`. Server apps: `sudo docker ps`, `sudo docker logs <app>`. |
 | `no such host` or a timeout while downloading | A network problem on the server. Check its internet, then run `./install.sh` again. It is safe to run again: it continues where it stopped. |
+| No alerts arrive | Look at `https://alertmanager.<domain>`: if alerts are there, check `monitoring:` in `config.yml` and the `AlertsNotSent` alert. Logs: `sudo docker logs alertmanager` on the monitoring server. |
+| An alert you do not want | Silence it in `https://alertmanager.<domain>` (for a time), or change the rule in `roles/observability/files/alerts.yml`. |
 | `toomanyrequests` from Docker Hub | Docker Hub limits pulls. Wait, or run `sudo docker login` on the first manager. |
 
 ## Testing
