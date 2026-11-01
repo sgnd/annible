@@ -1,5 +1,5 @@
 # Nightly backup of every server with restic (backup: in config.yml).
-# The script /usr/local/bin/ansibro-backup says what it saves. See README "Back up and restore".
+# The script /usr/local/bin/ansibro-backup says what it saves. See docs/how-to.md, "Back up and restore".
 
 - name: Write backup settings
   ansible.builtin.import_tasks: settings.yml

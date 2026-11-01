@@ -61,7 +61,7 @@ jobs:
         with:
           # Some websites block bots (403, 429) or answer slowly.
           # Only real errors, like 404 Not Found, fail this check.
-          args: --no-progress --accept 200..=299,403,429 --accept-timeouts --max-retries 3 README.md THIRD_PARTY.md CONTRIBUTING.md docs/getting-started.md
+          args: --no-progress --accept 200..=299,403,429 --accept-timeouts --max-retries 3 README.md THIRD_PARTY.md CONTRIBUTING.md docs/*.md
           fail: true
 
   # 5. Known security problems in the pinned images (a report on the run's page; it does not fail).
