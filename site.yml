@@ -39,8 +39,9 @@
       changed_when: false
       when: inventory_hostname in groups['swarm']
 
-    # The registry lives on the first manager. If another manager has it, the managers were
-    # reordered (or a new one was put first). Stop before anything moves.
+    # The registry started on the first manager. If another manager has it and the first one does not,
+    # the managers were reordered (or a new one was put first). Stop before anything moves.
+    # It passes when the first manager has the registry, or no manager has it yet (a new install).
     - name: Look for the registry
       ansible.builtin.stat:
         path: "{{ apps_dir }}/registry/ca/ca.crt"

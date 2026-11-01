@@ -18,7 +18,7 @@ registry_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/regist
 # On k3s, every cluster server answers on 80 and 443 (k3s's built-in load balancer).
 traefik_nodes: >-
   {{ groups['swarm'] if orchestrator == 'k3s'
-  else [swarm_leader] if tls | default('letsencrypt') == 'letsencrypt' else groups['managers'] }}
+  else [swarm_leader] if tls == 'letsencrypt' else groups['managers'] }}
 
 # The login on admin pages: Authelia, or Keycloak (through oauth2-proxy), or else the Traefik
 # dashboard password. Authelia and Keycloak ask for a second factor (an authenticator app).

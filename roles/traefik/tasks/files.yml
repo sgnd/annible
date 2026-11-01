@@ -30,7 +30,7 @@
     - { src: "{{ tls_key | default('') }}", dest: key.pem }
   loop_control:
     label: "{{ item.dest }}"
-  when: tls | default('letsencrypt') == 'custom'
+  when: tls == 'custom'
   notify: Restart traefik  # Traefik reads certificate files only when it starts
 
 - name: Copy the ACME server's CA certificate
@@ -45,7 +45,7 @@
   ansible.builtin.file:
     path: "{{ traefik_dir }}/dynamic/tls.yml"
     state: absent
-  when: tls | default('letsencrypt') != 'custom'
+  when: tls != 'custom'
 
 - name: Write custom certificate config
   ansible.builtin.copy:
@@ -58,7 +58,7 @@
               certFile: /etc/traefik/certs/cert.pem
               keyFile: /etc/traefik/certs/key.pem
     mode: "0600"
-  when: tls | default('letsencrypt') == 'custom'
+  when: tls == 'custom'
 
 # A fixed salt gives the same hash every run, so nothing changes on rerun.
 - name: Hash dashboard password

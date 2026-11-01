@@ -13,7 +13,7 @@ entryPoints:
   websecure:
     address: ":443"
     http:
-{% if tls | default('letsencrypt') == 'letsencrypt' %}
+{% if tls == 'letsencrypt' %}
       tls:
         certResolver: letsencrypt
 {% else %}
@@ -35,7 +35,7 @@ providers:
     directory: /etc/traefik/dynamic
     watch: true
 
-{% if tls | default('letsencrypt') == 'letsencrypt' %}
+{% if tls == 'letsencrypt' %}
 certificatesResolvers:
   letsencrypt:
     acme:

@@ -12,7 +12,7 @@ spec:
       - --entryPoints.web.http.redirections.entryPoint.scheme=https
       - --api.dashboard=true
       - --providers.kubernetescrd.allowCrossNamespace=true  # routes use the middlewares in "ansibro"
-{% if tls | default('letsencrypt') == 'letsencrypt' %}
+{% if tls == 'letsencrypt' %}
       - --entryPoints.websecure.http.tls.certResolver=letsencrypt
       - --certificatesresolvers.letsencrypt.acme.email={{ acme_email }}
       - --certificatesresolvers.letsencrypt.acme.storage=/data/acme.json
@@ -92,7 +92,7 @@ spec:
     trustForwardHeader: true
     authResponseHeaders: [X-Auth-Request-User, X-Auth-Request-Email]
 {% endif %}
-{% if tls | default('letsencrypt') == 'custom' %}
+{% if tls == 'custom' %}
 ---
 # Your own certificate for every site.
 apiVersion: v1
