@@ -6,21 +6,24 @@
 - `apps:` config: choose apps and the server they run on
 - Swarm apps: traefik, kong, portainer, swarmpit, keycloak, authelia
 - Server apps: postgres, mariadb, redis, valkey, rustfs, garage, rabbitmq, nats, uptimekuma, beszel,
-  prometheus, victoria
+  prometheus, victoria, openbao
 - Offline install: `build-bundle.sh` makes one file with apt packages, Ansible and images
 - `host` per node (multi-IP servers), optional WireGuard network, swarm MTU, cloud-init hostname
 - Backup (restic, nightly) and restore of the whole cluster on new servers
 - Monitoring and alerts: prometheus or victoria, agents on every server, Uptime Kuma watches the monitoring server
+- HA: registry and Traefik on every manager, tier labels
+- PostgreSQL replicas (manual failover), Garage on 3 servers
+- Zero trust: per-port firewall between servers, Authelia (2FA) for admin pages, encrypted `state/`, image scan in CI
+- Secrets: OpenBao
+- Remove apps and servers that are no longer in `config.yml`
+- Offline bundles built in CI for each release
+- GPU servers (NVIDIA)
 
 ## Next
 
-1. HA: Traefik on all managers, a second registry, `tier=app` / `tier=data` labels
-2. Database HA (Postgres replica and failover, Garage on 3 servers, ...)
-3. Zero trust: encrypt `state/` (sops + age), SSO for admin pages, firewall per app, image scan in CI
-4. Secrets: OpenBao or Infisical
-5. Remove apps and nodes automatically (today: by hand, see README)
-6. Release bundles on GitHub (build in CI on each tag)
-7. GPU servers (NVIDIA driver, container toolkit, `gpu=true` label, GPU monitoring), when a client needs it
+1. Test everything above on real servers (DigitalOcean), see "Not tested yet" in CHANGELOG
+2. Automatic PostgreSQL failover (Patroni), MariaDB and Valkey replicas
+3. SSO for admin pages with Keycloak (today: Authelia only)
 
 ## Rules
 

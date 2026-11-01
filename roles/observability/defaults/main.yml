@@ -20,6 +20,7 @@ observability_vector_port: 9598
 observability_postgres_exporter_port: 9187
 observability_mysqld_exporter_port: 9104
 observability_redis_exporter_port: 9121
+observability_dcgm_exporter_port: 9400
 observability_traefik_metrics_port: 8082
 
 # The port of each server app. Every minute, each server checks that its apps answer there.

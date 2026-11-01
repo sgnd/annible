@@ -2,6 +2,10 @@
 {% if inventory_hostname not in groups['swarm'] %}
   "live-restore": true,
 {% endif %}
+{% if node_gpu %}
+  "default-runtime": "nvidia",
+  "runtimes": { "nvidia": { "path": "nvidia-container-runtime", "args": [] } },
+{% endif %}
   "log-driver": "json-file",
   "log-opts": {
     "max-size": "{{ docker_log_max_size }}",

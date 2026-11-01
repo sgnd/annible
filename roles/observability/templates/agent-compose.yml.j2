@@ -58,6 +58,19 @@ services:
       - /var/log/journal:/var/log/journal:ro
       - /run/log/journal:/run/log/journal:ro
       - /etc/machine-id:/etc/machine-id:ro
+{% if node_gpu %}
+
+  # NVIDIA GPU use, temperature, memory and errors.
+  dcgm-exporter:
+    image: {{ registry_addr }}/dcgm-exporter:{{ images['dcgm-exporter'].tag }}
+    container_name: dcgm-exporter
+    restart: always
+    network_mode: host
+    cap_add: [SYS_ADMIN]
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all  # Docker's nvidia runtime gives it every GPU
+      DCGM_EXPORTER_LISTEN: "{{ node_ip }}:{{ observability_dcgm_exporter_port }}"
+{% endif %}
 {% if 'postgres' in node_apps %}
 
   postgres-exporter:

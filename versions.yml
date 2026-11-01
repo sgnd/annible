@@ -10,6 +10,9 @@ docker_packages:
   - docker-buildx-plugin=0.38.1-1*
   - docker-compose-plugin=5.6.1-1*
 
+# NVIDIA Container Toolkit, for servers with gpu: true (from NVIDIA's apt repository).
+nvidia_container_toolkit: 1.20.1-1
+
 images:
   registry:
     repo: docker.io/library/registry
@@ -47,6 +50,10 @@ images:
     repo: docker.io/rustfs/rustfs
     tag: 1.0.4
     digest: sha256:ed9210d6411d77ffceb70d94b964a3cb7d225983368bc25bebe01e995293dcc2
+  dcgm-exporter:
+    repo: nvcr.io/nvidia/k8s/dcgm-exporter
+    tag: 4.5.2-4.8.1-ubuntu22.04
+    digest: sha256:17e9d49093f2d86d90260eec3c07b18b3f78fc5eadef3c8ab26a24fa5a9c1b2c
   openbao:
     repo: docker.io/openbao/openbao
     tag: 2.7.2

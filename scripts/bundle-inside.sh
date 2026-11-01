@@ -61,7 +61,8 @@ echo "- image list"
 /tmp/venv/bin/python - > /out/images.txt <<'EOF'
 import yaml
 for name, image in yaml.safe_load(open("/src/versions.yml"))["images"].items():
-    print(name, image["repo"], image["tag"], image["digest"])
+    if name != "dcgm-exporter":  # GPU servers need internet anyway (NVIDIA's packages)
+        print(name, image["repo"], image["tag"], image["digest"])
 EOF
 
 cat > /out/info.yml <<EOF

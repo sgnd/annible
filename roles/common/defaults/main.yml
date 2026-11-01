@@ -48,6 +48,7 @@ common_cluster_tcp_ports: >-
   + ([7946] if inventory_hostname in groups['swarm'] else [])
   + ([8082] if monitoring_app and 'traefik' in apps and inventory_hostname in traefik_nodes else [])
   + ([9100, 9280, 9598, 9187, 9104, 9121] if monitoring_app else [])
+  + ([9400] if monitoring_app and node_gpu else [])
   + ([45876] if 'beszel' in apps else [])
   + (node_apps | map('extract', common_app_ports) | flatten))
   | unique | sort }}

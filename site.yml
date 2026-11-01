@@ -112,6 +112,8 @@
     - common
     - role: wireguard
       when: wireguard
+    - role: gpu
+      when: node_gpu
     - docker
 
 - name: Registry

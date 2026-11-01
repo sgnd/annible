@@ -203,6 +203,24 @@ secrets from `http://<server ip>:8200/v1/secret/data/<path>`. OpenBao starts sea
 run `./install.sh` again (it unseals it with `state/secrets/openbao_unseal_key`), or unseal it on
 the web page. With monitoring, the alert `OpenBaoSealed` tells you.
 
+**GPU servers.** Set `gpu: true` on a server with an NVIDIA GPU. The installer installs the
+NVIDIA driver that Ubuntu recommends (and restarts the server once), the NVIDIA Container Toolkit,
+and makes `nvidia` Docker's default runtime there. Swarm servers get the label `gpu=true`. A service
+that needs the GPU:
+
+```yaml
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+    deploy:
+      placement:
+        constraints: [node.labels.gpu == true]
+```
+
+With monitoring, dcgm-exporter reports GPU use, temperature and memory (alerts `GpuTooHot`,
+`GpuErrors`, `GpuMemoryFull`). GPU servers need internet. If the installer runs on a GPU server,
+restart it by hand after the first run and run `./install.sh` again. The NVIDIA driver is not
+open source; it is only installed with `gpu: true`.
+
 **Kong** runs on its own network, `kong`, shared only with Traefik. Put your API services on that
 network too (`networks: [kong]`, external) so Kong can reach them. Other apps cannot reach Kong's admin API.
 

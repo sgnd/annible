@@ -24,7 +24,7 @@ scrape_configs:
 {% endfor %}
 {% endfor %}
 
-  # Database exporters, on the server where the database runs.
+  # Database exporters, on each server where the database runs (replicas too).
 {% for app, job, port in [
      ('postgres', 'postgres', observability_postgres_exporter_port),
      ('mariadb', 'mariadb', observability_mysqld_exporter_port),
@@ -32,9 +32,21 @@ scrape_configs:
      ('valkey', 'valkey', observability_redis_exporter_port)] if app in apps %}
   - job_name: {{ job }}
     static_configs:
-      - targets: ["{{ hostvars[apps[app]].node_ip }}:{{ port }}"]
-        labels: { node: {{ apps[app] }} }
+{% for host in app_nodes[app] %}
+      - targets: ["{{ hostvars[host].node_ip }}:{{ port }}"]
+        labels: { node: {{ host }} }
 {% endfor %}
+{% endfor %}
+{% if groups['all'] | map('extract', hostvars, 'node_gpu') | select | list %}
+
+  # NVIDIA GPUs (dcgm-exporter), on servers with gpu: true.
+  - job_name: gpu
+    static_configs:
+{% for host in groups['all'] if hostvars[host].node_gpu %}
+      - targets: ["{{ hostvars[host].node_ip }}:{{ observability_dcgm_exporter_port }}"]
+        labels: { node: {{ host }} }
+{% endfor %}
+{% endif %}
 {% if 'traefik' in apps %}
 
   # Traefik: requests, backends that are down, and when the certificates end.

@@ -27,6 +27,9 @@ Their source code is at the links below and at https://launchpad.net/ubuntu (apt
 | Uptime Kuma | MIT | https://github.com/louislam/uptime-kuma |
 | Beszel | MIT | https://github.com/henrygd/beszel |
 | OpenBao | MPL-2.0 | https://github.com/openbao/openbao |
+| NVIDIA Container Toolkit (only with `gpu: true`) | Apache-2.0 | https://github.com/NVIDIA/nvidia-container-toolkit |
+| NVIDIA dcgm-exporter (only with `gpu: true`) | Apache-2.0 | https://github.com/NVIDIA/dcgm-exporter |
+| NVIDIA driver (only with `gpu: true`, from Ubuntu) | NVIDIA license, not open source | https://www.nvidia.com/en-us/drivers/ |
 | PostgreSQL | PostgreSQL | https://www.postgresql.org |
 | MariaDB | GPL-2.0 | https://github.com/MariaDB/server |
 | Redis 8 | AGPL-3.0 (one of its three licenses) | https://github.com/redis/redis |

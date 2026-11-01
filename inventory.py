@@ -33,7 +33,7 @@ TIME = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
 SWARM_ADDRESS_POOL = "10.200.0.0/16"
 REGISTRY_PORT = 5000  # the local image registry on the first manager
 KONG_SUBNET = "10.200.255.0/24"  # Kong's own network, inside the pool
-NODE_KEYS = {"name", "ip", "host", "role", "labels"}
+NODE_KEYS = {"name", "ip", "host", "role", "labels", "gpu"}
 WIREGUARD_PORT = 51820  # UDP port of the WireGuard network between the servers
 
 
@@ -211,6 +211,8 @@ def build_nodes(nodes, wireguard):
         for key, value in labels.items():
             if not LABEL.match(str(key)) or not LABEL.match(str(value)):
                 fail(f"{name}: label {key}: {value} may only use letters, numbers, . _ and -")
+        if node.get("gpu", False) not in (True, False):
+            fail(f"{name}: gpu must be true or false")
         if name in hostvars:
             fail(f"duplicate node name {name}")
         try:
@@ -243,7 +245,11 @@ def build_nodes(nodes, wireguard):
             "node_role": role,
             "node_labels": {str(k): str(v) for k, v in (node.get("labels") or {}).items()},
             "node_apps": [],
+            "node_gpu": node.get("gpu", False),
         }
+        # Swarm services that need a GPU use the placement rule node.labels.gpu == true.
+        if node.get("gpu") and role != "standalone":
+            hostvars[name]["node_labels"].setdefault("gpu", "true")
 
     if not groups["managers"]:
         fail("at least one manager is required")
@@ -324,6 +330,8 @@ def build(cfg, base_dir):
     check_settings(cfg, bundle)
     groups, hostvars = build_nodes(cfg.get("nodes"), cfg.get("wireguard", False))
     catalog = load_yaml(os.path.join(HERE, "catalog.yml"))
+    if bundle and any(h["node_gpu"] for h in hostvars.values()):
+        fail("gpu: true needs internet (the NVIDIA driver and toolkit are not in the offline bundle)")
     apps, app_nodes = build_apps(cfg.get("apps"), catalog, hostvars, cfg.get("monitoring"))
     # tier=data: a swarm server that runs server apps (databases, ...); tier=app: the others.
     # Swarm apps without data prefer tier=app servers. A tier in config.yml labels wins.

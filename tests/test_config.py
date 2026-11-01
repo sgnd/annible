@@ -51,6 +51,7 @@ CASES = [
     ("garage on 2 servers", lambda c: c["apps"].update(rustfs=None) or c["apps"].pop("rustfs")
      or c["apps"].update(garage=["data1", "swarm1"]), "list 1 or 3 servers"),
     ("replica on unknown node", lambda c: c["apps"].update(postgres=["data1", "nowhere"]), "nowhere is not a node name"),
+    ("gpu not true or false", lambda c: c["nodes"][0].update(gpu="yes"), "gpu must be true or false"),
     ("same server twice", lambda c: c["apps"].update(postgres=["data1", "data1"]), "listed twice"),
     ("allow_from as text, not a list", lambda c: c["ssh"].update(allow_from="203.0.113.0/24"), "must be a list"),
     ("allow_from with a bad IP", lambda c: c["ssh"].update(allow_from=["300.1.1.1"]), "not an IP or range"),
@@ -135,6 +136,7 @@ GOOD = [
             "webhook": "https://hooks.slack.com/services/x",
             "heartbeat_url": "https://hc-ping.com/abc",
             "keep_days": 14}))),
+    ("gpu on a node", lambda c: c["nodes"][1].update(gpu=True)),
     ("postgres with a replica", lambda c: c["apps"].update(postgres=["data1", "swarm2"])),
 ]
 

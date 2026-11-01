@@ -79,6 +79,9 @@ wireguard: false
 #         standalone not in the swarm, runs server apps like databases
 #   labels: optional tags for your own swarm placement rules, e.g. node.labels.tier == app.
 #           The installer only adds labels; remove old ones by hand (sudo docker node update --label-rm <key> <node>).
+#           Swarm servers also get tier=data (they run server apps) or tier=app, unless you set tier.
+#   gpu:  optional, true for a server with an NVIDIA GPU: the installer adds the driver, the
+#         NVIDIA Container Toolkit and the label gpu=true. Needs internet.
 nodes:
   - name: swarm1
     ip: 10.0.0.11

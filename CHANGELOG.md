@@ -18,8 +18,11 @@ Not tested yet (test before the next release):
 - OpenBao.
 - Removing apps and servers.
 - The release workflow (bundles built by GitHub Actions on each tag).
+- GPU servers (needs a server with an NVIDIA GPU).
 
 New
+- `gpu: true` on a node: NVIDIA driver, NVIDIA Container Toolkit (pinned), `nvidia` as Docker's
+  default runtime, label `gpu=true`, and GPU monitoring with dcgm-exporter (3 GPU alerts).
 - Each GitHub release gets the offline bundles for amd64 and arm64, Ubuntu 24.04 and 26.04,
   built by GitHub Actions (`.github/workflows/release.yml`).
 - Remove an app: take it out of `config.yml` and run `./install.sh`. It stops (data kept).

@@ -105,7 +105,9 @@
     apply:
       run_once: true
   vars:
-    registry_mirror_images: [node-exporter, cadvisor, vector, postgres-exporter, mysqld-exporter, redis-exporter]
+    registry_mirror_images: >-
+      {{ ['node-exporter', 'cadvisor', 'vector', 'postgres-exporter', 'mysqld-exporter', 'redis-exporter']
+      + (['dcgm-exporter'] if groups['all'] | map('extract', hostvars, 'node_gpu') | select | list else []) }}
 
 - name: Write monitoring agent compose file
   ansible.builtin.template:

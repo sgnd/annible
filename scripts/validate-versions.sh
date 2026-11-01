@@ -41,4 +41,16 @@ for target in noble/amd64 noble/arm64 resolute/amd64 resolute/arm64; do
   echo "ok $ubuntu $arch"
 done
 
+echo "== NVIDIA Container Toolkit"
+version=$(yq '.nvidia_container_toolkit' versions.yml)
+for arch in amd64 arm64; do
+  if curl -fsSL "https://nvidia.github.io/libnvidia-container/stable/deb/$arch/Packages" \
+      | awk '/^Package: /{p=$2} /^Version: /{print p, $2}' | grep -q "^nvidia-container-toolkit $version$"; then
+    echo "ok $arch"
+  else
+    echo "MISSING nvidia-container-toolkit $version for $arch"
+    failed=1
+  fi
+done
+
 exit $failed
