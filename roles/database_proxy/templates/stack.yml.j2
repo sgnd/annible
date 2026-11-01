@@ -6,6 +6,9 @@ services:
       - { source: haproxy, target: /usr/local/etc/haproxy/haproxy.cfg }
     networks:
       - public
+{% if 'kong' in apps %}
+      - kong  # Kong is only on its own network
+{% endif %}
     deploy:
       replicas: 2
 
@@ -18,3 +21,7 @@ configs:
 networks:
   public:
     external: true
+{% if 'kong' in apps %}
+  kong:
+    external: true
+{% endif %}
