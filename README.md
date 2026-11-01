@@ -439,15 +439,18 @@ A server app has one middleware, so this replaces its `admin_allow_from` limit.
 `install.sh` installs Ansible into `.venv/`, reads `config.yml` through
 [`inventory.py`](inventory.py) (which also checks it), and runs [`site.yml`](site.yml):
 
-1. **bundle** (offline only): copies the bundle to the servers
-2. **common**: hostname, packages, time sync, firewall
-3. **wireguard** (if `wireguard: true`): the encrypted network between the servers
-4. **docker**: installs Docker
-5. **registry**: a private image registry on every manager, with the same images. All servers pull from it.
-6. **swarm**: creates the swarm and joins the servers
-7. **server apps**: `roles/<app>/`, Docker Compose in `/opt/ansibro/<app>/`
-8. **beszel agents** (if beszel is picked): on every server
-9. **swarm apps**: `roles/<app>/`, swarm stacks in `/opt/ansibro/<app>/`
+1. **removed servers** leave the cluster (only with `-e remove_nodes=true`)
+2. **bundle** (offline only): copies the bundle to the servers
+3. **common**: hostname, packages, time sync, firewall
+4. **wireguard** (if `wireguard: true`): the encrypted network between the servers
+5. **gpu** (servers with `gpu: true`): NVIDIA driver and container toolkit
+6. **docker**: installs Docker
+7. **registry**: a private image registry on every manager, with the same images. All servers pull from it.
+8. **swarm** or **k3s**: creates the cluster and joins the servers
+9. **server apps**: `roles/<app>/`, Docker Compose in `/opt/ansibro/<app>/`
+10. **agents** on every server: beszel (if picked), monitoring (with prometheus or victoria)
+11. **swarm apps**: `roles/<app>/`, swarm stacks in `/opt/ansibro/<app>/` (k3s: its built-in Traefik)
+12. **removed apps** stop, then **backup** (if `backup:` is set)
 
 ### Firewall
 
@@ -488,7 +491,7 @@ is open to everyone: the firewall cannot block it (that is how Docker works). Us
   in your own stacks too. Set `labels: { tier: ... }` on a node to choose yourself.
 - **The registry needs a login.** Every server logs in (password in `state/secrets/registry`),
   so a container cannot push a fake image into it.
-- **Swarm networks use `10.200.0.0/16`.** Your servers' IPs must be outside that range.
+- **Swarm networks use `10.200.0.0/16`, k3s uses `10.42.0.0/16` and `10.43.0.0/16`.** Your servers' IPs must be outside them.
 - **Use a private network between servers, or `wireguard: true`.** Without WireGuard, traffic between servers is not encrypted.
 - **The `ip` of a node is its private IP** (or its WireGuard address). DNS must point to the public IP of the servers Traefik runs on.
 - **A swarm server cannot change its `ip`.** The installer stops if a server's swarm address differs from `ip`
