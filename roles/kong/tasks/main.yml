@@ -50,6 +50,7 @@
   changed_when: "'migrated' in kong_migrations.stdout or 'executed' in kong_migrations.stdout"
 
 - name: Write Kong stack
+  when: orchestrator == 'swarm'
   ansible.builtin.template:
     src: stack.yml.j2
     dest: "{{ kong_dir }}/stack.yml"
@@ -57,12 +58,22 @@
   register: kong_stack
 
 - name: Deploy Kong
+  when: orchestrator == 'swarm'
   ansible.builtin.include_role:
     name: swarm
     tasks_from: deploy
   vars:
     swarm_stack: kong
     swarm_stack_changed: "{{ kong_stack.changed or kong_env.changed }}"
+
+# k3s: a manifest in k3s's folder; k3s applies it by itself.
+- name: Write Kong for k3s
+  ansible.builtin.template:
+    src: k3s.yaml.j2
+    dest: /var/lib/rancher/k3s/server/manifests/ansibro-kong.yaml
+    mode: "0600"
+  diff: false  # has passwords
+  when: orchestrator == 'k3s'
 
 - name: Finish Kong database changes
   ansible.builtin.command: >-

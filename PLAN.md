@@ -18,14 +18,13 @@
 - Remove apps and servers that are no longer in `config.yml`
 - Offline bundles built in CI for each release
 - GPU servers (NVIDIA)
-- k3s as a second orchestrator (`orchestrator: k3s`)
+- k3s as a second orchestrator (`orchestrator: k3s`), with portainer, kong, keycloak, authelia and restore
 
 ## Next
 
 1. Test everything above on real servers (DigitalOcean), see "Not tested yet" in CHANGELOG
-2. k3s: Kubernetes versions of kong, portainer, keycloak, authelia; restore=true for k3s
-3. Automatic PostgreSQL failover (Patroni), MariaDB and Valkey replicas
-4. SSO for admin pages with Keycloak (today: Authelia only)
+2. Automatic PostgreSQL failover (Patroni), MariaDB and Valkey replicas
+3. SSO for admin pages with Keycloak (today: Authelia only)
 
 ## Rules
 

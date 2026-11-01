@@ -20,6 +20,9 @@ traefik_nodes: >-
   {{ groups['swarm'] if orchestrator == 'k3s'
   else [swarm_leader] if tls | default('letsencrypt') == 'letsencrypt' else groups['managers'] }}
 
+# k3s: the login on admin pages (a Traefik middleware in the "ansibro" namespace).
+k3s_admin_login: "{{ 'authelia' if 'authelia' in apps else 'admin-auth' }}"
+
 # Swarm apps without data run on servers with the label tier=app, if there are any
 # (servers without server apps get it; see inventory.py).
 swarm_app_constraint: >-

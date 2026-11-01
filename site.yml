@@ -75,14 +75,19 @@
           To go back to a backup, install new servers and restore there.
       when: restore | bool and inventory_hostname in groups['swarm']
 
-    - name: Check a restore is for Docker Swarm
+    - name: Look for k3s
+      ansible.builtin.stat:
+        path: /var/lib/rancher/k3s/server
+      register: k3s_here
+      when: restore | bool and orchestrator == 'k3s'
+
+    - name: Check a k3s restore goes to new servers
       ansible.builtin.assert:
-        that: orchestrator == 'swarm'
+        that: not k3s_here.stat.exists
         fail_msg: >-
-          restore=true works with Docker Swarm only for now. On k3s, the backup has an etcd snapshot
-          (k3s/ in the backup): see https://docs.k3s.io/datastore/backup-restore
-      when: restore | bool
-      run_once: true
+          restore=true is only for new, empty servers, but {{ inventory_hostname }} already runs k3s.
+          To go back to a backup, install new servers and restore there.
+      when: restore | bool and orchestrator == 'k3s'
 
     - name: Check a restore has a backup to read
       ansible.builtin.assert:
@@ -206,7 +211,8 @@
     - name: Deploy swarm apps
       ansible.builtin.include_role:
         name: "{{ app }}"
-      loop: "{{ swarm_apps if orchestrator == 'swarm' else [] }}"
+      # On k3s, Traefik is k3s's own (play "Traefik on k3s"); the other apps get a k3s manifest.
+      loop: "{{ swarm_apps if orchestrator == 'swarm' else swarm_apps | difference(['traefik']) }}"
       loop_control:
         loop_var: app
 

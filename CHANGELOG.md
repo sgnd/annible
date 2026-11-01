@@ -22,8 +22,9 @@ New
 - k3s: `orchestrator: k3s` makes a k3s (Kubernetes) cluster instead of Docker Swarm: managers are
   k3s servers (embedded etcd), workers agents. Pinned version, offline bundle, WireGuard, registry
   mirror, firewall, built-in Traefik with routes to server apps, metrics and alerts (K3sNodeDown,
-  K3sDeploymentDown, K3sPodsStuck), etcd snapshot in the backup, node removal. Swarm-only apps for
-  now: kong, portainer, swarmpit, keycloak, authelia. In `apps`, `cluster` is the same as `swarm`.
+  K3sDeploymentDown, K3sPodsStuck), etcd snapshot in the backup and `-e restore=true`, node removal.
+  portainer, kong, keycloak and authelia run on k3s too; swarmpit is Swarm only. In `apps`, `cluster`
+  is the same as `swarm`.
 - `gpu: true` on a node: NVIDIA driver, NVIDIA Container Toolkit (pinned), `nvidia` as Docker's
   default runtime, label `gpu=true`, and GPU monitoring with dcgm-exporter (3 GPU alerts).
 - Each GitHub release gets the offline bundles for amd64 and arm64, Ubuntu 24.04 and 26.04,

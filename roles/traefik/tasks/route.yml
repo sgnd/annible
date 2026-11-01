@@ -70,7 +70,9 @@
             middlewares:
               - { name: admin-ip }
       {% if traefik_route_middleware | default('admin-ip') == 'admin' %}
-              - { name: admin-auth }
+              - { name: {{ k3s_admin_login }} }
+      {% elif traefik_route_middleware | default('admin-ip') == 'authelia@file' %}
+              - { name: authelia }
       {% endif %}
             services:
               - { name: {{ traefik_route_name }}, port: {{ traefik_route_port }} }

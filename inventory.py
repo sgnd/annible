@@ -22,8 +22,8 @@ CONFIG_KEYS = {
 ORCHESTRATORS = ("swarm", "k3s")
 # k3s uses these for its pods and services; server IPs must be outside them.
 K3S_CIDRS = ("10.42.0.0/16", "10.43.0.0/16")
-# Apps that run as cluster services. On k3s only Traefik for now (the one k3s has built in).
-K3S_CLUSTER_APPS = ("traefik",)
+# Apps that run as cluster services and also work on k3s. Swarmpit manages Docker Swarm only.
+K3S_CLUSTER_APPS = ("traefik", "portainer", "kong", "keycloak", "authelia")
 # Node names become hostnames, and must not clash with "swarm" or group names.
 NODE_NAME = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
 RESERVED_NAMES = {"swarm", "all", "managers", "workers", "standalone", "localhost"}
@@ -348,8 +348,7 @@ def build(cfg, base_dir):
     if orchestrator == "k3s":
         for name, target in apps.items():
             if target == "swarm" and name not in K3S_CLUSTER_APPS:
-                fail(f"{name} runs only on Docker Swarm for now. On k3s, use the apps that run on a server, "
-                     f"and {', '.join(K3S_CLUSTER_APPS)} (write it as 'traefik: cluster')")
+                fail(f"{name} manages Docker Swarm, so it does not run on k3s (use portainer)")
     # tier=data: a swarm server that runs server apps (databases, ...); tier=app: the others.
     # Swarm apps without data prefer tier=app servers. A tier in config.yml labels wins.
     for name in groups["managers"] + groups["workers"]:

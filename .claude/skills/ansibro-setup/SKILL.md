@@ -11,8 +11,8 @@ Goal: a valid `config.yml`. Start from `config.example.yml`. Every setting is ex
 
 Ask only what you cannot guess. Keep it short.
 
-1. **Cluster**: Docker Swarm (default) or k3s (`orchestrator: k3s`). On k3s, kong, portainer,
-   swarmpit, keycloak and authelia are not available yet; traefik is written `traefik: cluster`.
+1. **Cluster**: Docker Swarm (default) or k3s (`orchestrator: k3s`). On k3s write `cluster` instead
+   of `swarm` (for example `traefik: cluster`); swarmpit is Swarm only (use portainer).
 2. **Servers**: name, private IP, role for each one.
    - `manager` runs the cluster (swarm manager or k3s server). Use 1, 3 or 5.
    - `worker` runs cluster apps (swarm worker or k3s agent).

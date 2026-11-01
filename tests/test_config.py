@@ -67,7 +67,8 @@ CASES = [
     ("server ip inside the swarm range", lambda c: c["nodes"][1].update(ip="10.200.1.5"), "which the cluster uses"),
     ("server ip inside the k3s pod range", lambda c: c["nodes"][1].update(ip="10.42.0.5"), "which the cluster uses"),
     ("unknown orchestrator", lambda c: c.update(orchestrator="nomad"), "orchestrator must be swarm or k3s"),
-    ("swarm-only app on k3s", lambda c: c.update(orchestrator="k3s"), "runs only on Docker Swarm"),
+    ("swarmpit on k3s", lambda c: (c.update(orchestrator="k3s"), c["apps"].pop("portainer", None),
+     c["apps"].update(swarmpit="swarm")), "manages Docker Swarm"),
     ("firewall_allow as text", lambda c: c.update(firewall_allow="51820/udp"), "firewall_allow must be a list"),
     ("firewall_allow bad port", lambda c: c.update(firewall_allow=[{"port": 70000}]), "port must be a number"),
     ("firewall_allow bad proto", lambda c: c.update(firewall_allow=[{"port": 53, "proto": "icmp"}]), "proto must be tcp or udp"),
@@ -142,6 +143,8 @@ GOOD = [
     ("gpu on a node", lambda c: c["nodes"][1].update(gpu=True)),
     ("k3s with server apps and traefik", lambda c: (c.update(orchestrator="k3s"),
      [c["apps"].pop(a) for a in list(c["apps"]) if a not in ("traefik", "postgres", "redis", "rustfs")])),
+    ("k3s with portainer, kong and authelia", lambda c: (c.update(orchestrator="k3s"),
+     c["apps"].update(portainer="cluster", kong="cluster", authelia="cluster"))),
     ("postgres with a replica", lambda c: c["apps"].update(postgres=["data1", "swarm2"])),
 ]
 

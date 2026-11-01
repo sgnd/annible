@@ -269,10 +269,16 @@ def check_kong():
     result = admin_login("kong admin API", "kong-manager", "/api/")
     if result:
         check("kong admin API works", "version" in result[1])
-    # From the public network (where other apps are), the admin API must not be reachable.
-    _, out = on_leader(["sudo", "docker", "run", "--rm", "--network", "public", f"{REGISTRY}/kong:{IMAGES['kong']['tag']}",
-                        "curl", "-s", "-m", "5", "-o", "/dev/null", "-w", "%{http_code}", "http://kong_kong:8001/"])
-    check("kong admin API is not reachable from other apps", not out.endswith("200"), out[-80:])
+    # From where other apps are, the admin API must not be reachable.
+    curl = ["curl", "-s", "-m", "5", "-o", "/dev/null", "-w", "%{http_code}"]
+    if CFG.get("orchestrator") == "k3s":
+        _, out = on_leader(["sudo", "k3s", "kubectl", "run", "ansibro-check-kong", "-n", "default", "--rm", "-i",
+                            "--restart=Never", f"--image=registry.ansibro:{CFG['registry_port']}/kong:{IMAGES['kong']['tag']}",
+                            "--command", "--", *curl, "http://kong.ansibro.svc.cluster.local:8001/"])
+    else:
+        _, out = on_leader(["sudo", "docker", "run", "--rm", "--network", "public", f"{REGISTRY}/kong:{IMAGES['kong']['tag']}",
+                            *curl, "http://kong_kong:8001/"])
+    check("kong admin API is not reachable from other apps", "200" not in out, out[-80:])
 
 
 def check_keycloak():

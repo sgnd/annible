@@ -1,0 +1,55 @@
+# app: portainer (the installer removes this file when the app is removed)
+# Portainer on k3s: it manages the cluster it runs in, so it needs no agent. Made by ansibro.
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: portainer, namespace: ansibro }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: { name: ansibro-portainer }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: cluster-admin }
+subjects: [{ kind: ServiceAccount, name: portainer, namespace: ansibro }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: portainer, namespace: ansibro }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: portainer } }
+  template:
+    metadata: { labels: { app: portainer } }
+    spec:
+      serviceAccountName: portainer
+      # Its data stays on the first manager, like with Swarm (and the backup saves it there).
+      nodeSelector: { kubernetes.io/hostname: {{ swarm_leader }} }
+      containers:
+        - name: portainer
+          image: {{ registry_addr }}/portainer:{{ images.portainer.tag }}
+          args: [--admin-password-file, /run/admin_password]
+          ports: [{ containerPort: 9000 }]
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: password, mountPath: /run/admin_password, readOnly: true }
+      volumes:
+        - { name: data, hostPath: { path: "{{ portainer_dir }}/data" } }
+        - { name: password, hostPath: { path: "{{ portainer_dir }}/admin_password", type: File } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: portainer, namespace: ansibro }
+spec:
+  selector: { app: portainer }
+  ports: [{ port: 9000 }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: portainer, namespace: ansibro }
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`{{ portainer_host }}`)
+      kind: Rule
+      middlewares: [{ name: admin-ip }]
+      services: [{ name: portainer, port: 9000 }]
+  tls: {}
