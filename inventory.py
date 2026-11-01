@@ -253,11 +253,30 @@ def build_nodes(nodes, wireguard):
 
 
 def build_apps(apps, catalog, hostvars, monitoring=None):
-    """Return {app: "swarm" or node name} in catalog order, after checking it."""
-    apps = apps or {}
+    """Return ({app: "swarm" or first node name}, {app: [all its node names]}) in catalog order.
+
+    Apps with "servers" in the catalog can run on more than one server: [db1, db2].
+    The first one is the main server (the primary), apps use that one.
+    """
+    apps = dict(apps or {})
+    app_nodes = {}
     for name, target in apps.items():
         if name not in catalog:
             fail(f"unknown app {name}, available: {', '.join(catalog)}")
+        if isinstance(target, list):
+            allowed = catalog[name].get("servers")
+            if not allowed:
+                fail(f"{name} runs on one server only, write it as '{name}: <node name>'")
+            if len(target) not in allowed:
+                fail(f"{name}: list {' or '.join(map(str, allowed))} servers, got {len(target)}")
+            if len(set(target)) != len(target):
+                fail(f"{name}: a server is listed twice")
+            for node in target:
+                if node not in hostvars:
+                    fail(f"{name}: {node} is not a node name")
+            app_nodes[name] = target
+            apps[name] = target[0]
+            continue
         if not isinstance(target, str):
             fail(f"{name}: write it as '{name}: swarm' or '{name}: <node name>'")
         runs_on = catalog[name]["runs_on"]
@@ -294,8 +313,10 @@ def build_apps(apps, catalog, hostvars, monitoring=None):
     ordered = {name: apps[name] for name in catalog if name in apps}
     for name, target in ordered.items():
         if target != "swarm":
-            hostvars[target]["node_apps"].append(name)
-    return ordered
+            app_nodes.setdefault(name, [target])
+            for node in app_nodes[name]:
+                hostvars[node]["node_apps"].append(name)
+    return ordered, app_nodes
 
 
 def build(cfg, base_dir):
@@ -303,7 +324,7 @@ def build(cfg, base_dir):
     check_settings(cfg, bundle)
     groups, hostvars = build_nodes(cfg.get("nodes"), cfg.get("wireguard", False))
     catalog = load_yaml(os.path.join(HERE, "catalog.yml"))
-    apps = build_apps(cfg.get("apps"), catalog, hostvars, cfg.get("monitoring"))
+    apps, app_nodes = build_apps(cfg.get("apps"), catalog, hostvars, cfg.get("monitoring"))
     # tier=data: a swarm server that runs server apps (databases, ...); tier=app: the others.
     # Swarm apps without data prefer tier=app servers. A tier in config.yml labels wins.
     for name in groups["managers"] + groups["workers"]:
@@ -322,6 +343,7 @@ def build(cfg, base_dir):
         offline=bool(bundle),
         bundle=bundle,
         apps=apps,
+        app_nodes=app_nodes,
         catalog=catalog,
         swarm_apps=[name for name, target in apps.items() if target == "swarm"],
         swarm_address_pool=SWARM_ADDRESS_POOL,

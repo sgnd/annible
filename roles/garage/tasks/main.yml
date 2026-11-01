@@ -1,4 +1,5 @@
 # Garage: S3-compatible storage. Apps use http://<server ip>:3900 with the access and secret key.
+# On 3 servers (garage: [s1, s2, s3]) every file is kept on all 3; any of them answers.
 
 - name: Create Garage folders
   ansible.builtin.file:
@@ -41,25 +42,46 @@
     docker_compose_app: garage
     docker_compose_restart: "{{ garage_config.changed }}"
 
-# A new Garage server stores nothing until it gets a place in the layout.
-- name: Get Garage layout
-  ansible.builtin.command: docker exec garage /garage layout show
-  register: garage_layout
+# Each server's Garage ID, like 563e...@10.0.0.5:3901.
+- name: Get Garage node ID
+  ansible.builtin.command: docker exec garage /garage node id -q
+  register: garage_node_id
   changed_when: false
   retries: 10
   delay: 3
-  until: garage_layout.rc == 0
+  until: garage_node_id.rc == 0
 
-- name: Add this server to the Garage layout
+# The first Garage server does the cluster steps below for all of them.
+- name: Connect the Garage servers
+  ansible.builtin.command: docker exec garage /garage node connect {{ hostvars[item].garage_node_id.stdout }}
+  loop: "{{ app_nodes.garage[1:] }}"
+  when: garage_first
+  changed_when: false
+
+# A new Garage server stores nothing until it gets a place in the layout.
+# Each server is its own zone, so the 3 copies of a file go to 3 different servers.
+- name: Add new servers to the Garage layout
   ansible.builtin.shell:
     cmd: |
       set -eo pipefail
-      node_id=$(docker exec garage /garage node id -q | cut -d@ -f1)
-      docker exec garage /garage layout assign -z dc1 -c {{ garage_capacity }} "$node_id"
-      docker exec garage /garage layout apply --version 1
+      layout=$(docker exec garage /garage layout show)
+      added=0
+      {% for host in app_nodes.garage %}
+      id={{ hostvars[host].garage_node_id.stdout.split('@')[0] }}
+      if ! grep -q "${id:0:16}" <<< "$layout"; then
+        docker exec garage /garage layout assign -z {{ host }} -c {{ garage_capacity }} "$id"
+        added=1
+      fi
+      {% endfor %}
+      if [ "$added" = 1 ]; then
+        version=$(sed -n 's/.*Current cluster layout version: \([0-9]*\).*/\1/p' <<< "$layout")
+        docker exec garage /garage layout apply --version $(( ${version:-0} + 1 ))
+        echo added
+      fi
     executable: /bin/bash
-  when: "'No nodes currently have a role' in garage_layout.stdout"
-  changed_when: true
+  register: garage_layout
+  when: garage_first
+  changed_when: "'added' in garage_layout.stdout"
 
 # The key goes in through Garage's admin API, so the secret is never on a command line.
 - name: Get Garage keys
@@ -68,6 +90,7 @@
     headers:
       Authorization: "Bearer {{ garage_admin_token }}"
   register: garage_keys
+  when: garage_first
   no_log: true
 
 - name: Add Garage access key
@@ -81,6 +104,6 @@
       name: default
       accessKeyId: "{{ garage_access_key }}"
       secretAccessKey: "{{ garage_secret_key }}"
-  when: garage_access_key not in garage_keys.json | map(attribute='id')
+  when: garage_first and garage_access_key not in garage_keys.json | map(attribute='id')
   changed_when: true
   no_log: true

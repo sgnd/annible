@@ -102,9 +102,9 @@ apps:
   portainer: swarm         # or swarmpit
   # kong: swarm            # API gateway, needs postgres
   # keycloak: swarm        # login, or authelia (needs a database; authelia also a cache)
-  postgres: data1          # or mariadb
+  postgres: data1          # or mariadb. Replicas: postgres: [data1, data2] (first = primary)
   redis: data1             # or valkey
-  rustfs: data1            # or garage
+  rustfs: data1            # or garage. 3 copies of every file: garage: [data1, data2, data3]
   rabbitmq: data1          # or nats
   # uptimekuma: swarm2     # or beszel; with monitoring, on another server than it
   # victoria: data1        # metrics, logs and alerts, or prometheus (needs monitoring: above)

@@ -12,8 +12,12 @@ Not tested yet (test before the next release):
 - Mixed amd64 + arm64 clusters and the registry copy for both CPU types.
 - Telegram alerts, RabbitMQ metrics, and a restore of a cluster with monitoring.
 - HA: the registry on every manager, Traefik on every manager, tier labels.
+- PostgreSQL replicas and Garage on 3 servers.
 
 New
+- PostgreSQL replicas: `postgres: [db1, db2]`. The first server is the primary, the others follow
+  it (streaming replication). Failover is one command (see README), not automatic yet.
+- Garage on 3 servers: `garage: [s1, s2, s3]` keeps 3 copies of every file.
 - HA: every manager runs the image registry with the same images (apps use the name
   `registry.ansibro`), so images can be pulled when a manager is down. Traefik runs on every
   manager, except with `tls: letsencrypt` (see README). Swarm servers get the label `tier=data`

@@ -42,9 +42,12 @@ copy_app() {
 }
 
 # 1. Databases: a dump is consistent while the database runs.
+{% if apps.postgres | default('') == inventory_hostname %}
+# (Only on the primary. A PostgreSQL replica is a copy of it.)
 if docker ps -q --filter name=^postgres$ | grep -q .; then
   docker exec postgres pg_dumpall -U postgres --clean --if-exists > "$stage/dumps/postgres.sql"
 fi
+{% endif %}
 if docker ps -q --filter name=^mariadb$ | grep -q .; then
   docker exec mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb-dump -uroot --all-databases \
     --single-transaction --routines --events --add-drop-database --flush-privileges' > "$stage/dumps/mariadb.sql"

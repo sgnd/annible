@@ -47,6 +47,11 @@ CASES = [
     ("authelia without cache",
      lambda c: (c["apps"].update(authelia="swarm"), c["apps"].pop("redis")), "needs a cache (redis or valkey)"),
     ("long app form", lambda c: c["apps"].update(postgres={"on": "data1"}), "write it as"),
+    ("list for a one-server app", lambda c: c["apps"].update(redis=["data1", "swarm1"]), "runs on one server only"),
+    ("garage on 2 servers", lambda c: c["apps"].update(rustfs=None) or c["apps"].pop("rustfs")
+     or c["apps"].update(garage=["data1", "swarm1"]), "list 1 or 3 servers"),
+    ("replica on unknown node", lambda c: c["apps"].update(postgres=["data1", "nowhere"]), "nowhere is not a node name"),
+    ("same server twice", lambda c: c["apps"].update(postgres=["data1", "data1"]), "listed twice"),
     ("allow_from as text, not a list", lambda c: c["ssh"].update(allow_from="203.0.113.0/24"), "must be a list"),
     ("allow_from with a bad IP", lambda c: c["ssh"].update(allow_from=["300.1.1.1"]), "not an IP or range"),
     ("admin_allow_from as text", lambda c: c.update(admin_allow_from="203.0.113.0/24"), "must be a list"),
@@ -130,6 +135,7 @@ GOOD = [
             "webhook": "https://hooks.slack.com/services/x",
             "heartbeat_url": "https://hc-ping.com/abc",
             "keep_days": 14}))),
+    ("postgres with a replica", lambda c: c["apps"].update(postgres=["data1", "swarm2"])),
 ]
 
 

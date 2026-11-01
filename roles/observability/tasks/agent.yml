@@ -67,7 +67,7 @@
       SELECT 'CREATE ROLE monitor LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'monitor') \gexec
       ALTER ROLE monitor WITH LOGIN PASSWORD '{{ observability_monitor_password }}';
       GRANT pg_monitor TO monitor;
-  when: "'postgres' in node_apps"
+  when: apps.postgres | default('') == inventory_hostname  # the primary; replicas get it from there
   changed_when: false
   no_log: true
 

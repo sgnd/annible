@@ -223,6 +223,13 @@ groups:
         annotations:
           summary: "PostgreSQL on {{ $labels.node }} uses {{ $value | humanizePercentage }} of its connections."
 
+      - alert: PostgresReplicaBehind
+        expr: pg_replication_lag_seconds > 300
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "The PostgreSQL replica on {{ $labels.node }} is {{ $value | humanizeDuration }} behind the primary."
+
       - alert: MariadbDown
         expr: mysql_up == 0
         for: 1m

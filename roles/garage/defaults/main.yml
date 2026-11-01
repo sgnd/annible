@@ -6,3 +6,6 @@ garage_rpc_secret: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/garage
 garage_admin_token: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/garage_admin_token', chars=['ascii_letters', 'digits'], length=32) }}"
 garage_access_key: "GK{{ lookup('ansible.builtin.password', secrets_dir ~ '/garage_access_key', chars=['0123456789abcdef'], length=24) }}"
 garage_secret_key: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/garage_secret_key', chars=['0123456789abcdef'], length=64) }}"
+
+# The first server in apps (garage: [s1, s2, s3]) sets up the cluster.
+garage_first: "{{ inventory_hostname == apps.garage }}"

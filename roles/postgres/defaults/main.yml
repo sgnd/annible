@@ -2,3 +2,11 @@ postgres_dir: "{{ apps_dir }}/postgres"
 
 # Generated once and saved in state/secrets/ on the installer machine.
 postgres_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/postgres', chars=['ascii_letters', 'digits'], length=24) }}"
+postgres_replication_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/postgres_replication', chars=['ascii_letters', 'digits'], length=24) }}"
+
+# The primary is the first server in apps (postgres: [db1, db2]); the others are replicas.
+postgres_primary: "{{ inventory_hostname == apps.postgres }}"
+postgres_primary_ip: "{{ hostvars[apps.postgres].node_ip }}"
+postgres_replicas: "{{ app_nodes.postgres[1:] }}"
+# Where the image keeps the data, inside the data folder (PostgreSQL 18: <major version>/docker).
+postgres_data_subdir: "{{ images.postgres.tag.split('.')[0] }}/docker"
