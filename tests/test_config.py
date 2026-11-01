@@ -140,7 +140,7 @@ def run(cfg):
         with open(path, "w") as f:
             yaml.safe_dump(cfg, f)
         p = subprocess.run([sys.executable, os.path.join(HERE, "inventory.py"), "--list"],
-                           capture_output=True, text=True, cwd=HERE, env={**os.environ, "ANNIBLE_CONFIG": path})
+                           capture_output=True, text=True, cwd=HERE, env={**os.environ, "ANSIBRO_CONFIG": path})
     return p.returncode, p.stderr.strip()
 
 

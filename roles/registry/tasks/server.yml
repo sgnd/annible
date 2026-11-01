@@ -24,7 +24,7 @@
   ansible.builtin.command:
     cmd: >-
       openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes
-      -days {{ registry_cert_days }} -subj /CN=annible-registry-ca
+      -days {{ registry_cert_days }} -subj /CN=ansibro-registry-ca
       -addext "basicConstraints = critical, CA:TRUE"
       -addext "keyUsage = critical, keyCertSign, cRLSign"
       -keyout ca.key -out ca.crt

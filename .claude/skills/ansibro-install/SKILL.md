@@ -1,15 +1,15 @@
 ---
-name: annible-install
-description: Run the Annible installer, online or offline (bundle), and fix common problems. Use when someone wants to install, re-run, build an offline bundle, or debug a failed install.
+name: ansibro-install
+description: Run the Ansibro installer, online or offline (bundle), and fix common problems. Use when someone wants to install, re-run, build an offline bundle, or debug a failed install.
 ---
 
-# Install Annible
+# Install Ansibro
 
 The installer changes real servers. **Ask the user before you run `./install.sh`.**
 
 ## Before you start
 
-- `config.yml` exists and is valid. If not, use the `annible-setup` skill first.
+- `config.yml` exists and is valid. If not, use the `ansibro-setup` skill first.
 - Servers run Ubuntu 24.04 or 26.04, all with the same CPU type, with SSH key login and passwordless sudo.
 - The machine that runs the installer has Python 3.12 or newer and can reach every server's `ip` over SSH.
 - Always run it from the same machine, because the `state/` folder holds all passwords.
@@ -32,7 +32,7 @@ You can run it again any time. It only changes what is different in `config.yml`
    ./build-bundle.sh arm64 26.04    # ARM, Ubuntu 26.04
    ```
 
-   This makes `dist/annible-<ubuntu>-<arch>.tar.gz` (about 2.5 GB).
+   This makes `dist/ansibro-<ubuntu>-<arch>.tar.gz` (about 2.5 GB).
 2. Copy it **and the SSH private key** to the **first manager** (plus any `tls_cert`, `tls_key` or
    `acme_ca_cert` files: the bundle leaves out keys and certificates). The key must be allowed on
    every server, the first manager itself too. Unpack, add `config.yml` with `tls: selfsigned`
@@ -61,7 +61,7 @@ The installer sees the `bundle/` folder and uses it instead of the internet.
 | Server app not starting | `sudo docker ps`, `sudo docker logs <app>` on that server. |
 | `toomanyrequests` | Docker Hub limit. Wait, or run `sudo docker login` on the first manager. |
 | `cannot reach ... over WireGuard` | Open UDP 51820 between the servers' `host` addresses in the cloud firewall (security group). Check each `host`. `sudo wg show` on a server shows the last handshake. |
-| Backup fails | `sudo annible-backup` on the server shows the error. Check `backup.repository` and the S3 keys. |
+| Backup fails | `sudo ansibro-backup` on the server shows the error. Check `backup.repository` and the S3 keys. |
 | No alerts arrive | Check `https://alertmanager.<domain>`, then `sudo docker logs alertmanager` on the monitoring server. Telegram `chat_id` must be a number; email `smarthost` is `host:port`. |
 | `TargetDown` alert after the install | An agent or exporter does not answer. `sudo docker ps` on that server; the firewall must allow the monitoring server (it does for cluster servers). |
 | `restore=true is only for new, empty servers` | A restore replaces the swarm and data, so it only runs on new servers. |

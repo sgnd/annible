@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ansible inventory built from config.yml (path taken from $ANNIBLE_CONFIG).
+"""Ansible inventory built from config.yml (path taken from $ANSIBRO_CONFIG).
 
 It also checks config.yml, so mistakes stop the install early with a clear message.
 """
@@ -47,7 +47,7 @@ def load_yaml(path):
 
 
 def load_config():
-    path = os.path.abspath(os.environ.get("ANNIBLE_CONFIG", "config.yml"))
+    path = os.path.abspath(os.environ.get("ANSIBRO_CONFIG", "config.yml"))
     if not os.path.exists(path):
         fail(f"{path} not found (copy config.example.yml)")
     return load_yaml(path), os.path.dirname(path)

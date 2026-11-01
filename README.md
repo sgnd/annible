@@ -1,6 +1,6 @@
-# Annible
+# Ansibro
 
-[![Validate](https://github.com/sgnd/annible/actions/workflows/validate.yml/badge.svg)](https://github.com/sgnd/annible/actions/workflows/validate.yml)
+[![Validate](https://github.com/sgnd/ansibro/actions/workflows/validate.yml/badge.svg)](https://github.com/sgnd/ansibro/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Set up a production-ready Docker Swarm with one command.
@@ -26,8 +26,8 @@ Set up a production-ready Docker Swarm with one command.
 ## Quick start
 
 ```bash
-git clone https://github.com/sgnd/annible.git
-cd annible
+git clone https://github.com/sgnd/ansibro.git
+cd ansibro
 cp config.example.yml config.yml   # edit: servers, ssh key, domain, apps
 ./install.sh
 ```
@@ -60,7 +60,7 @@ building for the other CPU type needs QEMU (`docker run --privileged --rm tonist
 ./build-bundle.sh arm64 26.04    # ARM servers, Ubuntu 26.04
 ```
 
-This makes `dist/annible-<ubuntu>-<arch>.tar.gz` (about 2.5 GB). It holds this project, apt packages,
+This makes `dist/ansibro-<ubuntu>-<arch>.tar.gz` (about 2.5 GB). It holds this project, apt packages,
 Ansible and all Docker images from `versions.yml`. Your project folder is not changed.
 
 **2. Copy it to the first manager**, together with your SSH private key and, if you use them,
@@ -69,8 +69,8 @@ The installer connects over SSH to every server, the first manager itself too, s
 be allowed on all servers. Then run the installer there:
 
 ```bash
-tar -xzf annible-24.04-amd64.tar.gz
-cd annible
+tar -xzf ansibro-24.04-amd64.tar.gz
+cd ansibro
 cp config.example.yml config.yml   # set tls: selfsigned (or custom), and ssh.key
 ./install.sh
 ```
@@ -193,9 +193,9 @@ A server app has one middleware, so this replaces its `admin_allow_from` limit.
 4. **docker**: installs Docker
 5. **registry**: a private image registry on the first manager. All servers pull from it.
 6. **swarm**: creates the swarm and joins the servers
-7. **server apps**: `roles/<app>/`, Docker Compose in `/opt/annible/<app>/`
+7. **server apps**: `roles/<app>/`, Docker Compose in `/opt/ansibro/<app>/`
 8. **beszel agents** (if beszel is picked): on every server
-9. **swarm apps**: `roles/<app>/`, swarm stacks in `/opt/annible/<app>/`
+9. **swarm apps**: `roles/<app>/`, swarm stacks in `/opt/ansibro/<app>/`
 
 ### Firewall
 
@@ -242,24 +242,24 @@ Major Postgres upgrades (for example 18 to 19) need a manual dump and restore.
 A new Docker version is installed one server at a time, so the swarm keeps running.
 
 Commands on the servers need `sudo`: the installer does not add users to the `docker` group,
-and the passwords and data in `/opt/annible/` are readable by root only.
+and the passwords and data in `/opt/ansibro/` are readable by root only.
 
 **Back up and restore.** Add `backup:` to `config.yml` (see [`config.example.yml`](config.example.yml))
 and run `./install.sh`. Every server then backs up each night with [restic](https://restic.net)
 (encrypted), and the install runs the first backup right away. What is saved:
 
 - databases (PostgreSQL, MariaDB) as a dump, while they run
-- every other folder in `/opt/annible/`: the app is paused for a moment while its files are copied
+- every other folder in `/opt/ansibro/`: the app is paused for a moment while its files are copied
 - RustFS and Garage data as it is, while it runs
 - on the first manager: the swarm (your stacks, secrets, configs, networks), `config.yml` and `state/`
 
 Not saved: the image registry (the installer fills it again; push your own images again from CI)
-and Docker volumes. Keep your own stacks' files in `/opt/annible/<stack name>/` so they are saved too:
+and Docker volumes. Keep your own stacks' files in `/opt/ansibro/<stack name>/` so they are saved too:
 their containers are paused while copied, like the apps above.
 
 ```bash
-sudo annible-backup              # back up now
-sudo annible-backup snapshots    # list the backups
+sudo ansibro-backup              # back up now
+sudo ansibro-backup snapshots    # list the backups
 ```
 
 To move the cluster to new servers, or after you lost it: make new servers, keep the same node names
@@ -272,7 +272,7 @@ and `ip` values (with `wireguard: true` only `host` changes), keep `state/`, and
 Each server gets its newest backup back, the swarm comes back with your stacks, and the databases are
 loaded from their dumps. Old servers are removed from the swarm. A restore only runs on new servers.
 If you lost `state/` too, get it from the backup with the restic password (`state/secrets/restic`):
-`restic -r <repository> restore latest --host <first manager> --include /opt/annible/backup/stage/installer --target .`
+`restic -r <repository> restore latest --host <first manager> --include /opt/ansibro/backup/stage/installer --target .`
 
 **Monitoring and alerts.** Add `prometheus` or `victoria` to `apps` (on a server with at least 2 GB
 of free memory), and `monitoring:` with where alerts go: Telegram, email or a webhook (Slack and Discord
@@ -291,7 +291,7 @@ last backup and WireGuard. Alerts are sent for:
 - the monitoring itself: an agent or exporter that does not answer, alerts that cannot be sent
 
 The rules are in [`roles/observability/files/alerts.yml`](roles/observability/files/alerts.yml).
-Grafana has an "Annible overview" dashboard. Logs: Grafana > Explore (prometheus), or
+Grafana has an "Ansibro overview" dashboard. Logs: Grafana > Explore (prometheus), or
 `https://logs.<domain>/select/vmui` (victoria).
 
 **Who watches the monitoring?** If the monitoring server stops, it cannot send an alert. So the
@@ -310,14 +310,14 @@ Grafana has an "Annible overview" dashboard. Logs: Grafana > Explore (prometheus
 
 ```bash
 sudo docker stack rm <app>                                      # swarm app, on the first manager
-sudo docker compose -f /opt/annible/<app>/compose.yml down      # server app, on its server
+sudo docker compose -f /opt/ansibro/<app>/compose.yml down      # server app, on its server
 ```
 
-If you do not need the data: `sudo rm -rf /opt/annible/<app>` on its server, and
-`sudo rm -f /opt/annible/traefik/dynamic/<app>.yml` on the first manager.
-For beszel, also run `sudo docker compose -f /opt/annible/beszel-agent/compose.yml down` on every server.
-For prometheus or victoria, also run `sudo docker compose -f /opt/annible/monitoring-agent/compose.yml down`
-and `sudo systemctl disable --now annible-metrics.timer` on every server.
+If you do not need the data: `sudo rm -rf /opt/ansibro/<app>` on its server, and
+`sudo rm -f /opt/ansibro/traefik/dynamic/<app>.yml` on the first manager.
+For beszel, also run `sudo docker compose -f /opt/ansibro/beszel-agent/compose.yml down` on every server.
+For prometheus or victoria, also run `sudo docker compose -f /opt/ansibro/monitoring-agent/compose.yml down`
+and `sudo systemctl disable --now ansibro-metrics.timer` on every server.
 Not removed by itself: the app's database (drop it in Postgres or MariaDB), its old images in the
 registry, a server in Beszel's list (delete it in Beszel), and ports 80/443 if you remove traefik.
 
@@ -386,7 +386,7 @@ No servers needed. The first line makes `.venv/` with Ansible:
 ./install.sh config.example.yml --syntax-check
 .venv/bin/pip install ansible-lint==26.10.1
 .venv/bin/python tests/test_config.py      # config.example.yml works, mistakes are refused
-ANNIBLE_CONFIG=config.example.yml PATH="$PWD/.venv/bin:$PATH" ansible-lint --profile production
+ANSIBRO_CONFIG=config.example.yml PATH="$PWD/.venv/bin:$PATH" ansible-lint --profile production
 shellcheck install.sh build-bundle.sh scripts/*.sh
 scripts/validate-versions.sh               # needs yq, docker and curl
 ```

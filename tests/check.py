@@ -26,8 +26,8 @@ import time
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
 if len(sys.argv) > 1:
-    os.environ["ANNIBLE_CONFIG"] = sys.argv[1]
-os.environ.setdefault("ANNIBLE_CONFIG", "config.yml")
+    os.environ["ANSIBRO_CONFIG"] = sys.argv[1]
+os.environ.setdefault("ANSIBRO_CONFIG", "config.yml")
 import inventory  # noqa: E402
 
 inv = inventory.build(*inventory.load_config())
@@ -186,11 +186,11 @@ def check_swarm():
 
 def check_backup():
     """Every server has a backup in the repository, and the nightly timer is on."""
-    code, out = on_leader(["sudo", "annible-backup", "snapshots", "--json"])
+    code, out = on_leader(["sudo", "ansibro-backup", "snapshots", "--json"])
     hosts = {s["hostname"] for s in json.loads(out)} if code == 0 else set()
     for node in HOSTS:
         check(f"backup of {node} in the repository", node in hosts, out[-200:] if code else "no backup")
-    code, out = on_leader(["systemctl", "is-active", "annible-backup.timer"])
+    code, out = on_leader(["systemctl", "is-active", "ansibro-backup.timer"])
     check("nightly backup timer is on", out == "active", out)
 
 
@@ -349,7 +349,7 @@ def check_monitoring(app):
     for host in HOSTS:
         check(f"metrics script runs on {host}",
               any(r["metric"].get("node") == host and r["metric"].get("job") == "node" for r in up))
-    _, body = curl(metrics + "/api/v1/query?query=annible_app_up")
+    _, body = curl(metrics + "/api/v1/query?query=ansibro_app_up")
     apps = {r["metric"]["app"]: r["value"][1] for r in json.loads(body)["data"]["result"]}
     check(f"every server app answers ({len(apps)})", apps and all(v == "1" for v in apps.values()), str(apps))
 

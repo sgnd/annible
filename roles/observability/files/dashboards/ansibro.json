@@ -1,8 +1,8 @@
 {
-  "uid": "annible-overview",
-  "title": "Annible overview",
+  "uid": "ansibro-overview",
+  "title": "Ansibro overview",
   "tags": [
-    "annible"
+    "ansibro"
   ],
   "timezone": "browser",
   "schemaVersion": 39,
@@ -150,7 +150,7 @@
             "type": "prometheus",
             "uid": "metrics"
           },
-          "expr": "annible_app_up",
+          "expr": "ansibro_app_up",
           "legendFormat": "{{app}}",
           "instant": true,
           "format": "time_series"
@@ -215,7 +215,7 @@
             "type": "prometheus",
             "uid": "metrics"
           },
-          "expr": "(time() - annible_backup_last_success_timestamp_seconds) / 3600",
+          "expr": "(time() - ansibro_backup_last_success_timestamp_seconds) / 3600",
           "legendFormat": "{{node}}",
           "instant": true,
           "format": "time_series"
@@ -473,7 +473,7 @@
             "type": "prometheus",
             "uid": "metrics"
           },
-          "expr": "annible_swarm_service_running",
+          "expr": "ansibro_swarm_service_running",
           "legendFormat": "",
           "instant": true,
           "format": "table"
@@ -484,7 +484,7 @@
             "type": "prometheus",
             "uid": "metrics"
           },
-          "expr": "annible_swarm_service_desired",
+          "expr": "ansibro_swarm_service_desired",
           "legendFormat": "",
           "instant": true,
           "format": "table"

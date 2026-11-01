@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+Annible is now called Ansibro: the repo is github.com/sgnd/ansibro, app files are in
+`/opt/ansibro`, and the commands are `ansibro-backup` and `ansibro-metrics`.
+
+Not tested yet (test before the next release):
+- The rename to Ansibro on real servers (only the local checks ran).
+- `prometheus` (Prometheus + Loki). `victoria` was tested on 3 arm64 servers: all checks, alerts
+  by email and webhook, a second run with no changes.
+- Mixed amd64 + arm64 clusters and the registry copy for both CPU types.
+- Telegram alerts, RabbitMQ metrics, and a restore of a cluster with monitoring.
+
 New
 - Monitoring and alerts: `prometheus` (Prometheus + Loki) or `victoria` (VictoriaMetrics + VictoriaLogs),
   both with Alertmanager and Grafana. Agents on every server collect the server, its containers, all

@@ -18,8 +18,8 @@ if [ ! -f "$config" ]; then
   exit 1
 fi
 # Full path, so it still works after we change folder below.
-ANNIBLE_CONFIG="$(cd "$(dirname "$config")" && pwd)/$(basename "$config")"
-export ANNIBLE_CONFIG
+ANSIBRO_CONFIG="$(cd "$(dirname "$config")" && pwd)/$(basename "$config")"
+export ANSIBRO_CONFIG
 
 cd "$(dirname "$0")"
 

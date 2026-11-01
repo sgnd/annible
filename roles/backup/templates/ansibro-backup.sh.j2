@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Back up this server ({{ inventory_hostname }}) with restic. Made by annible, do not change it here.
-# Runs every night at {{ backup_time }} (annible-backup.timer).
+# Back up this server ({{ inventory_hostname }}) with restic. Made by ansibro, do not change it here.
+# Runs every night at {{ backup_time }} (ansibro-backup.timer).
 #
-#   sudo annible-backup              back up now
-#   sudo annible-backup snapshots    list the backups of all servers (add --json for a program)
+#   sudo ansibro-backup              back up now
+#   sudo ansibro-backup snapshots    list the backups of all servers (add --json for a program)
 #
 # What it saves:
 #   - databases (PostgreSQL, MariaDB) as a dump, while they run
@@ -73,7 +73,7 @@ cp -a {{ backup_dir }}/installer "$stage/installer"
 {% endif %}
 
 # 4. Send it to the repository, then delete old backups of this server.
-restic backup --quiet --retry-lock 1h --host {{ inventory_hostname }} --tag annible "${paths[@]}"
+restic backup --quiet --retry-lock 1h --host {{ inventory_hostname }} --tag ansibro "${paths[@]}"
 restic forget --quiet --retry-lock 1h --host {{ inventory_hostname }} --prune \
   --keep-daily {{ backup_keep_daily }} --keep-weekly {{ backup_keep_weekly }} --keep-monthly {{ backup_keep_monthly }}
 

@@ -3,7 +3,7 @@ services:
     image: {{ registry_addr }}/authelia:{{ images.authelia.tag }}
     # Changes when the config changes, so Authelia restarts and reads it.
     labels:
-      annible.config: "{{ authelia_config.checksum }}"
+      ansibro.config: "{{ authelia_config.checksum }}"
     volumes:
       - {{ authelia_dir }}/config:/config
     networks:

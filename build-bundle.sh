@@ -6,7 +6,7 @@
 #   ./build-bundle.sh arm64 26.04    # ARM servers, Ubuntu 26.04
 #
 # Run it on any machine with Docker and internet (also a Mac). It makes
-# dist/annible-<ubuntu>-<arch>.tar.gz: a copy of this project plus a bundle/ folder:
+# dist/ansibro-<ubuntu>-<arch>.tar.gz: a copy of this project plus a bundle/ folder:
 #   bundle/debs.tar       apt packages (Docker, chrony, ufw, ...)
 #   bundle/python/        Ansible and its Python packages
 #   bundle/collections/   Ansible collections
@@ -27,15 +27,15 @@ if [ "$ubuntu" != 24.04 ] && [ "$ubuntu" != 26.04 ]; then
 fi
 
 cd "$(dirname "$0")"
-file="dist/annible-$ubuntu-$arch.tar.gz"
+file="dist/ansibro-$ubuntu-$arch.tar.gz"
 root="dist/build-$ubuntu-$arch"   # one work folder per bundle, so two builds can run at once
-work="$root/annible"              # the folder that goes into the tar file
+work="$root/ansibro"              # the folder that goes into the tar file
 bundle="$work/bundle"
 
 echo "== Copy the project"
 # Only the files git knows about, so your own configs, keys and passwords never go in.
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "error: run this in a git clone of annible (it copies only the files git tracks)" >&2
+  echo "error: run this in a git clone of ansibro (it copies only the files git tracks)" >&2
   exit 1
 fi
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
@@ -69,11 +69,11 @@ while read -r name repo tag digest; do
 done < "$bundle/images.txt"
 
 echo "== Pack"
-tar --no-xattrs -C "$root" -czf "$file" annible
+tar --no-xattrs -C "$root" -czf "$file" ansibro
 rm -rf "$root"
 
 echo "Done: $file ($(du -h "$file" | cut -f1))"
 echo "Next: copy it and your SSH key to the first manager, then:"
-echo "  tar -xzf $(basename "$file") && cd annible"
+echo "  tar -xzf $(basename "$file") && cd ansibro"
 echo "  cp config.example.yml config.yml   # set tls: selfsigned, ssh.key, servers, apps"
 echo "  ./install.sh"

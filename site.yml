@@ -28,7 +28,7 @@
           - arch is not defined or node_arch == arch
           - not offline or node_arch == bundle.arch
         fail_msg: >-
-          {{ inventory_hostname }} is {{ node_arch }}. Annible runs on amd64 and arm64.
+          {{ inventory_hostname }} is {{ node_arch }}. Ansibro runs on amd64 and arm64.
           Check arch in config.yml (if set) and the offline bundle's CPU type (if offline).
 
     # Before anything changes: does config.yml still match the swarm? (No Docker yet = a new server.)

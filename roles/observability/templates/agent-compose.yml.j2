@@ -10,8 +10,8 @@ services:
     command:
       - --path.rootfs=/host
       - --web.listen-address={{ node_ip }}:{{ observability_node_exporter_port }}
-      # Metrics written by annible-metrics every minute.
-      - --collector.textfile.directory=/host/var/lib/annible-metrics
+      # Metrics written by ansibro-metrics every minute.
+      - --collector.textfile.directory=/host/var/lib/ansibro-metrics
       - --collector.filesystem.mount-points-exclude=^/(dev|proc|run|sys|var/lib/docker/.+|var/lib/containerd/.+)($|/)
     volumes:
       - /:/host:ro,rslave

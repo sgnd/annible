@@ -12,7 +12,7 @@ services:
       REGISTRY_HTTP_TLS_CERTIFICATE: /certs/registry.crt
       REGISTRY_HTTP_TLS_KEY: /certs/registry.key
       REGISTRY_AUTH: htpasswd
-      REGISTRY_AUTH_HTPASSWD_REALM: annible
+      REGISTRY_AUTH_HTPASSWD_REALM: ansibro
       REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
     volumes:
       - ./auth:/auth:ro

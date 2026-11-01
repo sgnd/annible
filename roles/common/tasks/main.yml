@@ -13,9 +13,9 @@
 
 - name: Keep hostname and /etc/hosts after reboot
   ansible.builtin.copy:
-    dest: /etc/cloud/cloud.cfg.d/99-annible.cfg
+    dest: /etc/cloud/cloud.cfg.d/99-ansibro.cfg
     content: |
-      # Managed by annible: keep the hostname and /etc/hosts that annible set.
+      # Managed by ansibro: keep the hostname and /etc/hosts that ansibro set.
       preserve_hostname: true
       manage_etc_hosts: false
     mode: "0644"
@@ -24,7 +24,7 @@
 - name: Add cluster nodes to /etc/hosts
   ansible.builtin.blockinfile:
     path: /etc/hosts
-    marker: "# {mark} annible nodes"
+    marker: "# {mark} ansibro nodes"
     block: |
       {% for host in groups['all'] %}
       {{ hostvars[host].node_ip }} {{ host }}
@@ -52,7 +52,7 @@
   ansible.posix.sysctl:
     name: "{{ item.key }}"
     value: "{{ item.value }}"
-    sysctl_file: /etc/sysctl.d/90-annible.conf
+    sysctl_file: /etc/sysctl.d/90-ansibro.conf
     reload: true
   loop: "{{ common_sysctl | dict2items }}"
 
@@ -64,7 +64,7 @@
 
 - name: Limit journald disk usage
   ansible.builtin.copy:
-    dest: /etc/systemd/journald.conf.d/90-annible.conf
+    dest: /etc/systemd/journald.conf.d/90-ansibro.conf
     content: |
       [Journal]
       SystemMaxUse={{ common_journald_max_use }}

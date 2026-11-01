@@ -45,7 +45,7 @@ wireguard: false
 # The restic password is made for you in state/secrets/restic. Without it the backups cannot be
 # read: keep a copy of state/ outside the cluster. Restore on new servers: ./install.sh -e restore=true
 # backup:
-#   repository: s3:https://s3.example.com/annible-backup
+#   repository: s3:https://s3.example.com/ansibro-backup
 #   s3_access_key: AKIA...
 #   s3_secret_key: ...
 #   time: "02:00"          # every night at this time (in quotes)

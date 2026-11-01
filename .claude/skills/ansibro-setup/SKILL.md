@@ -1,6 +1,6 @@
 ---
-name: annible-setup
-description: Write config.yml for Annible with the user. Use when someone wants to set up a new swarm, pick apps, or change servers or apps in config.yml.
+name: ansibro-setup
+description: Write config.yml for Ansibro with the user. Use when someone wants to set up a new swarm, pick apps, or change servers or apps in config.yml.
 ---
 
 # Set up config.yml
@@ -23,7 +23,7 @@ Ask only what you cannot guess. Keep it short.
    - Yes: `tls: letsencrypt` and set `acme_email`. DNS must point to the first manager **before** the install.
    - No: `tls: selfsigned`, `custom` (their own wildcard cert), or `letsencrypt` with `acme_server`
      set to an ACME server in their network (plus `acme_ca_cert` if its certificate is private).
-     Then use the `annible-install` skill for the offline bundle.
+     Then use the `ansibro-install` skill for the offline bundle.
 5. **SSH**: user (needs passwordless sudo), key path, port. Ask if SSH should be limited to some IPs (`ssh.allow_from`).
 6. **Apps**: which ones and where. See the rules below.
 
@@ -41,7 +41,7 @@ All apps are in `catalog.yml`.
 ## Check it
 
 ```bash
-ANNIBLE_CONFIG=config.yml .venv/bin/python inventory.py --list > /dev/null   # or: python3 inventory.py --list
+ANSIBRO_CONFIG=config.yml .venv/bin/python inventory.py --list > /dev/null   # or: python3 inventory.py --list
 ```
 
 No output means the config is fine. If you get `config error: ...`, the message says what to fix.
@@ -62,4 +62,4 @@ If a `bundle/` folder is here, the check treats it as an offline install.
 - Suggest monitoring: `victoria` (lighter) or `prometheus` on a server with 2 GB free memory, plus `monitoring:`
   with at least one of telegram, email or webhook. Put `uptimekuma` on another server and, after the first
   install, add the "HTTP(s) - Keyword" monitor the install prints, so someone watches the monitoring server.
-- Next step: run the installer (skill `annible-install`).
+- Next step: run the installer (skill `ansibro-install`).

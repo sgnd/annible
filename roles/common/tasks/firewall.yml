@@ -7,9 +7,9 @@
 
 - name: Save wanted firewall rules
   ansible.builtin.copy:
-    dest: /etc/ufw/annible-rules.txt
+    dest: /etc/ufw/ansibro-rules.txt
     content: |
-      # Managed by annible. Change config.yml instead of this file.
+      # Managed by ansibro. Change config.yml instead of this file.
       ssh {{ ansible_port }} from {{ common_ssh_allow_from | join(', ') }}
       web 80, 443: {{ inventory_hostname in groups['swarm'] }}
       cluster nodes: {{ common_cluster_ips | join(', ') }}

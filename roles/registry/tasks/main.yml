@@ -28,7 +28,7 @@
 # only the system's CA list. Only this server trusts the registry CA system-wide (its key is here anyway).
 - name: Trust registry CA on the first manager
   ansible.builtin.copy:
-    dest: /usr/local/share/ca-certificates/annible-registry.crt
+    dest: /usr/local/share/ca-certificates/ansibro-registry.crt
     content: "{{ registry_ca.content | b64decode }}"
     mode: "0644"
   register: registry_system_ca

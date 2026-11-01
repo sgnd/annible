@@ -4,11 +4,11 @@ registry_addr: "{{ hostvars[swarm_leader].node_ip }}:{{ registry_port }}"
 # The CPU types of the servers (amd64, arm64). The registry keeps each image for all of them.
 registry_platforms: "{{ groups['all'] | map('extract', hostvars, 'node_arch') | unique | sort }}"
 # The registry needs a login, so a container cannot push a fake image into it.
-registry_user: annible
+registry_user: ansibro
 registry_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/registry', chars=['ascii_letters', 'digits'], length=32) }}"
 
-# Each app keeps its files in /opt/annible/<app>/ on the server it runs on.
-apps_dir: /opt/annible
+# Each app keeps its files in /opt/ansibro/<app>/ on the server it runs on.
+apps_dir: /opt/ansibro
 
 # Offline install: where the bundle goes on each server, and how apt uses it.
 bundle_dir: "{{ apps_dir }}/bundle"

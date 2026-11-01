@@ -1,9 +1,9 @@
 ---
-name: annible-add-app
-description: Add a new app to the Annible catalog (a new role, catalog entry and pinned image). Use when someone wants Annible to support a new tool, like a database, gateway, queue or monitoring app.
+name: ansibro-add-app
+description: Add a new app to the Ansibro catalog (a new role, catalog entry and pinned image). Use when someone wants Ansibro to support a new tool, like a database, gateway, queue or monitoring app.
 ---
 
-# Add an app to Annible
+# Add an app to Ansibro
 
 ## Rules (check these first)
 
@@ -60,7 +60,7 @@ No servers needed. The first line makes `.venv/` with Ansible:
 ./install.sh config.example.yml --syntax-check
 .venv/bin/pip install ansible-lint==26.10.1
 .venv/bin/python tests/test_config.py
-ANNIBLE_CONFIG=config.example.yml PATH="$PWD/.venv/bin:$PATH" ansible-lint --profile production
+ANSIBRO_CONFIG=config.example.yml PATH="$PWD/.venv/bin:$PATH" ansible-lint --profile production
 shellcheck install.sh build-bundle.sh scripts/*.sh
 scripts/validate-versions.sh               # needs yq, docker and curl
 ```

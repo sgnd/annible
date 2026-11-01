@@ -64,7 +64,7 @@
 - name: Write Grafana data sources
   ansible.builtin.template:
     src: grafana-datasources.yml.j2
-    dest: "{{ observability_dir }}/config/grafana/datasources/annible.yml"
+    dest: "{{ observability_dir }}/config/grafana/datasources/ansibro.yml"
     mode: "0644"
   register: observability_datasources
 
@@ -75,7 +75,7 @@
     mode: "0644"
   loop:
     - dashboards.yml
-    - dashboards/annible.json
+    - dashboards/ansibro.json
 
 - name: Write Grafana admin password
   ansible.builtin.copy:

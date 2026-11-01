@@ -1,6 +1,6 @@
 {% set m = monitoring | default({}) %}
 {% set webhook = m.webhook | default('') %}
-# Where alerts go (monitoring: in config.yml). Made by annible, do not change it here.
+# Where alerts go (monitoring: in config.yml). Made by ansibro, do not change it here.
 route:
   receiver: team
   group_by: [alertname, node]

@@ -1,6 +1,6 @@
 ---
-name: annible-bump
-description: Update a pinned version in Annible's versions.yml (Docker image tag and digest, or Docker apt packages). Use when someone wants to upgrade an app, update images, or fix a pinned version that no longer exists.
+name: ansibro-bump
+description: Update a pinned version in Ansibro's versions.yml (Docker image tag and digest, or Docker apt packages). Use when someone wants to upgrade an app, update images, or fix a pinned version that no longer exists.
 ---
 
 # Update a pinned version

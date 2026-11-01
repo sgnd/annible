@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Extra metrics for {{ inventory_hostname }}, for the alerts that node-exporter cannot see.
-# Made by annible, do not change it here. Runs every minute (annible-metrics.timer).
-# node-exporter reads the file it writes: /var/lib/annible-metrics/annible.prom
+# Made by ansibro, do not change it here. Runs every minute (ansibro-metrics.timer).
+# node-exporter reads the file it writes: /var/lib/ansibro-metrics/ansibro.prom
 set -uo pipefail  # no -e: one failed check must not stop the others
 
-out=/var/lib/annible-metrics/annible.prom
+out=/var/lib/ansibro-metrics/ansibro.prom
 tmp=$(mktemp "$out.XXXXXX")
 
 {
   # 1. Each server app on this server answers on its port.
 {% for app in node_apps if app in observability_app_ports %}
   up=0; timeout 3 bash -c '</dev/tcp/{{ node_ip }}/{{ observability_app_ports[app] }}' 2>/dev/null && up=1
-  echo "annible_app_up{app=\"{{ app }}\",port=\"{{ observability_app_ports[app] }}\"} $up"
+  echo "ansibro_app_up{app=\"{{ app }}\",port=\"{{ observability_app_ports[app] }}\"} $up"
 {% endfor %}
 
   # 2. Containers started with docker compose (server apps, agents): running, restarts, out of memory.
@@ -20,9 +20,9 @@ tmp=$(mktemp "$out.XXXXXX")
     -f '{{.Name}} {{.State.Running}} {{.RestartCount}} {{.State.OOMKilled}}' |
   while read -r name running restarts oom; do
     name=${name#/}
-    echo "annible_container_running{container=\"$name\"} $([ "$running" = true ] && echo 1 || echo 0)"
-    echo "annible_container_restarts_total{container=\"$name\"} $restarts"
-    echo "annible_container_oom_killed{container=\"$name\"} $([ "$oom" = true ] && echo 1 || echo 0)"
+    echo "ansibro_container_running{container=\"$name\"} $([ "$running" = true ] && echo 1 || echo 0)"
+    echo "ansibro_container_restarts_total{container=\"$name\"} $restarts"
+    echo "ansibro_container_oom_killed{container=\"$name\"} $([ "$oom" = true ] && echo 1 || echo 0)"
   done
 {% endraw %}
 {% if inventory_hostname == swarm_leader %}
@@ -31,30 +31,30 @@ tmp=$(mktemp "$out.XXXXXX")
   # Replicas look like "1/1" or "2/3 (max 1 per node)": running/wanted.
 {% raw %}
   docker service ls --format '{{.Name}} {{.Replicas}}' | while read -r service replicas _; do
-    echo "annible_swarm_service_running{service=\"$service\"} ${replicas%/*}"
-    echo "annible_swarm_service_desired{service=\"$service\"} ${replicas#*/}"
+    echo "ansibro_swarm_service_running{service=\"$service\"} ${replicas%/*}"
+    echo "ansibro_swarm_service_desired{service=\"$service\"} ${replicas#*/}"
   done
   docker node ls --format '{{.Hostname}} {{.Status}}' | while read -r node status; do
-    echo "annible_swarm_node_ready{swarm_node=\"$node\"} $([ "$status" = Ready ] && echo 1 || echo 0)"
+    echo "ansibro_swarm_node_ready{swarm_node=\"$node\"} $([ "$status" = Ready ] && echo 1 || echo 0)"
   done
 {% endraw %}
 {% endif %}
 {% if backup is defined %}
 
   # 4. Backup: when the last one worked (0 = never).
-  echo "annible_backup_enabled 1"
-  echo "annible_backup_last_success_timestamp_seconds $(cat {{ apps_dir }}/backup/last-success 2>/dev/null || echo 0)"
+  echo "ansibro_backup_enabled 1"
+  echo "ansibro_backup_last_success_timestamp_seconds $(cat {{ apps_dir }}/backup/last-success 2>/dev/null || echo 0)"
 {% endif %}
 {% if wireguard %}
 
   # 5. WireGuard: last handshake with each other server (0 = never). Peers renew it every 2 minutes.
   wg show wg0 dump | tail -n +2 | while read -r _ _ _ allowed handshake _; do
-    echo "annible_wireguard_last_handshake_seconds{peer=\"${allowed%/32}\"} $handshake"
+    echo "ansibro_wireguard_last_handshake_seconds{peer=\"${allowed%/32}\"} $handshake"
   done
 {% endif %}
 
   # 6. System services that failed.
-  echo "annible_systemd_failed_units $(systemctl list-units --state=failed --no-legend --plain | wc -l)"
+  echo "ansibro_systemd_failed_units $(systemctl list-units --state=failed --no-legend --plain | wc -l)"
 } > "$tmp"
 
 chmod 0644 "$tmp"
