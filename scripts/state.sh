@@ -12,7 +12,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-key="${ANSIBRO_KEY:-$HOME/.config/ansibro/age.key}"
+# HOME is not set when this runs from a service or cron; ~ then comes from the user list.
+home="${HOME:-$(cd ~ && pwd)}"
+key="${ANSIBRO_KEY:-$home/.config/ansibro/age.key}"
 
 # Nothing to do when encryption is off (no key and no state.age).
 if [ ! -f "$key" ] && [ ! -f state.age ]; then
