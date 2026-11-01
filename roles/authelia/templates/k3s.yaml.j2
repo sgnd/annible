@@ -13,6 +13,8 @@ spec:
       # Changes when the config changes, so Authelia restarts and reads it.
       annotations: { ansibro/config: "{{ authelia_config.checksum }}" }
     spec:
+      # No service links: Kubernetes would add variables like <SERVICE>_PORT, which apps read as settings.
+      enableServiceLinks: false
       nodeSelector: { kubernetes.io/hostname: {{ swarm_leader }} }
       containers:
         - name: authelia

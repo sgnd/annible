@@ -16,6 +16,8 @@ spec:
   template:
     metadata: { labels: { app: keycloak } }
     spec:
+      # No service links: Kubernetes would add variables like <SERVICE>_PORT, which apps read as settings.
+      enableServiceLinks: false
 {% if swarm_app_constraint %}
       nodeSelector: { tier: app }
 {% endif %}
@@ -78,6 +80,8 @@ spec:
   template:
     metadata: { labels: { app: oauth2-proxy } }
     spec:
+      # No service links: Kubernetes would add variables like <SERVICE>_PORT, which apps read as settings.
+      enableServiceLinks: false
       containers:
         - name: oauth2-proxy
           image: {{ registry_addr }}/oauth2-proxy:{{ images['oauth2-proxy'].tag }}
