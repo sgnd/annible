@@ -20,6 +20,8 @@ spec:
   template:
     metadata: { labels: { app: portainer } }
     spec:
+      # No service links: Kubernetes would add variables like <SERVICE>_PORT, which apps read as settings.
+      enableServiceLinks: false
       serviceAccountName: portainer
       # Its data stays on the first manager, like with Swarm (and the backup saves it there).
       nodeSelector: { kubernetes.io/hostname: {{ swarm_leader }} }

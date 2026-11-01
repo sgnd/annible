@@ -36,6 +36,10 @@
   register: backup_repo
   changed_when: "'created restic repository' in backup_repo.stdout"
   throttle: 1
+  # Some S3 servers show a new repository a moment later; the next try then finds it.
+  retries: 3
+  delay: 5
+  until: backup_repo.rc == 0
 
 - name: Write the backup script
   ansible.builtin.template:
