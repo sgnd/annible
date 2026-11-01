@@ -76,6 +76,7 @@ cp -a /var/lib/docker/swarm "$stage/swarm"
 {% else %}
 # k3s: a snapshot of its database (etcd), with everything you deployed.
 rm -rf "$stage/k3s"
+mkdir -p "$stage/k3s"
 k3s etcd-snapshot save --dir "$stage/k3s" --name ansibro >/dev/null
 {% endif %}
 cp -a {{ backup_dir }}/installer "$stage/installer"

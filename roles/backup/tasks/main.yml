@@ -29,20 +29,13 @@
   when: inventory_hostname == swarm_leader
   diff: false  # has passwords
 
-- name: Check the backup repository exists
-  ansible.builtin.shell: set -a && . {{ backup_dir }}/restic.env && restic cat config
+# One server at a time: with a shared repository (S3, rest-server) the first one creates it,
+# with a folder each server has its own.
+- name: Create the backup repository if it is not there
+  ansible.builtin.shell: set -a && . {{ backup_dir }}/restic.env && (restic cat config >/dev/null 2>&1 || restic init)
   register: backup_repo
-  failed_when: false
-  changed_when: false
-  run_once: true
-  delegate_to: "{{ swarm_leader }}"
-
-- name: Create the backup repository
-  ansible.builtin.shell: set -a && . {{ backup_dir }}/restic.env && restic init
-  when: backup_repo.rc != 0
-  changed_when: true
-  run_once: true
-  delegate_to: "{{ swarm_leader }}"
+  changed_when: "'created restic repository' in backup_repo.stdout"
+  throttle: 1
 
 - name: Write the backup script
   ansible.builtin.template:
