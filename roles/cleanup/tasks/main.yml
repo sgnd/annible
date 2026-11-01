@@ -49,13 +49,16 @@
 # Each route file says which app made it ("# app: <name>").
 - name: Find Traefik routes of removed apps
   ansible.builtin.command:
-    argv: [grep, -rlE, "^# app: ({{ cleanup_removed_apps | join('|') }}) ", "{{ apps_dir }}/traefik/dynamic"]
+    argv: [grep, -rlE, "^# app: ({{ cleanup_removed_apps | join('|') }}) ", "{{ cleanup_route_dir }}"]
   vars:
     cleanup_removed_apps: "{{ catalog.keys() | difference(apps.keys()) }}"
+    # Swarm: Traefik's files on each Traefik server. k3s: its manifests on the first manager.
+    cleanup_route_dir: "{{ apps_dir ~ '/traefik/dynamic' if orchestrator == 'swarm' else '/var/lib/rancher/k3s/server/manifests' }}"
+    cleanup_route_here: "{{ inventory_hostname in traefik_nodes if orchestrator == 'swarm' else inventory_hostname == swarm_leader }}"
   register: cleanup_routes
   failed_when: false
   changed_when: false
-  when: inventory_hostname in traefik_nodes and cleanup_removed_apps | length > 0
+  when: cleanup_route_here and cleanup_removed_apps | length > 0
 
 - name: Remove Traefik routes of removed apps
   ansible.builtin.file:
@@ -68,10 +71,10 @@
   ansible.builtin.command: docker stack ls --format '{% raw %}{{ .Name }}{% endraw %}'
   register: cleanup_stacks
   changed_when: false
-  when: inventory_hostname == swarm_leader
+  when: inventory_hostname == swarm_leader and orchestrator == 'swarm'
 
 - name: Remove swarm apps that are no longer in config.yml
   ansible.builtin.command: docker stack rm {{ item }}
-  loop: "{{ cleanup_stacks.stdout_lines | intersect(catalog.keys()) | difference(swarm_apps) }}"
-  when: inventory_hostname == swarm_leader
+  loop: "{{ cleanup_stacks.stdout_lines | default([]) | intersect(catalog.keys()) | difference(swarm_apps) }}"
+  when: inventory_hostname == swarm_leader and orchestrator == 'swarm'
   changed_when: true

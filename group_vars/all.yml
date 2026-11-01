@@ -15,7 +15,10 @@ registry_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/regist
 # Traefik runs on every manager, so the apps stay reachable when one manager is down. Point DNS
 # to all of them. Let's Encrypt (and acme_server) checks a domain by calling it, and the call can
 # reach another manager, so with them Traefik runs only on the first manager.
-traefik_nodes: "{{ [swarm_leader] if tls | default('letsencrypt') == 'letsencrypt' else groups['managers'] }}"
+# On k3s, every cluster server answers on 80 and 443 (k3s's built-in load balancer).
+traefik_nodes: >-
+  {{ groups['swarm'] if orchestrator == 'k3s'
+  else [swarm_leader] if tls | default('letsencrypt') == 'letsencrypt' else groups['managers'] }}
 
 # Swarm apps without data run on servers with the label tier=app, if there are any
 # (servers without server apps get it; see inventory.py).

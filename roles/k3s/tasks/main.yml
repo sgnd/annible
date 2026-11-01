@@ -1,0 +1,111 @@
+# k3s (orchestrator: k3s): a small Kubernetes. Managers run "k3s server", workers "k3s agent".
+# The first manager starts the cluster, the others join it. Standalone servers are not in it.
+# kubectl on a manager: sudo k3s kubectl get nodes
+
+- name: Create k3s folders
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0700"
+  loop:
+    - /etc/rancher/k3s
+    - /var/lib/rancher/k3s/agent/images
+
+- name: Get the k3s program
+  ansible.builtin.get_url:
+    url: "{{ k3s_binary_url }}"
+    dest: /usr/local/bin/k3s
+    checksum: "sha256:{{ k3s[node_arch].binary }}"
+    mode: "0755"
+  when: not offline
+  notify: Restart k3s
+
+- name: Copy the k3s program from the bundle
+  ansible.builtin.copy:
+    src: "{{ bundle_dir }}/k3s/k3s-{{ node_arch }}"
+    dest: /usr/local/bin/k3s
+    remote_src: true
+    mode: "0755"
+  when: offline
+  notify: Restart k3s
+
+# Offline: k3s loads its own images (CoreDNS, Traefik, ...) from this folder when it starts.
+- name: Copy the k3s images from the bundle
+  ansible.builtin.copy:
+    src: "{{ bundle_dir }}/k3s/k3s-airgap-images-{{ node_arch }}.tar.zst"
+    dest: /var/lib/rancher/k3s/agent/images/
+    remote_src: true
+    mode: "0644"
+  when: offline
+
+- name: Write k3s config
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    mode: "0600"
+  diff: false  # has the token
+  notify: Restart k3s
+
+- name: Write k3s registry login
+  ansible.builtin.template:
+    src: registries.yaml.j2
+    dest: /etc/rancher/k3s/registries.yaml
+    mode: "0600"
+  no_log: true
+  notify: Restart k3s
+
+- name: Write k3s service
+  ansible.builtin.template:
+    src: k3s.service.j2
+    dest: /etc/systemd/system/{{ k3s_service }}.service
+    mode: "0644"
+  notify: Restart k3s
+
+# The first manager first: the others join it.
+- name: Start k3s on the first manager
+  ansible.builtin.systemd_service:
+    name: k3s
+    state: started
+    enabled: true
+    daemon_reload: true
+  when: inventory_hostname == swarm_leader
+
+- name: Wait for the k3s API
+  ansible.builtin.command: k3s kubectl get --raw /readyz
+  register: k3s_ready
+  until: k3s_ready.rc == 0
+  retries: 60
+  delay: 5
+  changed_when: false
+  delegate_to: "{{ swarm_leader }}"
+  run_once: true
+
+# Servers join one by one, so the cluster keeps a working majority.
+- name: Start k3s on the other servers
+  ansible.builtin.systemd_service:
+    name: "{{ k3s_service }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+  when: inventory_hostname != swarm_leader
+  throttle: 1
+
+- name: Wait until this server is ready in k3s
+  ansible.builtin.command: k3s kubectl wait --for=condition=Ready node/{{ inventory_hostname }} --timeout=10s
+  register: k3s_node
+  until: k3s_node.rc == 0
+  retries: 60
+  delay: 5
+  changed_when: false
+  delegate_to: "{{ swarm_leader }}"
+
+# Swarm adds labels from config.yml; here k3s does it from its config (node-label), but only when
+# a server joins. Set them on servers that are already in the cluster too.
+- name: Set node labels from config.yml
+  ansible.builtin.command: >-
+    k3s kubectl label node {{ inventory_hostname }} --overwrite
+    {% for key, value in node_labels.items() %}{{ key }}={{ value }} {% endfor %}
+  register: k3s_labels
+  changed_when: "'labeled' in k3s_labels.stdout"
+  delegate_to: "{{ swarm_leader }}"
+  when: node_labels | length > 0

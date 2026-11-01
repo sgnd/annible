@@ -12,7 +12,7 @@
     mode: "0700"
   loop: "{{ traefik_nodes }}"
   delegate_to: "{{ item }}"
-  when: "'traefik' in apps"
+  when: "'traefik' in apps and orchestrator == 'swarm'"
 
 - name: Add Traefik route for {{ traefik_route_name }}
   ansible.builtin.copy:
@@ -34,4 +34,47 @@
     mode: "0600"
   loop: "{{ traefik_nodes }}"
   delegate_to: "{{ item }}"
-  when: "'traefik' in apps"
+  when: "'traefik' in apps and orchestrator == 'swarm'"
+
+# On k3s: a Kubernetes service that points to this server, and a Traefik route to it.
+# k3s applies files in its manifests folder by itself (and removes what a deleted file made).
+- name: Add k3s route for {{ traefik_route_name }}
+  ansible.builtin.copy:
+    dest: /var/lib/rancher/k3s/server/manifests/ansibro-route-{{ traefik_route_name }}.yaml
+    content: |
+      # app: {{ app | default(traefik_route_name) }} (the installer removes this file when the app is removed)
+      apiVersion: v1
+      kind: Service
+      metadata: { name: {{ traefik_route_name }}, namespace: ansibro }
+      spec:
+        ports: [{ port: {{ traefik_route_port }} }]
+      ---
+      apiVersion: discovery.k8s.io/v1
+      kind: EndpointSlice
+      metadata:
+        name: {{ traefik_route_name }}
+        namespace: ansibro
+        labels: { kubernetes.io/service-name: {{ traefik_route_name }} }
+      addressType: IPv4
+      ports: [{ port: {{ traefik_route_port }} }]
+      endpoints: [{ addresses: ["{{ node_ip }}"] }]
+      ---
+      apiVersion: traefik.io/v1alpha1
+      kind: IngressRoute
+      metadata: { name: {{ traefik_route_name }}, namespace: ansibro }
+      spec:
+        entryPoints: [websecure]
+        routes:
+          - match: Host(`{{ traefik_route_name }}.{{ domain }}`)
+            kind: Rule
+            middlewares:
+              - { name: admin-ip }
+      {% if traefik_route_middleware | default('admin-ip') == 'admin' %}
+              - { name: admin-auth }
+      {% endif %}
+            services:
+              - { name: {{ traefik_route_name }}, port: {{ traefik_route_port }} }
+        tls: {}
+    mode: "0600"
+  delegate_to: "{{ swarm_leader }}"
+  when: "'traefik' in apps and orchestrator == 'k3s'"

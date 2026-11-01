@@ -10,7 +10,7 @@
 #   - every other app folder in {{ apps_dir }}: the app is paused for a moment while its files are copied
 #   - big object storage (RustFS, Garage data) as it is, while it runs
 #   - monitoring: Grafana and Alertmanager, but not the metrics and logs history
-#   - first manager: the swarm (your stacks, secrets, networks), config.yml and state/
+#   - first manager: the swarm (your stacks, secrets, networks) or a k3s snapshot, config.yml and state/
 # Not saved: the image registry (the installer fills it again; push your own images again).
 set -euo pipefail
 set -a
@@ -70,8 +70,14 @@ for dir in {{ apps_dir }}/*/; do
 done
 {% if inventory_hostname == swarm_leader %}
 
-# 3. First manager: the swarm state, and the installer files (config.yml, state/).
+# 3. First manager: the cluster state, and the installer files (config.yml, state/).
+{% if orchestrator == 'swarm' %}
 cp -a /var/lib/docker/swarm "$stage/swarm"
+{% else %}
+# k3s: a snapshot of its database (etcd), with everything you deployed.
+rm -rf "$stage/k3s"
+k3s etcd-snapshot save --dir "$stage/k3s" --name ansibro >/dev/null
+{% endif %}
 cp -a {{ backup_dir }}/installer "$stage/installer"
 {% endif %}
 

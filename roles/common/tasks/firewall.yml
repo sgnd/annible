@@ -15,6 +15,7 @@
       cluster nodes: {{ common_cluster_ips | join(', ') }}
       cluster tcp: {{ common_cluster_tcp_ports | join(', ') }}
       cluster udp: {{ common_cluster_udp_ports | join(', ') }}
+      k3s pods and services: {{ common_k3s_cidrs | join(', ') }}
       wireguard from: {{ common_wireguard_hosts | join(', ') }}
       ssh replies from: {{ common_cluster_hosts | join(', ') }}
       docker interfaces: {{ common_docker_interfaces | join(', ') }}
@@ -70,6 +71,12 @@
     proto: udp
   loop: "{{ common_cluster_ips }}"
   when: common_cluster_udp_ports | length > 0
+
+- name: Allow k3s pods and services
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item }}"
+  loop: "{{ common_k3s_cidrs }}"
 
 - name: Allow WireGuard from other cluster nodes
   community.general.ufw:

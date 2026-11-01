@@ -189,6 +189,29 @@ groups:
         annotations:
           summary: "The certificate for {{ $labels.sans }} ends in {{ $value | humanize }} days."
 
+  - name: k3s
+    rules:
+      - alert: K3sNodeDown
+        expr: ansibro_k3s_node_ready == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "k3s server {{ $labels.k3s_node }} is not ready."
+
+      - alert: K3sDeploymentDown
+        expr: ansibro_k3s_deployment_ready < ansibro_k3s_deployment_desired
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} runs fewer pods than it should."
+
+      - alert: K3sPodsStuck
+        expr: ansibro_k3s_pods_stuck > 0
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $value }} k3s pods are stuck (not running). Run: sudo k3s kubectl get pods -A"
+
   - name: backup
     rules:
       - alert: BackupTooOld

@@ -1,0 +1,18 @@
+# Traefik on k3s: k3s has it built in. This sets HTTPS, the certificates and the admin login.
+# Runs on the first manager; k3s applies files in its manifests folder by itself.
+
+# A fixed salt gives the same hash every run, so nothing changes on rerun.
+- name: Hash dashboard password
+  ansible.builtin.command:
+    cmd: openssl passwd -apr1 -salt {{ traefik_password_salt }} -stdin
+    stdin: "{{ traefik_password }}"  # not on the command line
+  register: traefik_password_hash
+  changed_when: false
+  no_log: true
+
+- name: Write Traefik settings for k3s
+  ansible.builtin.template:
+    src: k3s.yaml.j2
+    dest: /var/lib/rancher/k3s/server/manifests/ansibro-traefik.yaml
+    mode: "0600"
+  diff: false  # has the password hash

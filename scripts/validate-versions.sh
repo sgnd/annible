@@ -41,6 +41,20 @@ for target in noble/amd64 noble/arm64 resolute/amd64 resolute/arm64; do
   echo "ok $ubuntu $arch"
 done
 
+echo "== k3s"
+k3s_version=$(yq '.k3s.version' versions.yml)
+for arch in amd64 arm64; do
+  sums=$(curl -fsSL "https://github.com/k3s-io/k3s/releases/download/${k3s_version/+/%2B}/sha256sum-$arch.txt")
+  binary=$([ "$arch" = amd64 ] && echo k3s || echo "k3s-$arch")
+  if grep -q "^$(yq ".k3s.$arch.binary" versions.yml)  $binary$" <<< "$sums" &&
+     grep -q "^$(yq ".k3s.$arch.images" versions.yml)  k3s-airgap-images-$arch.tar.zst$" <<< "$sums"; then
+    echo "ok $k3s_version $arch"
+  else
+    echo "WRONG k3s $k3s_version $arch sha256"
+    failed=1
+  fi
+done
+
 echo "== NVIDIA Container Toolkit"
 version=$(yq '.nvidia_container_toolkit' versions.yml)
 for arch in amd64 arm64; do

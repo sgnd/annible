@@ -44,16 +44,28 @@ common_app_ports:
   prometheus: [9090, 3100, 9093, 3000]      # metrics, logs, alerts, Grafana
   victoria: [8428, 9428, 8880, 9093, 3000]  # metrics, logs, rules, alerts, Grafana
 common_cluster_tcp_ports: >-
-  {{ (([2377, registry_port] if inventory_hostname in groups['managers'] else [])
-  + ([7946] if inventory_hostname in groups['swarm'] else [])
+  {{ (([registry_port] if inventory_hostname in groups['managers'] else [])
+  + (common_swarm_tcp_ports if orchestrator == 'swarm' else common_k3s_tcp_ports)
   + ([8082] if monitoring_app and 'traefik' in apps and inventory_hostname in traefik_nodes else [])
   + ([9100, 9280, 9598, 9187, 9104, 9121] if monitoring_app else [])
   + ([9400] if monitoring_app and node_gpu else [])
   + ([45876] if 'beszel' in apps else [])
   + (node_apps | map('extract', common_app_ports) | flatten))
   | unique | sort }}
-# Swarm: node discovery and the overlay networks.
-common_cluster_udp_ports: "{{ [7946, 4789] if inventory_hostname in groups['swarm'] else [] }}"
+# Swarm: managers 2377, node discovery 7946 and the overlay networks 4789/udp.
+common_swarm_tcp_ports: >-
+  {{ ([2377] if inventory_hostname in groups['managers'] else [])
+  + ([7946] if inventory_hostname in groups['swarm'] else []) }}
+# k3s: API 6443 and etcd 2379-2380 on servers, kubelet 10250, flannel (pod network) 8472/udp.
+common_k3s_tcp_ports: >-
+  {{ ([6443, 2379, 2380] if inventory_hostname in groups['managers'] else [])
+  + ([10250] if inventory_hostname in groups['swarm'] else []) }}
+common_cluster_udp_ports: >-
+  {{ [] if inventory_hostname not in groups['swarm']
+  else [7946, 4789] if orchestrator == 'swarm' else [8472] }}
+# k3s: its pods and services reach the server's own ports (DNS, apps on the host network).
+common_k3s_cidrs: >-
+  {{ ['10.42.0.0/16', '10.43.0.0/16'] if orchestrator == 'k3s' and inventory_hostname in groups['swarm'] else [] }}
 
 # docker0: default bridge. docker_gwbridge: how swarm containers reach the host.
 common_docker_interfaces: [docker0, docker_gwbridge]

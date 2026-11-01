@@ -30,7 +30,22 @@ tmp=$(mktemp "$out.XXXXXX")
     echo "ansibro_container_oom_killed{container=\"$name\"} $([ "$oom" = true ] && echo 1 || echo 0)"
   done
 {% endraw %}
-{% if inventory_hostname == swarm_leader %}
+{% if inventory_hostname == swarm_leader and orchestrator == 'k3s' %}
+
+  # 3. First manager (k3s): each server is ready, each deployment runs all its pods,
+  # and how many pods are stuck (not running and not finished).
+{% raw %}
+  k3s kubectl get nodes --no-headers | while read -r node status _; do
+    echo "ansibro_k3s_node_ready{k3s_node=\"$node\"} $([ "${status%%,*}" = Ready ] && echo 1 || echo 0)"
+  done
+  k3s kubectl get deployments -A --no-headers | while read -r namespace name ready _; do
+    echo "ansibro_k3s_deployment_ready{namespace=\"$namespace\",deployment=\"$name\"} ${ready%/*}"
+    echo "ansibro_k3s_deployment_desired{namespace=\"$namespace\",deployment=\"$name\"} ${ready#*/}"
+  done
+  echo "ansibro_k3s_pods_stuck $(k3s kubectl get pods -A --no-headers --field-selector=status.phase!=Running,status.phase!=Succeeded | wc -l)"
+{% endraw %}
+{% endif %}
+{% if inventory_hostname == swarm_leader and orchestrator == 'swarm' %}
 
   # 3. First manager: each swarm service runs all its tasks, and each server is ready.
   # Replicas look like "1/1" or "2/3 (max 1 per node)": running/wanted.

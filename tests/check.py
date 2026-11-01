@@ -108,6 +108,18 @@ def python_on_leader(code, data):
     return on_leader(["python3", "-c", code], stdin=json.dumps(data))
 
 
+def admin_login(name, sub, path="/", ok=("200",)):
+    """An admin page needs a login: the Traefik password, or Authelia (with a second factor) when installed.
+    Returns (status, body) after logging in with the Traefik password, or None with Authelia."""
+    check(f"{name} needs a login", https(sub, path)[0] in ("401", "302"))
+    if "authelia" in APPS:
+        print(f"SKIP  {name} opens after login  (Authelia login with a second factor)")
+        return None
+    code, body = https(sub, path, user="admin:" + secret("traefik_admin"))
+    check(f"{name} opens with the password", code in ok, code)
+    return code, body
+
+
 def check(name, ok, detail=""):
     results.append((name, ok))
     print(f"{'PASS' if ok else 'FAIL'}  {name}" + (f"  ({detail})" if not ok and detail else ""))
@@ -184,6 +196,25 @@ def check_swarm():
                 check(f"packets of {int(mtu) + 50} bytes reach {node} (swarm MTU {mtu})", code == 0, out[-200:])
 
 
+def check_k3s():
+    _, out = on_leader(["sudo", "k3s", "kubectl", "get", "nodes", "--no-headers"])
+    status = {line.split()[0]: line.split()[1] for line in out.splitlines() if line.strip()}
+    for node in inv["managers"]["hosts"] + inv["workers"]["hosts"]:
+        check(f"k3s node {node} ready", status.get(node, "").split(",")[0] == "Ready", status.get(node, "missing"))
+    _, out = on_leader(["sudo", "k3s", "kubectl", "get", "pods", "-A", "--no-headers",
+                        "--field-selector=status.phase!=Running,status.phase!=Succeeded"])
+    check("no stuck k3s pods", not out.strip() or "No resources" in out, out[-300:])
+    code, _ = curl(f"https://{REGISTRY}/v2/")
+    check("registry refuses access without login", code == "401", code)
+    # k3s pulls from the cluster's own registry (registries.yaml): pull an image that is in it.
+    _, body = curl(f"https://{REGISTRY}/v2/_catalog", user="ansibro:" + secret("registry"))
+    repos = [r for r in json.loads(body or "{}").get("repositories", []) if r in IMAGES]
+    if repos:
+        image = f"registry.ansibro:{CFG['registry_port']}/{repos[0]}:{IMAGES[repos[0]]['tag']}"
+        code, out = on_leader(["sudo", "k3s", "crictl", "pull", image])
+        check(f"k3s pulls {repos[0]} from the cluster's registry", code == 0, out[-200:])
+
+
 def check_backup():
     """Every server has a backup in the repository, and the nightly timer is on."""
     code, out = on_leader(["sudo", "ansibro-backup", "snapshots", "--json"])
@@ -212,8 +243,7 @@ def check_wireguard():
 def check_traefik():
     code, _ = curl(f"http://traefik.{DOMAIN}/", resolve=f"traefik.{DOMAIN}:80:{LEADER_IP}")
     check("traefik redirects HTTP to HTTPS", code in ("301", "308"), code)
-    check("traefik dashboard needs a password", https("traefik", "/dashboard/")[0] == "401")
-    check("traefik dashboard opens with the password", https("traefik", "/dashboard/", user="admin:" + secret("traefik_admin"))[0] == "200")
+    admin_login("traefik dashboard", "traefik", "/dashboard/")
 
 
 def check_portainer():
@@ -222,18 +252,16 @@ def check_portainer():
 
 
 def check_swarmpit():
-    check("swarmpit needs the Traefik password", https("swarmpit")[0] == "401")
-    check("swarmpit page opens with the password", https("swarmpit", user="admin:" + secret("traefik_admin"))[0] == "200")
+    admin_login("swarmpit", "swarmpit")
 
 
 def check_kong():
     code, body = https("kong")
     check("kong proxy answers", code == "404" and "no Route matched" in body, code)
-    check("kong manager needs a password", https("kong-manager")[0] == "401")
-    pw = "admin:" + secret("traefik_admin")
-    check("kong manager opens with the password", https("kong-manager", user=pw)[0] == "200")
-    code, body = https("kong-manager", "/api/", user=pw)
-    check("kong admin API works", code == "200" and "version" in body, code)
+    admin_login("kong manager", "kong-manager")
+    result = admin_login("kong admin API", "kong-manager", "/api/")
+    if result:
+        check("kong admin API works", "version" in result[1])
     # From the public network (where other apps are), the admin API must not be reachable.
     _, out = on_leader(["sudo", "docker", "run", "--rm", "--network", "public", f"{REGISTRY}/kong:{IMAGES['kong']['tag']}",
                         "curl", "-s", "-m", "5", "-o", "/dev/null", "-w", "%{http_code}", "http://kong_kong:8001/"])
@@ -340,13 +368,11 @@ def check_nats():
     _, out = python_on_leader(NATS_LOGIN, {"ip": ip_of("nats"), "password": secret("nats")})
     check("nats login", out.startswith("PONG"), out[-200:])
     if WEB:
-        check("nats monitoring needs a password", https("nats", "/varz")[0] == "401")
-        check("nats monitoring opens with the password", https("nats", "/varz", user="admin:" + secret("traefik_admin"))[0] == "200")
+        admin_login("nats monitoring", "nats", "/varz")
 
 
 def check_uptimekuma():
-    check("uptime kuma needs the Traefik password", https("uptimekuma")[0] == "401")
-    check("uptime kuma page opens with the password", https("uptimekuma", user="admin:" + secret("traefik_admin"))[0] in ("200", "302"))
+    admin_login("uptime kuma", "uptimekuma", ok=("200", "302"))
 
 
 def check_beszel():
@@ -371,9 +397,7 @@ def check_monitoring(app):
     code, _ = curl(f"http://{ip}:3000/api/user", user="admin:" + secret("grafana_admin"))
     check("grafana admin login", code == "200", code)
     check("grafana page", https("grafana", path="/login")[0] == "200")
-    check("alertmanager needs the Traefik password", https("alertmanager")[0] == "401")
-    check("alertmanager opens with the password",
-          https("alertmanager", path="/-/healthy", user="admin:" + secret("traefik_admin"))[0] == "200")
+    admin_login("alertmanager", "alertmanager", "/-/healthy")
 
     # Every target answers: servers, containers, log agents, exporters, Traefik, the monitoring apps.
     _, body = curl(metrics + "/api/v1/query?query=up")
@@ -421,7 +445,7 @@ CHECKS = {
 
 if __name__ == "__main__":
     print(f"Checking {', '.join(APPS)} on {DOMAIN} (from {'the first manager' if ON_LEADER else 'here, over SSH'})\n")
-    check_swarm()
+    check_k3s() if CFG.get("orchestrator") == "k3s" else check_swarm()
     if CFG.get("wireguard"):
         check_wireguard()
     if CFG.get("backup"):

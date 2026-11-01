@@ -65,6 +65,14 @@ for name, image in yaml.safe_load(open("/src/versions.yml"))["images"].items():
         print(name, image["repo"], image["tag"], image["digest"])
 EOF
 
+echo "- k3s version"
+# One line: version, sha256 of the program, sha256 of its images (for orchestrator: k3s).
+/tmp/venv/bin/python - "$(dpkg --print-architecture)" > /out/k3s.txt <<'EOF'
+import sys, yaml
+k3s = yaml.safe_load(open("/src/versions.yml"))["k3s"]
+print(k3s["version"], k3s[sys.argv[1]]["binary"], k3s[sys.argv[1]]["images"])
+EOF
+
 cat > /out/info.yml <<EOF
 ubuntu: "$VERSION_ID"
 arch: $(dpkg --print-architecture)

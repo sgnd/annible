@@ -17,7 +17,13 @@ GROUPS = {"manager": "managers", "worker": "workers", "standalone": "standalone"
 CONFIG_KEYS = {
     "domain", "acme_email", "acme_server", "acme_ca_cert", "tls", "tls_cert", "tls_key", "timezone", "arch",
     "ssh", "admin_allow_from", "firewall_allow", "wireguard", "backup", "monitoring", "nodes", "apps",
+    "orchestrator",
 }
+ORCHESTRATORS = ("swarm", "k3s")
+# k3s uses these for its pods and services; server IPs must be outside them.
+K3S_CIDRS = ("10.42.0.0/16", "10.43.0.0/16")
+# Apps that run as cluster services. On k3s only Traefik for now (the one k3s has built in).
+K3S_CLUSTER_APPS = ("traefik",)
 # Node names become hostnames, and must not clash with "swarm" or group names.
 NODE_NAME = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
 RESERVED_NAMES = {"swarm", "all", "managers", "workers", "standalone", "localhost"}
@@ -180,6 +186,8 @@ def check_settings(cfg, bundle):
     check_monitoring(cfg.get("monitoring"))
     if cfg.get("wireguard", False) not in (True, False):
         fail("wireguard must be true or false")
+    if cfg.get("orchestrator", "swarm") not in ORCHESTRATORS:
+        fail("orchestrator must be swarm or k3s")
     if bundle and cfg.get("arch") and cfg["arch"] != bundle["arch"]:
         fail(f"the bundle is for {bundle['arch']}, but config.yml arch is {cfg['arch']}")
 
@@ -219,8 +227,9 @@ def build_nodes(nodes, wireguard):
             address = ipaddress.IPv4Address(ip)
         except ValueError:
             fail(f"{name}: ip must be an IPv4 address, got {ip}")
-        if address in ipaddress.ip_network(SWARM_ADDRESS_POOL):
-            fail(f"{name}: ip {ip} is inside {SWARM_ADDRESS_POOL}, which the swarm uses for its own networks")
+        for cidr in (SWARM_ADDRESS_POOL,) + K3S_CIDRS:
+            if address in ipaddress.ip_network(cidr):
+                fail(f"{name}: ip {ip} is inside {cidr}, which the cluster uses for its own networks")
         if any(h["node_ip"] == ip for h in hostvars.values()):
             fail(f"duplicate ip {ip}")
 
@@ -333,6 +342,12 @@ def build(cfg, base_dir):
     if bundle and any(h["node_gpu"] for h in hostvars.values()):
         fail("gpu: true needs internet (the NVIDIA driver and toolkit are not in the offline bundle)")
     apps, app_nodes = build_apps(cfg.get("apps"), catalog, hostvars, cfg.get("monitoring"))
+    orchestrator = cfg.get("orchestrator", "swarm")
+    if orchestrator == "k3s":
+        for name, target in apps.items():
+            if target == "swarm" and name not in K3S_CLUSTER_APPS:
+                fail(f"{name} runs only on Docker Swarm for now. On k3s, use the apps that run on a server, "
+                     f"and {', '.join(K3S_CLUSTER_APPS)} (write it as '{name}: swarm' too)")
     # tier=data: a swarm server that runs server apps (databases, ...); tier=app: the others.
     # Swarm apps without data prefer tier=app servers. A tier in config.yml labels wins.
     for name in groups["managers"] + groups["workers"]:
@@ -358,6 +373,7 @@ def build(cfg, base_dir):
         registry_port=REGISTRY_PORT,
         kong_subnet=KONG_SUBNET,
         wireguard=cfg.get("wireguard", False),
+        orchestrator=orchestrator,
         wireguard_port=WIREGUARD_PORT,
         ansible_user=ssh.get("user", "ubuntu"),
         ansible_port=ssh.get("port", 22),

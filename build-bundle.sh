@@ -71,6 +71,18 @@ while read -r name repo tag digest; do
     docker save "$repo:$tag" | gzip > "$bundle/images/$name.tar.gz"
 done < "$bundle/images.txt"
 
+echo "== k3s (for orchestrator: k3s)"
+read -r k3s_version k3s_binary_sha k3s_images_sha < "$bundle/k3s.txt"
+rm "$bundle/k3s.txt"
+mkdir -p "$bundle/k3s"
+k3s_url="https://github.com/k3s-io/k3s/releases/download/${k3s_version/+/%2B}"
+k3s_name=$([ "$arch" = amd64 ] && echo k3s || echo "k3s-$arch")
+curl -fsSL --retry 3 -o "$bundle/k3s/k3s-$arch" "$k3s_url/$k3s_name"
+curl -fsSL --retry 3 -o "$bundle/k3s/k3s-airgap-images-$arch.tar.zst" "$k3s_url/k3s-airgap-images-$arch.tar.zst"
+# Stop if a download is not exactly the pinned file.
+(cd "$bundle/k3s" && printf '%s  %s\n%s  %s\n' "$k3s_binary_sha" "k3s-$arch" "$k3s_images_sha" "k3s-airgap-images-$arch.tar.zst" \
+  | { sha256sum -c - 2>/dev/null || shasum -a 256 -c -; })
+
 echo "== Pack"
 tar --no-xattrs -C "$root" -czf "$file" ansibro
 rm -rf "$root"

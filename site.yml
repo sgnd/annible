@@ -75,6 +75,15 @@
           To go back to a backup, install new servers and restore there.
       when: restore | bool and inventory_hostname in groups['swarm']
 
+    - name: Check a restore is for Docker Swarm
+      ansible.builtin.assert:
+        that: orchestrator == 'swarm'
+        fail_msg: >-
+          restore=true works with Docker Swarm only for now. On k3s, the backup has an etcd snapshot
+          (k3s/ in the backup): see https://docs.k3s.io/datastore/backup-restore
+      when: restore | bool
+      run_once: true
+
     - name: Check a restore has a backup to read
       ansible.builtin.assert:
         that: backup is defined
@@ -131,10 +140,25 @@
         tasks_from: restore
       when: restore | bool
 
+# The cluster: Docker Swarm, or k3s (orchestrator in config.yml). The group "swarm" holds the
+# cluster servers (managers and workers) for both.
 - name: Swarm
   hosts: swarm
   roles:
-    - swarm
+    - role: swarm
+      when: orchestrator == 'swarm'
+    - role: k3s
+      when: orchestrator == 'k3s'
+
+# k3s: settings for its built-in Traefik.
+- name: Traefik on k3s
+  hosts: managers[0]
+  tasks:
+    - name: Set up Traefik on k3s
+      ansible.builtin.include_role:
+        name: traefik
+        tasks_from: k3s
+      when: "'traefik' in apps and orchestrator == 'k3s'"
 
 # Apps that run on one server with Docker Compose, like databases.
 - name: Server apps
@@ -174,7 +198,7 @@
       ansible.builtin.include_role:
         name: traefik
         tasks_from: files
-      when: "'traefik' in apps and inventory_hostname in traefik_nodes"
+      when: "'traefik' in apps and inventory_hostname in traefik_nodes and orchestrator == 'swarm'"
 
 - name: Swarm apps
   hosts: managers[0]
@@ -182,7 +206,7 @@
     - name: Deploy swarm apps
       ansible.builtin.include_role:
         name: "{{ app }}"
-      loop: "{{ swarm_apps }}"
+      loop: "{{ swarm_apps if orchestrator == 'swarm' else [] }}"
       loop_control:
         loop_var: app
 

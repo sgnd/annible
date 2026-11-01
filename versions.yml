@@ -10,6 +10,17 @@ docker_packages:
   - docker-buildx-plugin=0.38.1-1*
   - docker-compose-plugin=5.6.1-1*
 
+# k3s (orchestrator: k3s): the binary and, for offline installs, its system images. From
+# https://github.com/k3s-io/k3s/releases (stable channel), with the sha256 from sha256sum-<arch>.txt.
+k3s:
+  version: v1.36.5+k3s1
+  amd64:
+    binary: d73847bcd3c5fccef0115b372e2f9a91f3032dc84bbf71518a4617565294d313
+    images: 7d939471907df2d4e537a9c308bf94173e453fff4a2e9e77e9ae92a64be3007f
+  arm64:
+    binary: 135e34cb9e8a1cfae3cb55577789e93501efe7edc080a8b2630458a85b07721e
+    images: aeb7b47b0f0cb1356a5f0bc1c11b7c499deceeeafcd411963064e02bfc77da84
+
 # NVIDIA Container Toolkit, for servers with gpu: true (from NVIDIA's apt repository).
 nvidia_container_toolkit: 1.20.1-1
 

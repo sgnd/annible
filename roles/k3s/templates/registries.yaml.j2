@@ -1,0 +1,9 @@
+# Pods pull images from the cluster's own registry (registry.ansibro:5000) with this login.
+# Made by ansibro, do not change it here.
+configs:
+  "{{ registry_addr }}":
+    auth:
+      username: {{ registry_user }}
+      password: "{{ registry_password }}"
+    tls:
+      ca_file: /etc/docker/certs.d/{{ registry_addr }}/ca.crt

@@ -1,0 +1,28 @@
+# k3s settings for {{ inventory_hostname }}. Made by ansibro, do not change it here.
+token: "{{ k3s_token }}"
+node-name: {{ inventory_hostname }}
+node-ip: {{ node_ip }}
+{% if wireguard %}
+flannel-iface: wg0
+{% endif %}
+{% if k3s_server %}
+advertise-address: {{ node_ip }}
+tls-san: [{{ node_ip }}, {{ node_host }}]
+write-kubeconfig-mode: "0600"
+{% if inventory_hostname == swarm_leader %}
+cluster-init: true  # embedded etcd, so more servers can join
+{% else %}
+server: {{ k3s_url }}
+{% endif %}
+{% if 'traefik' not in apps %}
+disable: [traefik]
+{% endif %}
+{% else %}
+server: {{ k3s_url }}
+{% endif %}
+{% if node_labels %}
+node-label:
+{% for key, value in node_labels.items() %}
+  - "{{ key }}={{ value }}"
+{% endfor %}
+{% endif %}

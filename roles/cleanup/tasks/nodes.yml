@@ -2,10 +2,14 @@
 # before anything else changes. They are only removed with ./install.sh -e remove_nodes=true,
 # so a typo in config.yml cannot throw a server out of the swarm. Their containers move to the others.
 
-- name: Get swarm servers
-  ansible.builtin.command: docker node ls --format '{% raw %}{{ .Hostname }}{% endraw %}'
+- name: Get cluster servers
+  ansible.builtin.command: "{{ cleanup_list_nodes[orchestrator] }}"
+  vars:
+    cleanup_list_nodes:
+      swarm: docker node ls --format '{% raw %}{{ .Hostname }}{% endraw %}'
+      k3s: k3s kubectl get nodes -o name
   register: cleanup_nodes
-  failed_when: false  # no swarm yet (a new install)
+  failed_when: false  # no cluster yet (a new install)
   changed_when: false
 
 - name: Get swarm managers
@@ -13,6 +17,7 @@
   register: cleanup_managers
   failed_when: false
   changed_when: false
+  when: orchestrator == 'swarm'
 
 - name: Stop if servers would be removed by accident
   ansible.builtin.fail:
@@ -25,10 +30,18 @@
 # A manager leaves as a worker first, so the other managers keep their majority.
 - name: Demote removed managers
   ansible.builtin.command: docker node demote {{ item }}
-  loop: "{{ cleanup_managers.stdout_lines | intersect(cleanup_old_nodes) }}"
+  loop: "{{ cleanup_managers.stdout_lines | default([]) | intersect(cleanup_old_nodes) }}"
   changed_when: true
 
 - name: Remove servers from the swarm
   ansible.builtin.command: docker node rm --force {{ item }}
   loop: "{{ cleanup_old_nodes }}"
+  when: orchestrator == 'swarm'
+  changed_when: true
+
+# k3s moves their pods to other servers. A removed k3s server also leaves etcd this way.
+- name: Remove servers from k3s
+  ansible.builtin.command: k3s kubectl delete node {{ item }}
+  loop: "{{ cleanup_old_nodes }}"
+  when: orchestrator == 'k3s'
   changed_when: true

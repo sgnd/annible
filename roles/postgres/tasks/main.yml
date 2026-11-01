@@ -57,7 +57,7 @@
     stdin: |
       SELECT 'CREATE ROLE replicator REPLICATION LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'replicator') \gexec
       ALTER ROLE replicator WITH REPLICATION LOGIN PASSWORD '{{ postgres_replication_password }}';
-  when: postgres_primary and postgres_replicas
+  when: postgres_primary and postgres_replicas | length > 0
   changed_when: false
   no_log: true
 
