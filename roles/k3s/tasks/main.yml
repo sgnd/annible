@@ -20,11 +20,11 @@
   when: not offline
   notify: Restart k3s
 
+# From the bundle on the machine that runs the installer.
 - name: Copy the k3s program from the bundle
   ansible.builtin.copy:
-    src: "{{ bundle_dir }}/k3s/k3s-{{ node_arch }}"
+    src: "{{ playbook_dir }}/bundle/k3s/k3s-{{ node_arch }}"
     dest: /usr/local/bin/k3s
-    remote_src: true
     mode: "0755"
   when: offline
   notify: Restart k3s
@@ -32,9 +32,8 @@
 # Offline: k3s loads its own images (CoreDNS, Traefik, ...) from this folder when it starts.
 - name: Copy the k3s images from the bundle
   ansible.builtin.copy:
-    src: "{{ bundle_dir }}/k3s/k3s-airgap-images-{{ node_arch }}.tar.zst"
+    src: "{{ playbook_dir }}/bundle/k3s/k3s-airgap-images-{{ node_arch }}.tar.zst"
     dest: /var/lib/rancher/k3s/agent/images/
-    remote_src: true
     mode: "0644"
   when: offline
 
