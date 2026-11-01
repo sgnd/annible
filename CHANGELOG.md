@@ -10,19 +10,27 @@ a simpler README, and clearer messages. A real install now stops early when `dom
 are still example.com, or `ssh.key` is missing. A tab or a wrong indent in `config.yml` gives the line number.
 The README is short now: details moved to [docs/](docs/) (how to, apps, check and fix, offline, k3s, advanced, how it works).
 
-Tested on DigitalOcean (Ubuntu 24.04, amd64), with `tests/check.py` passing and a second run with no changes:
-- Docker Swarm, 3 managers + worker + 3 data servers: the registry and Traefik on every manager
-  (also with the first manager turned off), tier labels, PostgreSQL replica, Garage on 3 servers,
-  OpenBao, Authelia login on admin pages, the per-port firewall, `state.age`, victoria monitoring
-  with webhook alerts, backup to a folder, removing an app and a server.
-- k3s, 3 servers + agent + data server, over WireGuard: Traefik routes to server apps, the registry,
-  PostgreSQL, Valkey, OpenBao, victoria monitoring, backup with the etcd snapshot.
-- The release workflow builds all four bundles.
+Tested on real servers (Ubuntu 24.04), with `tests/check.py` passing and a second run with no changes:
+- Docker Swarm, 3 managers + 3 data servers (DigitalOcean): the registry and Traefik on every manager
+  (also with the first manager turned off), tier labels, Garage on 3 servers, OpenBao, the per-port
+  firewall, `state.age`, monitoring with webhook alerts, backup to a folder and to S3, removing an app
+  and a server; PostgreSQL with Patroni (the primary stopped: another took over, writes through
+  database-proxy kept working, the old one came back as a copy); Valkey with Sentinel (the same);
+  Keycloak as the login for admin pages; Kong through database-proxy.
+- k3s, 3 servers + 3 data servers over WireGuard: portainer, authelia, MariaDB Galera, Redis with
+  Sentinel, prometheus monitoring; then all servers deleted and new ones made, and `-e restore=true`
+  brought back the cluster (etcd snapshot) and the data.
+- k3s from the offline bundle, on a server with no internet.
+- A mixed cluster: an amd64 manager (DigitalOcean) and an arm64 worker (Google Cloud), over WireGuard.
+- A GPU server (NVIDIA H100): driver, toolkit, GPU metrics.
+- Alerts to Telegram, email and a webhook.
+- A release: the workflow builds the four bundles and attaches them to the release (pre-release v1.1.0-rc1).
 
-Not tested yet (test before the next release):
-- PostgreSQL with Patroni, MariaDB Galera, Redis/Valkey with Sentinel; the Keycloak login for admin pages; portainer, kong, keycloak, authelia and restore on k3s.
-- Mixed amd64 + arm64 clusters (DigitalOcean has no arm64 servers), GPU servers, Telegram alerts,
-  a restore of a cluster with monitoring, offline installs with k3s, uploading bundles to a release.
+Fixed by these tests: the NVIDIA driver choice (the "open" one first), Spilo's data folder owner,
+the MariaDB Galera health check, MariaDB dumps without Galera's own tables, Kong reaching
+database-proxy, Authelia on k3s (service links), k3s offline (the program comes from the bundle),
+a swarm that is "pending" right after Docker restarts, the backup repository on S3 servers that
+show a new repository a moment later.
 
 New
 - Keycloak as the login for admin pages (when Authelia is not installed): realm `ansibro`, user
