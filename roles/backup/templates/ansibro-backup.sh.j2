@@ -56,7 +56,10 @@ fi
 # (Only on the first server: with Galera every server has the same data.)
 if docker ps -q --filter name=^mariadb$ | grep -q .; then
   docker exec mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb-dump -uroot --all-databases \
-    --single-transaction --routines --events --add-drop-database --flush-privileges' > "$stage/dumps/mariadb.sql"
+    --single-transaction --routines --events --add-drop-database --flush-privileges \
+    --ignore-table=mysql.wsrep_cluster --ignore-table=mysql.wsrep_cluster_members \
+    --ignore-table=mysql.wsrep_streaming_log' > "$stage/dumps/mariadb.sql"
+  # (The wsrep_ tables belong to Galera and the old cluster; a restore must not load them.)
 fi
 {% endif %}
 
