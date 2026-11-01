@@ -14,7 +14,7 @@ if [ "$#" -gt 0 ] && [ "${1#-}" = "$1" ]; then
   shift
 fi
 if [ ! -f "$config" ]; then
-  echo "error: $config not found (cp config.example.yml config.yml)" >&2
+  echo "error: $config not found. Run: cp config.example.yml config.yml, then edit config.yml." >&2
   exit 1
 fi
 # Full path, so it still works after we change folder below.
@@ -26,7 +26,8 @@ cd "$(dirname "$0")"
 # Ansible needs Python 3.12 or newer.
 if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 12))' 2>/dev/null; then
   echo "error: Python 3.12 or newer is needed, found: $(python3 --version 2>&1)" >&2
-  echo "  On a Mac: brew install python@3.12 (or newer), then run ./install.sh again." >&2
+  echo "  On a Mac: brew install python@3.12 (or newer). On Ubuntu: sudo apt install python3 python3-venv." >&2
+  echo "  Then run ./install.sh again." >&2
   exit 1
 fi
 
@@ -50,7 +51,7 @@ fi
 # Install python3-venv with apt, from the internet or from the bundle.
 install_venv_package() {
   if ! command -v apt-get >/dev/null; then
-    echo "error: python3 with venv support is required" >&2
+    echo "error: Python's venv is missing. On a Mac: brew install python@3.12, then run ./install.sh again." >&2
     exit 1
   fi
   if $offline; then
@@ -90,7 +91,10 @@ fi
 export PATH="$PWD/$venv/bin:$PATH"
 
 # Check config.yml first, so a mistake stops here with a clear message.
-if ! "$venv/bin/python" inventory.py --list >/dev/null; then
+# A real run also checks for values left from config.example.yml (a --syntax-check does not).
+ready=--ready
+case " $* " in *" --syntax-check "*) ready= ;; esac
+if ! "$venv/bin/python" inventory.py --list ${ready:+"$ready"} >/dev/null; then
   exit 1
 fi
 

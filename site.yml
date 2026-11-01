@@ -264,4 +264,6 @@
 
     - name: Show where the summary is
       ansible.builtin.debug:
-        msg: "All of this, plus the passwords, is saved in {{ playbook_dir }}/state/summary.md. Back up state/."
+        msg: >-
+          All of this, plus the passwords, is saved in {{ playbook_dir }}/state/summary.md. Back up state/.
+          If state/ is kept encrypted, run scripts/state.sh open to read it, and scripts/state.sh close after.
