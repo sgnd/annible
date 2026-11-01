@@ -145,25 +145,33 @@ A new Docker version is installed one server at a time, so the swarm keeps runni
 
 ## Database replicas
 
-Give PostgreSQL a list of servers: `postgres: [db1, db2, db3]`. It then runs with
-[Patroni](https://patroni.readthedocs.io): one server is the primary, the others are copies that
-follow it all the time. When the primary is down, another one becomes the primary by itself (in about
-30 seconds). Patroni keeps track of this in etcd, which runs on the managers. Cluster apps (kong,
-keycloak, authelia) connect through `database-proxy`, which always goes to the primary. Your own apps
-in the cluster: `database-proxy_haproxy:5432` (Swarm) or `database-proxy.ansibro.svc.cluster.local:5432`
-(k3s). See the servers: `sudo docker exec postgres patronictl list` on a database server. With 3
-managers etcd survives one down; with 1 manager, failover needs that manager. Alerts:
-`PostgresNoPrimary`, `PostgresReplicaBehind`.
+**PostgreSQL**: give it a list of servers, `postgres: [db1, db2, db3]`. It then runs with
+[Patroni](https://patroni.readthedocs.io).
+- What it does: one server is the primary, the others are copies that follow it. When the primary
+  is down, another one becomes the primary by itself, in about 30 seconds.
+- How apps connect: cluster apps (kong, keycloak, authelia) use `database-proxy`, which always goes
+  to the primary. Your own apps in the cluster: `database-proxy_haproxy:5432` (Swarm) or
+  `database-proxy.ansibro.svc.cluster.local:5432` (k3s).
+- How to see it: `sudo docker exec postgres patronictl list`, on a database server.
+- Needs: etcd, which runs on the managers. With 3 managers one can be down; with 1 manager,
+  failover needs that manager.
+- Alerts: `PostgresNoPrimary`, `PostgresReplicaBehind`.
 
-MariaDB on 3 servers (`mariadb: [m1, m2, m3]`) is a [Galera](https://mariadb.com/kb/en/galera-cluster/)
-cluster: every server has all the data. Cluster apps connect through `database-proxy` (port 3306),
-which uses the first server and the others when it is down. If all 3 servers stop at the same time,
-start the cluster again by hand, see [Galera: restarting the cluster](https://mariadb.com/kb/en/getting-started-with-mariadb-galera-cluster/#restarting-the-cluster).
-Alert: `MariadbClusterSmall`.
+**MariaDB**: on 3 servers, `mariadb: [m1, m2, m3]`, it is a [Galera](https://mariadb.com/kb/en/galera-cluster/) cluster.
+- What it does: every server has all the data, and stays up when one server is down.
+- How apps connect: through `database-proxy` (port 3306). It uses the first server, and the
+  others when the first is down.
+- If all 3 servers stop at the same time, start the cluster again by hand: see
+  [Galera: restarting the cluster](https://mariadb.com/kb/en/getting-started-with-mariadb-galera-cluster/#restarting-the-cluster).
+- Alert: `MariadbClusterSmall`.
 
-Redis or Valkey on 3 servers (`valkey: [c1, c2, c3]`): one primary, two copies, and Sentinel
-(port 26379) on each server makes a copy the primary when the primary is down. Apps must ask
-Sentinel for the primary (name `ansibro`, the cache password); Authelia does. Alert: `CacheNoPrimary`.
+**Redis or Valkey**: on 3 servers, `valkey: [c1, c2, c3]`.
+- What it does: one primary and two copies. Sentinel (port 26379) runs on each server and makes a
+  copy the primary when the primary is down.
+- How apps connect: they ask Sentinel where the primary is (Sentinel name `ansibro`, the cache
+  password). Authelia does this. For your own app, its Redis client library must support Sentinel
+  (most do); give it the three servers with port 26379 instead of one address with port 6379.
+- Alert: `CacheNoPrimary`.
 
 ## Garage on 3 servers
 
