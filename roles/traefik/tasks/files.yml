@@ -1,0 +1,78 @@
+# Traefik's files. Written on every server Traefik runs on (traefik_nodes), so they are the same.
+
+- name: Create Traefik directories
+  ansible.builtin.file:
+    path: "{{ traefik_dir }}/{{ item }}"
+    state: directory
+    mode: "0700"
+  loop: [dynamic, acme, certs]
+
+- name: Write Traefik static config
+  ansible.builtin.template:
+    src: traefik.yml.j2
+    dest: "{{ traefik_dir }}/traefik.yml"
+    mode: "0600"
+  notify: Restart traefik
+
+- name: Write Traefik middlewares
+  ansible.builtin.template:
+    src: middlewares.yml.j2
+    dest: "{{ traefik_dir }}/dynamic/middlewares.yml"
+    mode: "0600"
+
+- name: Copy custom certificate
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ traefik_dir }}/certs/{{ item.dest }}"
+    mode: "0600"
+  loop:
+    - { src: "{{ tls_cert | default('') }}", dest: cert.pem }
+    - { src: "{{ tls_key | default('') }}", dest: key.pem }
+  loop_control:
+    label: "{{ item.dest }}"
+  when: tls | default('letsencrypt') == 'custom'
+  notify: Restart traefik  # Traefik reads certificate files only when it starts
+
+- name: Copy the ACME server's CA certificate
+  ansible.builtin.copy:
+    src: "{{ acme_ca_cert }}"
+    dest: "{{ traefik_dir }}/certs/acme-ca.pem"
+    mode: "0600"
+  when: acme_ca_cert is defined
+  notify: Restart traefik
+
+- name: Remove custom certificate config
+  ansible.builtin.file:
+    path: "{{ traefik_dir }}/dynamic/tls.yml"
+    state: absent
+  when: tls | default('letsencrypt') != 'custom'
+
+- name: Write custom certificate config
+  ansible.builtin.copy:
+    dest: "{{ traefik_dir }}/dynamic/tls.yml"
+    content: |
+      tls:
+        stores:
+          default:
+            defaultCertificate:
+              certFile: /etc/traefik/certs/cert.pem
+              keyFile: /etc/traefik/certs/key.pem
+    mode: "0600"
+  when: tls | default('letsencrypt') == 'custom'
+
+# A fixed salt gives the same hash every run, so nothing changes on rerun.
+- name: Hash dashboard password
+  ansible.builtin.command:
+    cmd: openssl passwd -apr1 -salt {{ traefik_password_salt }} -stdin
+    stdin: "{{ traefik_password }}"  # not on the command line
+  register: traefik_password_hash
+  changed_when: false
+  no_log: true
+
+- name: Write dashboard users
+  ansible.builtin.copy:
+    dest: "{{ traefik_dir }}/users"
+    content: "admin:{{ traefik_password_hash.stdout }}\n"
+    mode: "0600"
+  diff: false
+  no_log: true

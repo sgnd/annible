@@ -29,6 +29,7 @@
       {% for host in groups['all'] %}
       {{ hostvars[host].node_ip }} {{ host }}
       {% endfor %}
+      {{ registry_ip }} {{ registry_host }}
 
 - name: Install base packages
   ansible.builtin.apt:

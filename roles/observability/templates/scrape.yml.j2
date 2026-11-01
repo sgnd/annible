@@ -40,8 +40,10 @@ scrape_configs:
   # Traefik: requests, backends that are down, and when the certificates end.
   - job_name: traefik
     static_configs:
-      - targets: ["{{ hostvars[swarm_leader].node_ip }}:{{ observability_traefik_metrics_port }}"]
-        labels: { node: {{ swarm_leader }} }
+{% for host in traefik_nodes %}
+      - targets: ["{{ hostvars[host].node_ip }}:{{ observability_traefik_metrics_port }}"]
+        labels: { node: {{ host }} }
+{% endfor %}
 {% endif %}
 {% if 'rabbitmq' in apps %}
 

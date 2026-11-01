@@ -1,3 +1,7 @@
 registry_dir: "{{ apps_dir }}/registry"
 registry_cert_days: 3650
 registry_image: "{{ images.registry.repo }}:{{ images.registry.tag }}"
+# Every node uses the registry by name. The first manager also uses each manager's registry
+# by IP, to copy images into all of them.
+registry_manager_addrs: "{{ groups['managers'] | map('extract', hostvars, 'node_ip') | map('regex_replace', '$', ':' ~ registry_port) | list }}"
+registry_names: "{{ [registry_addr] + (registry_manager_addrs if inventory_hostname == swarm_leader else []) }}"

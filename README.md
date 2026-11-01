@@ -191,7 +191,7 @@ A server app has one middleware, so this replaces its `admin_allow_from` limit.
 2. **common**: hostname, packages, time sync, firewall
 3. **wireguard** (if `wireguard: true`): the encrypted network between the servers
 4. **docker**: installs Docker
-5. **registry**: a private image registry on the first manager. All servers pull from it.
+5. **registry**: a private image registry on every manager, with the same images. All servers pull from it.
 6. **swarm**: creates the swarm and joins the servers
 7. **server apps**: `roles/<app>/`, Docker Compose in `/opt/ansibro/<app>/`
 8. **beszel agents** (if beszel is picked): on every server
@@ -218,14 +218,21 @@ stacks skip the firewall (that is how Docker works), so prefer Traefik for web a
 
 ### Good to know
 
-- **The first manager is special.** The registry, Traefik, Portainer, Authelia and Swarmpit's
-  databases run there and keep their data there. 3 managers keep the swarm itself alive, but not those apps.
-  Keep it first in the `nodes` list: the installer stops if the first manager is not the one that made the swarm.
+- **The first manager is special.** Portainer, Authelia and Swarmpit's databases run there and
+  keep their data there. Keep it first in the `nodes` list: the installer stops if the first manager
+  is not the one that made the swarm.
+- **With 3 managers, one can go down.** The swarm keeps working, every manager has the registry
+  with all images, and Traefik runs on every manager (point DNS to all of them). With `tls: letsencrypt`
+  Traefik runs only on the first manager: Let's Encrypt checks a domain by calling it, and the call
+  could reach another manager. Use `tls: custom` (for example a wildcard certificate) for Traefik on every manager.
+- **Tiers.** Swarm servers that run server apps get the label `tier=data`, the others `tier=app`.
+  Kong and Keycloak run on `tier=app` servers when there are any. Use `node.labels.tier == app`
+  in your own stacks too. Set `labels: { tier: ... }` on a node to choose yourself.
 - **The registry needs a login.** Every server logs in (password in `state/secrets/registry`),
   so a container cannot push a fake image into it.
 - **Swarm networks use `10.200.0.0/16`.** Your servers' IPs must be outside that range.
 - **Use a private network between servers, or `wireguard: true`.** Without WireGuard, traffic between servers is not encrypted.
-- **The `ip` of a node is its private IP** (or its WireGuard address). DNS must point to the public IP of the first manager.
+- **The `ip` of a node is its private IP** (or its WireGuard address). DNS must point to the public IP of the servers Traefik runs on.
 - **A swarm server cannot change its `ip`.** The installer stops if a server's swarm address differs from `ip`
   (for example after a snapshot restore on a new IP). With `wireguard: true` you only change `host`.
 - **Network size (MTU) is set for you.** Swarm networks use the smallest MTU of the servers minus 50

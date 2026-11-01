@@ -11,8 +11,13 @@ Not tested yet (test before the next release):
   by email and webhook, a second run with no changes.
 - Mixed amd64 + arm64 clusters and the registry copy for both CPU types.
 - Telegram alerts, RabbitMQ metrics, and a restore of a cluster with monitoring.
+- HA: the registry on every manager, Traefik on every manager, tier labels.
 
 New
+- HA: every manager runs the image registry with the same images (apps use the name
+  `registry.ansibro`), so images can be pulled when a manager is down. Traefik runs on every
+  manager, except with `tls: letsencrypt` (see README). Swarm servers get the label `tier=data`
+  (they run server apps) or `tier=app`; Kong and Keycloak run on `tier=app` servers.
 - Monitoring and alerts: `prometheus` (Prometheus + Loki) or `victoria` (VictoriaMetrics + VictoriaLogs),
   both with Alertmanager and Grafana. Agents on every server collect the server, its containers, all
   logs and the database stats. Alerts for servers, apps, containers, swarm services, disks, memory,

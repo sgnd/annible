@@ -7,3 +7,4 @@
       fi
     executable: /bin/bash
   changed_when: true
+  run_once: true  # one restart, even when the files changed on several managers

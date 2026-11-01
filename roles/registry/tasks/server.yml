@@ -1,4 +1,5 @@
-# Runs only on the first manager.
+# Runs on every manager. The first manager makes the certificate and the password file,
+# the other managers get a copy.
 
 - name: Create registry directories
   ansible.builtin.file:
@@ -8,17 +9,20 @@
   loop: [ca, certs, data, auth]
 
 # Full certificate fields: newer tools (for example Python 3.13+) reject certificates without them.
+# The certificate is good for the registry name and the IP of every manager.
 - name: Write certificate extensions
   ansible.builtin.copy:
     dest: "{{ registry_dir }}/ca/san.cnf"
     content: |
-      subjectAltName = IP:{{ node_ip }}, DNS:{{ inventory_hostname }}
+      subjectAltName = DNS:{{ registry_host }}, {{ groups['managers'] | map('extract', hostvars, 'node_ip') | map('regex_replace', '^', 'IP:') | join(', ') }}
       basicConstraints = critical, CA:FALSE
       keyUsage = critical, digitalSignature
       extendedKeyUsage = serverAuth
       subjectKeyIdentifier = hash
       authorityKeyIdentifier = keyid
     mode: "0600"
+  register: registry_san
+  when: inventory_hostname == swarm_leader
 
 - name: Create registry CA
   ansible.builtin.command:
@@ -30,22 +34,32 @@
       -keyout ca.key -out ca.crt
     chdir: "{{ registry_dir }}/ca"
     creates: "{{ registry_dir }}/ca/ca.crt"
+  when: inventory_hostname == swarm_leader
 
+- name: Look for the registry certificate
+  ansible.builtin.stat:
+    path: "{{ registry_dir }}/certs/registry.crt"
+  register: registry_cert
+  when: inventory_hostname == swarm_leader
+
+# Made again when the managers change, so it covers every manager's IP.
 - name: Create registry certificate
   ansible.builtin.shell:
     cmd: >-
       openssl req -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes
-      -subj /CN={{ node_ip }} -keyout ../certs/registry.key -out registry.csr &&
+      -subj /CN={{ registry_host }} -keyout ../certs/registry.key -out registry.csr &&
       openssl x509 -req -in registry.csr -CA ca.crt -CAkey ca.key -CAcreateserial
       -days {{ registry_cert_days }} -extfile san.cnf -out ../certs/registry.crt
     chdir: "{{ registry_dir }}/ca"
-    creates: "{{ registry_dir }}/certs/registry.crt"
+  when: inventory_hostname == swarm_leader and (registry_san.changed or not registry_cert.stat.exists)
+  changed_when: true
 
 # The password file holds a bcrypt hash. It is made once; the hash is different every time.
 - name: Check registry password file
   ansible.builtin.stat:
     path: "{{ registry_dir }}/auth/htpasswd"
   register: registry_htpasswd
+  when: inventory_hostname == swarm_leader
 
 - name: Hash registry password
   ansible.builtin.command:
@@ -55,7 +69,7 @@
   delegate_to: localhost
   become: false
   register: registry_hash
-  when: not registry_htpasswd.stat.exists
+  when: inventory_hostname == swarm_leader and not registry_htpasswd.stat.exists
   changed_when: false
   no_log: true
 
@@ -64,7 +78,28 @@
     dest: "{{ registry_dir }}/auth/htpasswd"
     content: "{{ registry_user }}:{{ registry_hash.stdout }}\n"
     mode: "0600"
-  when: not registry_htpasswd.stat.exists
+  when: inventory_hostname == swarm_leader and not registry_htpasswd.stat.exists
+  no_log: true
+
+- name: Read the registry files of the first manager
+  ansible.builtin.slurp:
+    src: "{{ registry_dir }}/{{ item }}"
+  loop: [certs/registry.crt, certs/registry.key, auth/htpasswd]
+  delegate_to: "{{ swarm_leader }}"
+  run_once: true
+  register: registry_files
+  no_log: true
+
+- name: Copy the registry files to the other managers
+  ansible.builtin.copy:
+    dest: "{{ registry_dir }}/{{ item.item }}"
+    content: "{{ item.content | b64decode }}"
+    mode: "0600"
+  loop: "{{ registry_files.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: inventory_hostname != swarm_leader
+  register: registry_copied
   no_log: true
 
 - name: Check if the registry image is here
@@ -93,9 +128,11 @@
     dest: "{{ registry_dir }}/compose.yml"
     mode: "0644"
 
+# The registry reads its certificate only when it starts.
 - name: Start registry
   ansible.builtin.include_role:
     name: docker
     tasks_from: compose
   vars:
     docker_compose_app: registry
+    docker_compose_restart: "{{ registry_san.changed | default(false) or registry_copied.changed }}"

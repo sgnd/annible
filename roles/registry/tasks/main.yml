@@ -1,9 +1,9 @@
-# Local image registry on the first manager. Every node trusts its certificate and logs in.
-# Apps pull images from here, so the cluster also works without internet.
+# Local image registry on every manager, with the same images. Every node trusts its
+# certificate and logs in. Apps pull images from here, so the cluster also works without internet.
 
-- name: Run registry on leader
+- name: Run registry on the managers
   ansible.builtin.include_tasks: server.yml
-  when: inventory_hostname == swarm_leader
+  when: inventory_hostname in groups['managers']
 
 - name: Read registry CA
   ansible.builtin.slurp:
@@ -12,17 +12,20 @@
   run_once: true
   register: registry_ca
 
+# The first manager also uses each manager's registry by IP, to copy the images into all of them.
 - name: Create Docker certs directory for registry
   ansible.builtin.file:
-    path: "/etc/docker/certs.d/{{ registry_addr }}"
+    path: "/etc/docker/certs.d/{{ item }}"
     state: directory
     mode: "0755"
+  loop: "{{ registry_names }}"
 
 - name: Trust registry CA in Docker
   ansible.builtin.copy:
-    dest: "/etc/docker/certs.d/{{ registry_addr }}/ca.crt"
+    dest: "/etc/docker/certs.d/{{ item }}/ca.crt"
     content: "{{ registry_ca.content | b64decode }}"
     mode: "0644"
+  loop: "{{ registry_names }}"
 
 # The first manager copies images into the registry with "docker buildx imagetools", which reads
 # only the system's CA list. Only this server trusts the registry CA system-wide (its key is here anyway).
@@ -53,7 +56,8 @@
   no_log: true
 
 - name: Check if Docker is logged in to the registry
-  ansible.builtin.command: grep -q {{ registry_addr }} /root/.docker/config.json
+  ansible.builtin.command: grep -qF '"{{ item }}"' /root/.docker/config.json
+  loop: "{{ registry_names }}"
   register: registry_login_check
   failed_when: false
   changed_when: false
@@ -61,8 +65,11 @@
 # The login is saved in /root/.docker/config.json (root only). The password goes in through stdin.
 - name: Log Docker in to the registry
   ansible.builtin.command:
-    cmd: docker login --username {{ registry_user }} --password-stdin {{ registry_addr }}
+    cmd: docker login --username {{ registry_user }} --password-stdin {{ item.item }}
     stdin: "{{ registry_password }}"
-  when: registry_login_check.rc != 0
+  loop: "{{ registry_login_check.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.rc != 0
   changed_when: true
   no_log: true

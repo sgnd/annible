@@ -1,11 +1,27 @@
 node_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_architecture] | default(ansible_architecture) }}"
 swarm_leader: "{{ groups['managers'][0] }}"
-registry_addr: "{{ hostvars[swarm_leader].node_ip }}:{{ registry_port }}"
+# Every manager runs a registry with the same images, so images can still be pulled when one
+# manager is down. Apps use the name below: managers find their own registry under it,
+# the other servers the first manager's (set in /etc/hosts).
+registry_host: registry.ansibro
+registry_addr: "{{ registry_host }}:{{ registry_port }}"
+registry_ip: "{{ node_ip if inventory_hostname in groups['managers'] else hostvars[swarm_leader].node_ip }}"
 # The CPU types of the servers (amd64, arm64). The registry keeps each image for all of them.
 registry_platforms: "{{ groups['all'] | map('extract', hostvars, 'node_arch') | unique | sort }}"
 # The registry needs a login, so a container cannot push a fake image into it.
 registry_user: ansibro
 registry_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/registry', chars=['ascii_letters', 'digits'], length=32) }}"
+
+# Traefik runs on every manager, so the apps stay reachable when one manager is down. Point DNS
+# to all of them. Let's Encrypt (and acme_server) checks a domain by calling it, and the call can
+# reach another manager, so with them Traefik runs only on the first manager.
+traefik_nodes: "{{ [swarm_leader] if tls | default('letsencrypt') == 'letsencrypt' else groups['managers'] }}"
+
+# Swarm apps without data run on servers with the label tier=app, if there are any
+# (servers without server apps get it; see inventory.py).
+swarm_app_constraint: >-
+  {{ 'node.labels.tier == app' if groups['swarm'] | map('extract', hostvars, 'node_labels')
+  | selectattr('tier', 'defined') | selectattr('tier', 'equalto', 'app') | list else '' }}
 
 # Each app keeps its files in /opt/ansibro/<app>/ on the server it runs on.
 apps_dir: /opt/ansibro

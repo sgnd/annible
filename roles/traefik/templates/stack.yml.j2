@@ -1,7 +1,7 @@
 services:
   traefik:
     image: {{ registry_addr }}/traefik:{{ images.traefik.tag }}
-    # Host mode keeps the real client IP. Point DNS to {{ swarm_leader }}.
+    # Host mode keeps the real client IP. Point DNS to {{ traefik_nodes | join(', ') }}.
     ports:
       - { target: 80, published: 80, protocol: tcp, mode: host }
       - { target: 443, published: 443, protocol: tcp, mode: host }
@@ -22,10 +22,14 @@ services:
       timeout: 5s
       retries: 3
     deploy:
-      replicas: 1
+      mode: global  # one on each server below
       placement:
         constraints:
+{% if traefik_nodes | length > 1 %}
+          - node.role == manager
+{% else %}
           - node.hostname == {{ swarm_leader }}
+{% endif %}
       update_config:
         order: stop-first
       labels:

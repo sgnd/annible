@@ -27,6 +27,11 @@ services:
       - public
     deploy:
       replicas: 1
+{% if swarm_app_constraint %}
+      placement:
+        constraints:
+          - {{ swarm_app_constraint }}
+{% endif %}
       labels:
         traefik.enable: "true"
         traefik.http.routers.keycloak.rule: Host(`{{ keycloak_host }}`)

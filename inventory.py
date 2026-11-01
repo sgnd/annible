@@ -304,6 +304,10 @@ def build(cfg, base_dir):
     groups, hostvars = build_nodes(cfg.get("nodes"), cfg.get("wireguard", False))
     catalog = load_yaml(os.path.join(HERE, "catalog.yml"))
     apps = build_apps(cfg.get("apps"), catalog, hostvars, cfg.get("monitoring"))
+    # tier=data: a swarm server that runs server apps (databases, ...); tier=app: the others.
+    # Swarm apps without data prefer tier=app servers. A tier in config.yml labels wins.
+    for name in groups["managers"] + groups["workers"]:
+        hostvars[name]["node_labels"].setdefault("tier", "data" if hostvars[name]["node_apps"] else "app")
 
     def from_config_dir(path):
         return os.path.join(base_dir, os.path.expanduser(path))

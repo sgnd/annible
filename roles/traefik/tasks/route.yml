@@ -10,7 +10,8 @@
     path: "{{ traefik_dir }}/dynamic"
     state: directory
     mode: "0700"
-  delegate_to: "{{ swarm_leader }}"
+  loop: "{{ traefik_nodes }}"
+  delegate_to: "{{ item }}"
   when: "'traefik' in apps"
 
 - name: Add Traefik route for {{ traefik_route_name }}
@@ -30,5 +31,6 @@
               servers:
                 - url: http://{{ node_ip }}:{{ traefik_route_port }}
     mode: "0600"
-  delegate_to: "{{ swarm_leader }}"
+  loop: "{{ traefik_nodes }}"
+  delegate_to: "{{ item }}"
   when: "'traefik' in apps"

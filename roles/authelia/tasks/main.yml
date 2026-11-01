@@ -92,6 +92,8 @@
               trustForwardHeader: true
               authResponseHeaders: [Remote-User, Remote-Groups, Remote-Email, Remote-Name]
     mode: "0600"
+  loop: "{{ traefik_nodes }}"  # every server Traefik runs on
+  delegate_to: "{{ item }}"
 
 - name: Write Authelia stack
   ansible.builtin.template:

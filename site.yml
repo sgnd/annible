@@ -154,6 +154,16 @@
         tasks_from: agent
       when: monitoring_app != ''
 
+# Traefik's files go on every server it runs on (traefik_nodes in group_vars).
+- name: Traefik files
+  hosts: managers
+  tasks:
+    - name: Write Traefik files
+      ansible.builtin.include_role:
+        name: traefik
+        tasks_from: files
+      when: "'traefik' in apps and inventory_hostname in traefik_nodes"
+
 - name: Swarm apps
   hosts: managers[0]
   tasks:
@@ -196,7 +206,7 @@
 
     - name: Show DNS setting
       ansible.builtin.debug:
-        msg: "DNS for *.{{ domain }} must point to the public IP of {{ inventory_hostname }}."
+        msg: "DNS for *.{{ domain }} must point to the public IP of {{ traefik_nodes | join(', ') }}."
 
     - name: Show how to reach each app
       ansible.builtin.debug:
