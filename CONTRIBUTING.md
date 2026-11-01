@@ -34,7 +34,8 @@ that read `SKILL.md`: set up `config.yml`, install, add an app, and update versi
 ## Send a pull request
 
 1. Make your change on a branch. `main` only takes changes from pull requests.
-2. Run the checks. No servers needed. The first line makes `.venv/` with Ansible:
+2. Run the checks. No servers needed. You need `shellcheck`, `yq`, `docker` and `curl`
+   (on a Mac: `brew install shellcheck yq`). The first line makes `.venv/` with Ansible:
 
    ```bash
    ./install.sh config.example.yml --syntax-check

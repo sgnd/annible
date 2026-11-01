@@ -10,7 +10,8 @@ A word you do not know? See [Words](#words) at the end.
 You need:
 
 - A computer with macOS or Linux, with `git` and Python 3.12 or newer. This is where you run the installer.
-  Check with `python3 --version`. Too old? On a Mac: `brew install python@3.12`.
+  Check with `python3 --version`. Too old or missing? On a Mac: `brew install python@3.12 git`
+  (no `brew`? Get it from [brew.sh](https://brew.sh)). On Ubuntu: `sudo apt install git python3 python3-venv`.
 - A domain name you own, for example `example.com`, where you can add DNS records.
 - A little money for a cloud server (a few dollars a month).
 
@@ -95,7 +96,7 @@ ssh:
 
 nodes:
   - name: server1
-    ip: 203.0.113.10            # the private IP from step 2. No private IP? Write the public IP here too.
+    ip: 10.0.0.5                # the private IP from step 2. No private IP? Write the public IP here too.
     host: 203.0.113.10          # the public IP: where the installer connects
     role: manager
 
@@ -119,10 +120,13 @@ red lines that say `FAILED` are not (see [Troubleshooting](../README.md#troubles
 
 At the end it prints the address of each app. It also saves them, with all passwords, in `state/summary.md`.
 
+Want to be sure everything works? Run the checks in [Check that everything works](../README.md#check-that-everything-works).
+
 ## 6. Open your apps
 
 Open `https://portainer.example.com` in your browser. Portainer shows your containers and lets you
-start your own apps. The passwords are in `state/summary.md`.
+start your own apps. The passwords are in `state/summary.md`. (If you set up encryption for `state/`,
+run `scripts/state.sh open` first, and `scripts/state.sh close` when you are done.)
 
 You are done. Next:
 
@@ -133,7 +137,7 @@ You are done. Next:
   (for example in a password manager). From the next run, `state/` is kept encrypted.
 - **Run `./install.sh` again** whenever you change `config.yml`, for example to add an app or a server.
   It only changes what is different.
-- **Add backups and alerts**: see [How to](../README.md#how-to) in the README.
+- **Add backups and alerts**: see "Back up and restore" and "Monitoring and alerts" in [How to](../README.md#how-to).
 
 ## Words
 
@@ -149,6 +153,10 @@ You are done. Next:
 | **manager** | A server that controls the cluster and runs swarm apps. Use 1, 3 or 5. |
 | **worker** | A server in the cluster that only runs swarm apps. |
 | **standalone** | A server that is not in the cluster. It runs server apps, like a database. |
+| **first manager** | The first server with `role: manager` in `config.yml`. Some apps keep their data there. |
+| **stack** | A group of containers that belong together and are started as one, in a swarm. |
+| **registry** | A place that stores images. Ansibro runs its own on your managers, so servers do not download from the internet each time. |
+| **label** | A tag on a server, like `tier=app`, that tells the swarm which apps may run there. |
 | **swarm app** | An app that the cluster runs, on any manager or worker (for example Traefik, Portainer). |
 | **server app** | An app that runs on the one server you name (for example PostgreSQL). Its data stays on that server. |
 | **SSH** | The way to log in to a server and type commands there, over the network. |
@@ -170,6 +178,8 @@ You are done. Next:
 | **`state/` folder** | The folder where Ansibro keeps the passwords it made. Back it up. |
 | **Portainer** | A web page to see and manage your containers. |
 | **PostgreSQL** | A popular database. |
+| **tag**, **digest** | The version name of an image (`18.1`), and a fingerprint of that exact image, so it can not change. |
+| **dump** | One file with all the data of a database, used for backups and big upgrades. |
 | **Docker Compose** | A way to start containers from a file. Ansibro uses it for server apps. |
 | **YAML** | The format of `config.yml`: `name: value` lines, with spaces at the start to show what belongs together. Use spaces, not tabs. |
 | **VPC** | A private network for your servers at a cloud provider. |
