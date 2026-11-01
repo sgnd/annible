@@ -39,6 +39,10 @@ firewall_allow: []
 # Open UDP port 51820 between the servers in your cloud firewall (security group).
 wireguard: false
 
+# The cluster: swarm (Docker Swarm, the default) or k3s (small Kubernetes). See README "Docker Swarm or k3s".
+# With k3s, write traefik: cluster in apps; kong, portainer, swarmpit, keycloak and authelia are Swarm only.
+# orchestrator: k3s
+
 # Optional: back up every server each night with restic (encrypted). Use storage outside this cluster.
 # repository: s3:https://<s3 server>/<bucket> (AWS S3, Wasabi, another cluster's RustFS or Garage, ...),
 #   rest:https://user:pass@<host>/ (restic rest-server), or a folder that is mounted on every server.

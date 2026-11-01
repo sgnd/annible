@@ -34,12 +34,17 @@
       docker push -q {{ dst }}
       {% else %}
       docker buildx imagetools create {{ registry_platforms | map('regex_replace', '^', '--platform linux/') | join(' ') }} \
-        --tag {{ dst }} {{ image.repo }}@{{ image.digest }}
+        --tag {{ dst }} {{ src }}
       {% endif %}
     executable: /bin/bash
   vars:
     image: "{{ images[item.item.0] }}"
     dst: "{{ item.item.1 }}/{{ item.item.0 }}:{{ image.tag }}"
+    # The first manager's registry gets it from the internet, the other managers from there (faster,
+    # and Docker Hub counts fewer downloads). Images come first manager first, see the loop above.
+    src: >-
+      {{ image.repo ~ '@' ~ image.digest if item.item.1 == registry_manager_addrs[0]
+      else registry_manager_addrs[0] ~ '/' ~ item.item.0 ~ ':' ~ image.tag }}
     # Online, the image must also be there for every CPU type (a new arm64 server, for example).
     have: "{{ (item.json | default({})).manifests | default([]) | selectattr('platform', 'defined') | map(attribute='platform.architecture') }}"
   loop: "{{ registry_mirror_check.results }}"

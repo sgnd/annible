@@ -294,6 +294,8 @@ def build_apps(apps, catalog, hostvars, monitoring=None):
             continue
         if not isinstance(target, str):
             fail(f"{name}: write it as '{name}: swarm' or '{name}: <node name>'")
+        if target == "cluster":  # the same as swarm; reads better with orchestrator: k3s
+            target = apps[name] = "swarm"
         runs_on = catalog[name]["runs_on"]
         if target == "swarm" and runs_on != "swarm":
             fail(f"{name} runs on one server, set it to a node name")
@@ -347,7 +349,7 @@ def build(cfg, base_dir):
         for name, target in apps.items():
             if target == "swarm" and name not in K3S_CLUSTER_APPS:
                 fail(f"{name} runs only on Docker Swarm for now. On k3s, use the apps that run on a server, "
-                     f"and {', '.join(K3S_CLUSTER_APPS)} (write it as '{name}: swarm' too)")
+                     f"and {', '.join(K3S_CLUSTER_APPS)} (write it as 'traefik: cluster')")
     # tier=data: a swarm server that runs server apps (databases, ...); tier=app: the others.
     # Swarm apps without data prefer tier=app servers. A tier in config.yml labels wins.
     for name in groups["managers"] + groups["workers"]:
