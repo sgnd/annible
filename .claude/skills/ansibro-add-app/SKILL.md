@@ -46,11 +46,20 @@ description: Add a new app to the Ansibro catalog (a new role, catalog entry and
    - Server apps: use `network_mode: host`, **never `ports:`**. Published ports skip the firewall.
    - Add `diff: false` or `no_log: true` to tasks that write passwords.
 
-4. **Docs**:
+4. **k3s** (swarm apps only): a swarm app must also work with `orchestrator: k3s`.
+   - Write the stack only `when: orchestrator == 'swarm'`.
+   - Add `templates/k3s.yaml.j2` and write it to `/var/lib/rancher/k3s/server/manifests/ansibro-myapp.yaml`
+     `when: orchestrator == 'k3s'` (k3s applies it by itself). Copy both from `roles/portainer/`.
+   - Add the app to `K3S_CLUSTER_APPS` in `inventory.py`. If it only works with Docker Swarm
+     (like swarmpit), leave it out: the config check then stops it on k3s.
+
+5. **Docs and tests**:
    - `README.md`: add a row to the Apps table.
+   - `docs/apps.md`: add notes if the app has a special login or needs something.
    - `THIRD_PARTY.md`: add name, license and source link.
    - `config.example.yml`: mention it as a comment next to the other app in its category.
-   - `tests/check.py`: add a check that logs in to it for real.
+   - `tests/check.py`: add a `check_myapp()` that logs in to it for real, and add it to `CHECKS`.
+   - `CHANGELOG.md`: one line about the new app.
 
 ## Check
 
