@@ -4,6 +4,8 @@
 #   traefik_route_port:       port of the app on this server
 #   traefik_route_middleware: admin-ip (default), admin (adds the dashboard password),
 #                             or authelia@file (Authelia login; this replaces the admin-ip limit)
+# app (optional): the app this route belongs to, written in the file so the installer can remove it
+#   with the app. site.yml sets it when it loops over the apps; it defaults to traefik_route_name.
 
 - name: Create Traefik route folder
   ansible.builtin.file:
