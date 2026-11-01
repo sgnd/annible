@@ -162,6 +162,17 @@ Click a name to open its official website.
 Users and password files are listed in [`catalog.yml`](catalog.yml), and printed at the end of
 the install. Passwords are in `state/secrets/`, and all together in `state/summary.md`.
 
+**Keep `state/` encrypted.** Create a key once, on the machine that runs the installer, and keep a
+copy of it somewhere safe (a password manager):
+
+```bash
+mkdir -p ~/.config/ansibro && age-keygen -o ~/.config/ansibro/age.key
+```
+
+From then on `state/` is kept as `state.age`, encrypted with [age](https://age-encryption.org).
+`./install.sh` opens it while it runs and closes it at the end. To read a password:
+`scripts/state.sh open`, and `scripts/state.sh close` when you are done.
+
 Some apps need others:
 - Every app with a web page needs traefik (for rabbitmq, nats and rustfs only the web page does).
 - kong needs postgres. keycloak needs a database. authelia needs a database and a cache.
@@ -170,6 +181,12 @@ Some apps need others:
 Swarmpit and Uptime Kuma create their admin user on the first visit. So their pages first ask for
 the Traefik dashboard login (user `admin`, password in `state/secrets/traefik_admin`); after that you
 create the app's own admin user.
+
+**With Authelia, admin pages use Authelia.** The Traefik dashboard, Swarmpit, Uptime Kuma, Kong
+Manager, Alertmanager and the other pages that ask for the Traefik login then ask for the Authelia
+login instead (user `admin`, password in `state/secrets/authelia_admin`), with a second factor (an
+authenticator app). The first time, Authelia asks for a code that it writes to
+`/opt/ansibro/authelia/config/notification.txt` on the first manager.
 
 **Kong** runs on its own network, `kong`, shared only with Traefik. Put your API services on that
 network too (`networks: [kong]`, external) so Kong can reach them. Other apps cannot reach Kong's admin API.
@@ -203,12 +220,14 @@ A server app has one middleware, so this replaces its `admin_allow_from` limit.
 |------|----|
 | SSH | `ssh.allow_from`, or anyone |
 | 80, 443 | anyone, on swarm servers |
-| everything | other servers in `config.yml` (from their `ip`) |
+| the ports a server needs: swarm, registry, its apps, monitoring agents | other servers in `config.yml` (from their `ip`) |
 | UDP 51820 | other servers' `host`, with `wireguard: true` |
 | everything | containers on the same server (`docker0`, `docker_gwbridge`) |
 | your own ports | `firewall_allow` in `config.yml` (for example a VPN) |
 
 Everything else is blocked. Server apps use the host network, so the firewall controls them.
+Even between your servers only those ports are open (the list is `common_app_ports` in
+`roles/common/defaults/main.yml`). An app of your own on a server's host network needs a `firewall_allow` rule.
 Admin web pages can be limited to some IPs with `admin_allow_from`.
 
 The installer owns the firewall. The first run, and every run where the rules change, resets it:

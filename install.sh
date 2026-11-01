@@ -94,4 +94,9 @@ if ! "$venv/bin/python" inventory.py --list >/dev/null; then
   exit 1
 fi
 
-exec ansible-playbook site.yml "$@"
+# state/ holds the passwords. If it is kept encrypted (see scripts/state.sh), open it now
+# and close it again when the install ends, also when it fails.
+scripts/state.sh open
+trap 'scripts/state.sh close' EXIT
+
+ansible-playbook site.yml "$@"

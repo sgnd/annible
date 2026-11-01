@@ -1,6 +1,8 @@
 # Use in app labels:
 #   admin-ip@file  only allow admin_allow_from
-#   admin@file     admin-ip plus the dashboard password
+#   admin@file     admin-ip plus a login: the dashboard password, or Authelia (with a second
+#                  factor) when Authelia is installed
+#   authelia@file  Authelia login (only when Authelia is installed)
 http:
   middlewares:
     admin-ip:
@@ -17,4 +19,11 @@ http:
       chain:
         middlewares:
           - admin-ip
-          - admin-auth
+          - {{ 'authelia' if 'authelia' in apps else 'admin-auth' }}
+{% if 'authelia' in apps %}
+    authelia:
+      forwardAuth:
+        address: http://authelia_authelia:9091/api/authz/forward-auth
+        trustForwardHeader: true
+        authResponseHeaders: [Remote-User, Remote-Groups, Remote-Email, Remote-Name]
+{% endif %}

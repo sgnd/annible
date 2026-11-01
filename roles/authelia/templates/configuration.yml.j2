@@ -15,6 +15,14 @@ authentication_backend:
 
 access_control:
   default_policy: one_factor
+  rules:
+    # Admin pages need a second factor too (an authenticator app). The first time, Authelia asks
+    # for a code that it writes to config/notification.txt in its folder on the first manager.
+    - domain:
+{% for name in authelia_admin_hosts %}
+        - "{{ name }}.{{ domain }}"
+{% endfor %}
+      policy: two_factor
 
 session:
   secret: {{ authelia_session_secret }}

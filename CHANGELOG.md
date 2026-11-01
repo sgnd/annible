@@ -13,8 +13,18 @@ Not tested yet (test before the next release):
 - Telegram alerts, RabbitMQ metrics, and a restore of a cluster with monitoring.
 - HA: the registry on every manager, Traefik on every manager, tier labels.
 - PostgreSQL replicas and Garage on 3 servers.
+- Zero trust: the per-port firewall between servers, the Authelia login for admin pages,
+  `state.age` encryption (only tried on a Mac), the image scan in CI.
 
 New
+- Zero trust:
+  - Between your servers, only the ports in use are open (swarm, registry, each server's apps,
+    monitoring agents). Before, servers could reach every port of each other.
+  - With Authelia, every admin page uses the Authelia login with a second factor, instead of the
+    Traefik password.
+  - `state/` can be kept encrypted as `state.age` (with [age](https://age-encryption.org)):
+    create a key in `~/.config/ansibro/age.key` and the installer does the rest. `scripts/state.sh`.
+  - CI scans every pinned image for known security problems (`scripts/scan-images.sh`), each Monday.
 - PostgreSQL replicas: `postgres: [db1, db2]`. The first server is the primary, the others follow
   it (streaming replication). Failover is one command (see README), not automatic yet.
 - Garage on 3 servers: `garage: [s1, s2, s3]` keeps 3 copies of every file.

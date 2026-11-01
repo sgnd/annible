@@ -80,19 +80,11 @@
   when: not authelia_users.stat.exists
   no_log: true
 
-- name: Add Authelia middleware to Traefik
-  ansible.builtin.copy:
-    dest: "{{ apps_dir }}/traefik/dynamic/authelia.yml"
-    content: |
-      http:
-        middlewares:
-          authelia:
-            forwardAuth:
-              address: http://authelia_authelia:9091/api/authz/forward-auth
-              trustForwardHeader: true
-              authResponseHeaders: [Remote-User, Remote-Groups, Remote-Email, Remote-Name]
-    mode: "0600"
-  loop: "{{ traefik_nodes }}"  # every server Traefik runs on
+- name: Remove the old Authelia middleware file (it is in Traefik's middlewares.yml now)
+  ansible.builtin.file:
+    path: "{{ apps_dir }}/traefik/dynamic/authelia.yml"
+    state: absent
+  loop: "{{ traefik_nodes }}"
   delegate_to: "{{ item }}"
 
 - name: Write Authelia stack

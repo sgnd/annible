@@ -5,6 +5,8 @@ config.*.yml
 *.key
 /certs/
 /state/
+/state.age
+/state.age.new
 /bundle/
 /dist/
 .venv/

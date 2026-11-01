@@ -13,7 +13,10 @@
       ssh {{ ansible_port }} from {{ common_ssh_allow_from | join(', ') }}
       web 80, 443: {{ inventory_hostname in groups['swarm'] }}
       cluster nodes: {{ common_cluster_ips | join(', ') }}
+      cluster tcp: {{ common_cluster_tcp_ports | join(', ') }}
+      cluster udp: {{ common_cluster_udp_ports | join(', ') }}
       wireguard from: {{ common_wireguard_hosts | join(', ') }}
+      ssh replies from: {{ common_cluster_hosts | join(', ') }}
       docker interfaces: {{ common_docker_interfaces | join(', ') }}
       your rules: {{ firewall_allow | default([]) | to_json }}
     mode: "0644"
@@ -49,12 +52,24 @@
   loop: ["80", "443"]
   when: inventory_hostname in groups['swarm']
 
-# Cluster nodes trust each other: swarm, registry, databases, etc.
-- name: Allow all traffic from other cluster nodes
+# Other cluster servers may use only the ports this server needs to offer: swarm, registry,
+# the apps on it and the monitoring agents (see common_cluster_tcp_ports). Up to 15 ports per rule.
+- name: Allow app and swarm TCP ports from other cluster nodes
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item.0 }}"
+    port: "{{ item.1 | join(',') }}"
+    proto: tcp
+  loop: "{{ common_cluster_ips | product(common_cluster_tcp_ports | batch(15) | list) | list }}"
+
+- name: Allow swarm UDP ports from other cluster nodes
   community.general.ufw:
     rule: allow
     from_ip: "{{ item }}"
+    port: "{{ common_cluster_udp_ports | join(',') }}"
+    proto: udp
   loop: "{{ common_cluster_ips }}"
+  when: common_cluster_udp_ports | length > 0
 
 - name: Allow WireGuard from other cluster nodes
   community.general.ufw:
@@ -73,7 +88,7 @@
     proto: tcp
     from_ip: "{{ item }}"
     from_port: "{{ ansible_port | string }}"
-  loop: "{{ common_wireguard_hosts }}"
+  loop: "{{ common_cluster_hosts }}"
 
 # Containers on this server can reach apps that use the host network.
 - name: Allow traffic from local Docker networks
