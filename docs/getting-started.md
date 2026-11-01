@@ -116,11 +116,11 @@ You can add more apps later. The [Apps table](../README.md#apps) lists them all.
 
 It checks `config.yml` first. If something is wrong, it tells you what to fix.
 Then it sets up the server. This takes a while. Lines that say `ok` or `changed` are good;
-red lines that say `FAILED` are not (see [Troubleshooting](../README.md#troubleshooting)).
+red lines that say `FAILED` are not (see [Check and fix](troubleshooting.md#troubleshooting)).
 
 At the end it prints the address of each app. It also saves them, with all passwords, in `state/summary.md`.
 
-Want to be sure everything works? Run the checks in [Check that everything works](../README.md#check-that-everything-works).
+Want to be sure everything works? Run the checks in [Check and fix](troubleshooting.md).
 
 ## 6. Open your apps
 
@@ -137,7 +137,7 @@ You are done. Next:
   (for example in a password manager). From the next run, `state/` is kept encrypted.
 - **Run `./install.sh` again** whenever you change `config.yml`, for example to add an app or a server.
   It only changes what is different.
-- **Add backups and alerts**: see "Back up and restore" and "Monitoring and alerts" in [How to](../README.md#how-to).
+- **Add backups and alerts**: see "Back up and restore" and "Monitoring and alerts" in [How to](how-to.md).
 
 ## Words
 
@@ -153,6 +153,7 @@ You are done. Next:
 | **manager** | A server that controls the cluster and runs swarm apps. Use 1, 3 or 5. |
 | **worker** | A server in the cluster that only runs swarm apps. |
 | **standalone** | A server that is not in the cluster. It runs server apps, like a database. |
+| **`<...>`** | In commands and examples: put your own value here. `<domain>` means your domain, like `example.com`. |
 | **first manager** | The first server with `role: manager` in `config.yml`. Some apps keep their data there. |
 | **stack** | A group of containers that belong together and are started as one, in a swarm. |
 | **registry** | A place that stores images. Ansibro runs its own on your managers, so servers do not download from the internet each time. |

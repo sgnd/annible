@@ -1,6 +1,6 @@
 # Build the offline bundles when a version tag (like v1.1.0) is pushed, and attach them to its
 # GitHub release. "Run workflow" on GitHub builds them without a release (to test the build).
-# GitHub allows files up to 2 GB, so each bundle is split into parts (see README "Offline install").
+# GitHub allows files up to 2 GB, so each bundle is split into parts (see docs/offline.md).
 name: Release
 
 on:
@@ -24,7 +24,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md. Offline bundles: README, Offline install."
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md. Offline bundles: docs/offline.md."
 
   bundle:
     name: Bundle ${{ matrix.ubuntu }} ${{ matrix.arch }}

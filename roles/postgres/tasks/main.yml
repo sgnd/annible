@@ -1,6 +1,6 @@
 # PostgreSQL. Apps connect to <server ip>:5432 as user "postgres".
 # With more servers (postgres: [db1, db2]) the first is the primary and the others are replicas:
-# read-only copies that follow it all the time. See README "Database replicas".
+# read-only copies that follow it all the time. See docs/how-to.md, "Database replicas".
 
 # The app in the container runs as user 999, so it must own its data folder.
 - name: Create PostgreSQL folders
