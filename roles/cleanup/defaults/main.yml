@@ -1,0 +1,2 @@
+# Servers in the swarm that are not in config.yml (see tasks/nodes.yml).
+cleanup_old_nodes: "{{ cleanup_nodes.stdout_lines | default([]) | difference(groups['swarm']) }}"

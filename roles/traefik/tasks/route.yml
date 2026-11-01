@@ -18,6 +18,7 @@
   ansible.builtin.copy:
     dest: "{{ traefik_dir }}/dynamic/{{ traefik_route_name }}.yml"
     content: |
+      # app: {{ app | default(traefik_route_name) }} (the installer removes this file when the app is removed)
       http:
         routers:
           {{ traefik_route_name }}:

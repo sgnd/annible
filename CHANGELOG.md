@@ -16,8 +16,12 @@ Not tested yet (test before the next release):
 - Zero trust: the per-port firewall between servers, the Authelia login for admin pages,
   `state.age` encryption (only tried on a Mac), the image scan in CI.
 - OpenBao.
+- Removing apps and servers.
 
 New
+- Remove an app: take it out of `config.yml` and run `./install.sh`. It stops (data kept).
+- Remove a server: take it out of `config.yml` and run `./install.sh -e remove_nodes=true`.
+  Without that option the installer stops and lists the servers it would remove.
 - `openbao` app: secrets for your apps. The installer sets it up, saves the unseal key and root
   token in `state/secrets/`, unseals it on every run, and turns on `secret/` (KV version 2).
   Alert `OpenBaoSealed` when it needs unsealing after a restart.

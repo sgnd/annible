@@ -93,6 +93,16 @@
           If the server's real address changed, set the new one as host (with wireguard: true, ip never has to change).
       when: inventory_hostname in groups['swarm'] and swarm_now.stdout is match('active')
 
+# Servers removed from config.yml leave the swarm (only with -e remove_nodes=true).
+- name: Removed servers
+  hosts: managers[0]
+  gather_facts: false
+  tasks:
+    - name: Remove servers that are not in config.yml
+      ansible.builtin.include_role:
+        name: cleanup
+        tasks_from: nodes
+
 - name: Base system
   hosts: all
   environment: "{{ apt_env }}"  # offline: apt uses only the bundle
@@ -173,6 +183,14 @@
       loop: "{{ swarm_apps }}"
       loop_control:
         loop_var: app
+
+# Apps removed from config.yml stop (their data stays).
+- name: Removed apps
+  hosts: all
+  tasks:
+    - name: Stop apps that are not in config.yml
+      ansible.builtin.include_role:
+        name: cleanup
 
 - name: Backup
   hosts: all

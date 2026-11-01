@@ -40,6 +40,9 @@ cache_app: "{{ 'redis' if 'redis' in apps else 'valkey' if 'valkey' in apps else
 cache_ip: "{{ hostvars[apps[cache_app]].node_ip if cache_app else '' }}"
 cache_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/' ~ cache_app, chars=['ascii_letters', 'digits'], length=24) if cache_app else '' }}"
 
+# ./install.sh -e remove_nodes=true removes servers from the swarm that are not in config.yml.
+remove_nodes: false
+
 # ./install.sh -e restore=true puts the newest backup back on new servers (see roles/backup).
 restore: false
 

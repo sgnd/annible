@@ -1,0 +1,77 @@
+# Stop what config.yml no longer lists on this server. The data stays in /opt/ansibro/<app>/:
+# delete that folder by hand if you do not need it. Runs at the end of every install.
+
+- name: Find apps that run on this server
+  ansible.builtin.find:
+    paths: "{{ apps_dir }}"
+    patterns: compose.yml
+    recurse: true
+    depth: 2
+  register: cleanup_compose
+
+# A server app, agent or registry that should not run here (any more).
+- name: Stop apps that are no longer in config.yml
+  ansible.builtin.command:
+    cmd: docker compose down
+    chdir: "{{ apps_dir }}/{{ item }}"
+  loop: "{{ cleanup_compose.files | map(attribute='path') | map('dirname') | map('basename') | intersect(cleanup_unwanted) }}"
+  vars:
+    cleanup_unwanted: >-
+      {{ (catalog | dict2items | selectattr('value.runs_on', 'equalto', 'node') | map(attribute='key') | difference(node_apps))
+      + ([] if 'beszel' in apps else ['beszel-agent'])
+      + ([] if monitoring_app else ['monitoring-agent'])
+      + ([] if inventory_hostname in groups['managers'] else ['registry']) }}
+  changed_when: true
+
+- name: Look for timers of removed features
+  ansible.builtin.stat:
+    path: /etc/systemd/system/{{ item }}
+  loop: "{{ ([] if monitoring_app else ['ansibro-metrics.timer']) + ([] if backup is defined else ['ansibro-backup.timer']) }}"
+  register: cleanup_timers
+
+- name: Stop timers of removed features
+  ansible.builtin.systemd_service:
+    name: "{{ item.item }}"
+    state: stopped
+    enabled: false
+  loop: "{{ cleanup_timers.results | selectattr('stat.exists') | list }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Remove timers of removed features
+  ansible.builtin.file:
+    path: /etc/systemd/system/{{ item.item }}
+    state: absent
+  loop: "{{ cleanup_timers.results | selectattr('stat.exists') | list }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+# Each route file says which app made it ("# app: <name>").
+- name: Find Traefik routes of removed apps
+  ansible.builtin.command:
+    argv: [grep, -rlE, "^# app: ({{ cleanup_removed_apps | join('|') }}) ", "{{ apps_dir }}/traefik/dynamic"]
+  vars:
+    cleanup_removed_apps: "{{ catalog.keys() | difference(apps.keys()) }}"
+  register: cleanup_routes
+  failed_when: false
+  changed_when: false
+  when: inventory_hostname in traefik_nodes and cleanup_removed_apps | length > 0
+
+- name: Remove Traefik routes of removed apps
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ cleanup_routes.stdout_lines | default([]) }}"
+
+# Only the swarm apps from the catalog. Your own stacks are left alone.
+- name: Get swarm stacks
+  ansible.builtin.command: docker stack ls --format '{% raw %}{{ .Name }}{% endraw %}'
+  register: cleanup_stacks
+  changed_when: false
+  when: inventory_hostname == swarm_leader
+
+- name: Remove swarm apps that are no longer in config.yml
+  ansible.builtin.command: docker stack rm {{ item }}
+  loop: "{{ cleanup_stacks.stdout_lines | intersect(catalog.keys()) | difference(swarm_apps) }}"
+  when: inventory_hostname == swarm_leader
+  changed_when: true

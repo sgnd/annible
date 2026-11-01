@@ -354,27 +354,16 @@ Grafana has an "Ansibro overview" dashboard. Logs: Grafana > Explore (prometheus
   in `monitoring.heartbeat_url`. Alertmanager sends it a POST about every 2 minutes; set its period to 5 minutes.
   (Uptime Kuma's "Push" monitor does not work here: it takes only GET.)
 
-**Remove an app.** Remove it from `config.yml`, then:
+**Remove an app.** Remove it from `config.yml` and run `./install.sh`. The installer stops it
+(and its agents, Traefik page and timer). Its data stays in `/opt/ansibro/<app>` on its server:
+`sudo rm -rf /opt/ansibro/<app>` if you do not need it. Not removed by itself: the app's database
+(drop it in Postgres or MariaDB) and its old images in the registry.
 
-```bash
-sudo docker stack rm <app>                                      # swarm app, on the first manager
-sudo docker compose -f /opt/ansibro/<app>/compose.yml down      # server app, on its server
-```
-
-If you do not need the data: `sudo rm -rf /opt/ansibro/<app>` on its server, and
-`sudo rm -f /opt/ansibro/traefik/dynamic/<app>.yml` on the first manager.
-For beszel, also run `sudo docker compose -f /opt/ansibro/beszel-agent/compose.yml down` on every server.
-For prometheus or victoria, also run `sudo docker compose -f /opt/ansibro/monitoring-agent/compose.yml down`
-and `sudo systemctl disable --now ansibro-metrics.timer` on every server.
-Not removed by itself: the app's database (drop it in Postgres or MariaDB), its old images in the
-registry, a server in Beszel's list (delete it in Beszel), and ports 80/443 if you remove traefik.
-
-**Remove a server.** Move its apps to other servers first, then remove it from `config.yml`.
-- Worker: run `sudo docker swarm leave` on it, then `sudo docker node rm <name>` on a manager.
-- Manager: first `sudo docker node demote <name>` on another manager, then the same as a worker.
-- Standalone: nothing else to do.
-
-Run `./install.sh` again, so the firewall forgets the removed server. Never remove the first manager.
+**Remove a server.** Move its server apps to other servers first, then remove it from `config.yml`
+and run `./install.sh -e remove_nodes=true`. The installer takes it out of the swarm (a manager is
+demoted first) and the other servers' firewalls forget it. Without `-e remove_nodes=true` the
+installer stops and lists the servers it would remove, so a typo cannot remove one.
+Then turn the server off. Never remove the first manager.
 
 **Add a server.** Add it to `config.yml`, after the first manager, and run `./install.sh`.
 
