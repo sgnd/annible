@@ -1,9 +1,13 @@
 # Create the swarm on the first manager, then join the other nodes.
 # Note: {% raw %}...{% endraw %} keeps Docker's own {{ }} format text away from Ansible.
 
+# Right after Docker restarts (for example a new daemon.json) the swarm is "pending" for a moment.
 - name: Check if this node is in a swarm
   ansible.builtin.command: docker info --format '{% raw %}{{ .Swarm.LocalNodeState }}{% endraw %}'
   register: swarm_state
+  until: swarm_state.stdout != 'pending'
+  retries: 30
+  delay: 2
   changed_when: false
 
 # Swarm networks add 50 bytes to each packet. If a packet gets bigger than the servers' network
