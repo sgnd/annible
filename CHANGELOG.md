@@ -2,8 +2,12 @@
 
 ## Unreleased
 
-Annible is now called Ansibro: the repo is github.com/sgnd/ansibro, app files are in
+Annible (the old name) is now called Ansibro: the repo is github.com/sgnd/ansibro, app files are in
 `/opt/ansibro`, and the commands are `ansibro-backup` and `ansibro-metrics`.
+
+Easier for beginners: a step-by-step guide with a list of words ([docs/getting-started.md](docs/getting-started.md)),
+a simpler README, and clearer messages. A real install now stops early when `domain` or `acme_email`
+are still example.com, or `ssh.key` is missing. A tab or a wrong indent in `config.yml` gives the line number.
 
 Tested on DigitalOcean (Ubuntu 24.04, amd64), with `tests/check.py` passing and a second run with no changes:
 - Docker Swarm, 3 managers + worker + 3 data servers: the registry and Traefik on every manager

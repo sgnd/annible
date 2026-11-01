@@ -33,7 +33,8 @@ case "${1:-}" in
   open)
     [ -f state.age ] || exit 0
     if [ -d state ]; then
-      echo "error: both state/ and state.age are here. Keep the newest, remove the other." >&2
+      echo "error: both state/ and state.age are here. Do not delete either: they hold your passwords." >&2
+      echo "  Move one of them to a backup folder, then run this again." >&2
       exit 1
     fi
     age -d -i "$key" state.age | tar -xf -

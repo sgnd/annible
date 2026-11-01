@@ -39,7 +39,7 @@ CASES = [
     ("unknown app", lambda c: c["apps"].update(mysql="data1"), "unknown app mysql"),
     ("server app on swarm", lambda c: c["apps"].update(postgres="swarm"), "postgres runs on one server"),
     ("swarm app on a server", lambda c: c["apps"].update(traefik="data1"), "traefik runs as a swarm service"),
-    ("app on unknown node", lambda c: c["apps"].update(postgres="nowhere"), "got nowhere"),
+    ("app on unknown node", lambda c: c["apps"].update(postgres="nowhere"), "nowhere is not in nodes"),
     ("two apps in one category", lambda c: c["apps"].update(mariadb="data1"), "both database"),
     ("kong without postgres",
      lambda c: (c["apps"].update(kong="swarm", mariadb="data1"), c["apps"].pop("postgres")), "kong needs postgres"),

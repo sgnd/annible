@@ -49,7 +49,14 @@ def fail(msg):
 
 def load_yaml(path):
     with open(path) as f:
-        return yaml.safe_load(f) or {}
+        try:
+            return yaml.safe_load(f) or {}
+        except yaml.YAMLError as e:
+            # A tab or a wrong indent: say where, not a long Python error.
+            mark = getattr(e, "problem_mark", None)
+            where = f" line {mark.line + 1}" if mark else ""
+            hint = "use spaces, not tabs" if "\\t" in str(e) else "check the spaces at the start of this line and the line above"
+            fail(f"{os.path.basename(path)}{where}: {hint}")
 
 
 def load_config():
@@ -109,7 +116,8 @@ def check_backup(backup):
     if str(backup["repository"]).startswith("s3:") and not (backup.get("s3_access_key") and backup.get("s3_secret_key")):
         fail("backup: an s3: repository needs s3_access_key and s3_secret_key")
     if not TIME.match(str(backup.get("time", "02:00"))):
-        fail(f"backup.time must look like \"02:00\" (in quotes), got {backup.get('time')}")
+        fail(f"backup.time must look like \"02:00\", in quotes (without quotes it is read as a number), "
+             f"got {backup.get('time')}")
     for key in ("keep_daily", "keep_weekly", "keep_monthly"):
         value = backup.get(key, 1)
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
@@ -208,7 +216,8 @@ def build_nodes(nodes, wireguard):
         if not name or not ip:
             fail(f"every node needs name and ip: {node}")
         if not NODE_NAME.match(str(name)) or name in RESERVED_NAMES:
-            fail(f"node name {name}: use lowercase letters, numbers and -, not {', '.join(sorted(RESERVED_NAMES))}")
+            fail(f"node name {name}: use only lowercase letters, numbers and -. "
+                 f"These names are taken: {', '.join(sorted(RESERVED_NAMES))}")
         if role not in GROUPS:
             fail(f"{name}: role must be one of {', '.join(GROUPS)}")
         if node.get("labels") and role == "standalone":
@@ -300,7 +309,7 @@ def build_apps(apps, catalog, hostvars, monitoring=None):
         if target == "swarm" and runs_on != "swarm":
             fail(f"{name} runs on one server, set it to a node name")
         elif target != "swarm" and target not in hostvars:
-            fail(f"{name}: must be swarm or a node name, got {target}")
+            fail(f"{name}: {target} is not in nodes. Use one of your node names: {', '.join(hostvars)}")
         elif target != "swarm" and runs_on != "node":
             fail(f"{name} runs as a swarm service, set it to swarm")
 
@@ -391,11 +400,26 @@ def build(cfg, base_dir):
     }
 
 
+def check_ready(cfg, base_dir):
+    """Values a first install often forgets to change. install.sh checks these before a real run."""
+    if str(cfg.get("domain", "")).endswith("example.com"):
+        fail(f"domain is still {cfg['domain']}. Write your own domain.")
+    if cfg.get("tls", "letsencrypt") == "letsencrypt" and str(cfg.get("acme_email", "")).endswith("example.com"):
+        fail("acme_email is still an example.com address. Write your own email (Let's Encrypt refuses example.com).")
+    key = os.path.normpath(os.path.join(base_dir, os.path.expanduser((cfg.get("ssh") or {}).get("key", "~/.ssh/id_ed25519"))))
+    if not os.path.exists(key):
+        fail(f"ssh.key: {key} not found. Use the private SSH key that logs in to your servers.")
+
+
 def main():
     if "--host" in sys.argv:
         print("{}")
         return
-    print(json.dumps(build(*load_config()), indent=2))
+    cfg, base_dir = load_config()
+    inventory = build(cfg, base_dir)
+    if "--ready" in sys.argv:
+        check_ready(cfg, base_dir)
+    print(json.dumps(inventory, indent=2))
 
 
 if __name__ == "__main__":

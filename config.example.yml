@@ -1,7 +1,7 @@
 # Copy to config.yml and change it. Every setting is explained here.
 
 domain: example.com        # web pages get <name>.example.com, for example traefik.example.com
-tls: letsencrypt           # letsencrypt | selfsigned (no internet) | custom
+tls: letsencrypt           # letsencrypt | selfsigned (no internet) | custom (your own files: tls_cert, tls_key)
 acme_email: admin@example.com      # for tls: letsencrypt
 # acme_server: https://acme-staging-v02.api.letsencrypt.org/directory
 #                          # optional: another ACME server, e.g. Let's Encrypt staging for tests,
@@ -10,8 +10,7 @@ acme_email: admin@example.com      # for tls: letsencrypt
 # tls_cert: ./certs/fullchain.pem   # for tls: custom, a wildcard cert for *.example.com
 # tls_key: ./certs/privkey.pem      # paths are relative to this file
 timezone: Asia/Jakarta
-# arch: amd64              # Optional. The installer finds each server's CPU (amd64 or arm64); they may mix.
-                           # Set it only to make sure every server is that type. Offline: one type per bundle.
+# arch: amd64              # Leave this out: the installer finds each server's CPU (amd64 or arm64).
 
 ssh:
   user: ubuntu             # needs passwordless sudo
@@ -32,8 +31,8 @@ firewall_allow: []
 #  - { port: 9100, proto: tcp, from: 10.0.0.0/8 }
 
 # Optional: an encrypted network (WireGuard) between all servers. Use it when servers talk over
-# the internet or a network you do not trust, or to keep the swarm working when servers move:
-# the swarm only uses ip, so a server's real address (host) can change.
+# the internet or a network you do not trust. With WireGuard, ip never changes,
+# even when a server's real address (host) changes.
 # Every node then needs host, and ip is a new private address you pick, e.g. 10.99.0.11.
 # Each host must be reachable from the other servers and from the installer.
 # Open UDP port 51820 between the servers in your cloud firewall (security group).
@@ -79,12 +78,12 @@ wireguard: false
 #   host: optional, the server's own address, where the installer connects over SSH
 #         (and WireGuard, when on). Use it when a server has more than one IP, like a
 #         public IP for SSH and a private IP for the cluster. Default: same as ip.
-#   role: manager    runs the swarm and swarm apps (use 1, 3 or 5)
+#   role: manager    runs the swarm and swarm apps (have 1, 3 or 5 managers in total)
 #         worker     runs swarm apps
 #         standalone not in the swarm, runs server apps like databases
 #   labels: optional tags for your own swarm placement rules, e.g. node.labels.tier == app.
 #           The installer only adds labels; remove old ones by hand (sudo docker node update --label-rm <key> <node>).
-#           Swarm servers also get tier=data (they run server apps) or tier=app, unless you set tier.
+#           You can leave labels out. (Swarm servers get tier=data or tier=app by themselves.)
 #   gpu:  optional, true for a server with an NVIDIA GPU: the installer adds the driver, the
 #         NVIDIA Container Toolkit and the label gpu=true. Needs internet.
 nodes:
@@ -104,6 +103,7 @@ nodes:
 # Apps to install and where they run. Apps not listed are not installed.
 #   swarm       = a swarm service: traefik, kong, portainer, swarmpit, keycloak, authelia
 #   <node name> = runs on that server: databases, caches, storage, queues, monitoring
+#   cluster     = with orchestrator: k3s, for traefik
 # One app per category. All apps are in catalog.yml.
 apps:
   traefik: swarm           # needed by every app with a web page
@@ -114,6 +114,6 @@ apps:
   redis: data1             # or valkey
   rustfs: data1            # or garage. 3 copies of every file: garage: [data1, data2, data3]
   rabbitmq: data1          # or nats
-  # uptimekuma: swarm2     # or beszel; with monitoring, on another server than it
-  # openbao: data1          # secrets for your apps (passwords, API keys)
+  # uptimekuma: swarm2     # or beszel. With victoria or prometheus, put it on another server
+  # openbao: data1         # secrets for your apps (passwords, API keys)
   # victoria: data1        # metrics, logs and alerts, or prometheus (needs monitoring: above)
