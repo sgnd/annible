@@ -7,8 +7,8 @@ a beginner must be able to read every file. Use simple English.
 
 Open an issue with the [Suggest an app](https://github.com/sgnd/ansibro/issues/new?template=suggest-an-app.yml) form. An app fits when all of these are true:
 
-- It is open source, with an OSI-approved license (not BSL or SSPL).
-- It has a multi-arch image (amd64 and arm64) with a pinned version.
+- It is open source: its license is on the [OSI list](https://opensource.org/licenses) (so not BSL or SSPL).
+- It has an image for both Intel/AMD (amd64) and ARM (arm64), with a fixed version (not `latest`).
 - It works offline: everything it needs is in its image.
 - Its category has fewer than two apps. Each category has two choices at most.
 
@@ -34,7 +34,8 @@ that read `SKILL.md`: set up `config.yml`, install, add an app, and update versi
 ## Send a pull request
 
 1. Make your change on a branch. `main` only takes changes from pull requests.
-2. Run the checks. No servers needed. The first line makes `.venv/` with Ansible:
+2. Run the checks. No servers needed. You need `shellcheck`, `yq`, `docker` and `curl`
+   (on a Mac: `brew install shellcheck yq`). The first line makes `.venv/` with Ansible:
 
    ```bash
    ./install.sh config.example.yml --syntax-check
