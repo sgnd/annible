@@ -65,7 +65,10 @@ while read -r name repo tag digest; do
     sleep 15
   done
   docker tag "$repo@$digest" "$repo:$tag"
-  docker save --platform "linux/$arch" "$repo:$tag" | gzip > "$bundle/images/$name.tar.gz"
+  # --platform is needed with Docker's containerd image store (Docker Desktop, OrbStack). The classic
+  # store keeps only the pulled platform, and refuses --platform for some images: then save without it.
+  docker save --platform "linux/$arch" "$repo:$tag" 2>/dev/null | gzip > "$bundle/images/$name.tar.gz" ||
+    docker save "$repo:$tag" | gzip > "$bundle/images/$name.tar.gz"
 done < "$bundle/images.txt"
 
 echo "== Pack"

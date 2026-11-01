@@ -31,6 +31,7 @@ jobs:
     needs: release
     if: always() && needs.release.result != 'failure'
     strategy:
+      fail-fast: false  # one bundle failing does not stop the others
       matrix:
         include:
           - { arch: amd64, ubuntu: "24.04", runner: ubuntu-24.04 }
