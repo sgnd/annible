@@ -9,8 +9,8 @@ config.*.yml
 /state.age.new
 /bundle/
 /dist/
-.venv/
-.collections/
-.ansible/
+.venv
+.collections
+.ansible
 *.retry
 __pycache__/
