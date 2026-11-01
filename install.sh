@@ -92,9 +92,9 @@ export PATH="$PWD/$venv/bin:$PATH"
 
 # Check config.yml first, so a mistake stops here with a clear message.
 # A real run also checks for values left from config.example.yml (a --syntax-check does not).
-ready=--ready
-case " $* " in *" --syntax-check "*) ready= ;; esac
-if ! "$venv/bin/python" inventory.py --list ${ready:+"$ready"} >/dev/null; then
+check=(--list --ready)
+case " $* " in *" --syntax-check "*) check=(--list) ;; esac
+if ! "$venv/bin/python" inventory.py "${check[@]}" >/dev/null; then
   exit 1
 fi
 

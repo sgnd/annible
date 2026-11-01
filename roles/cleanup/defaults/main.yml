@@ -1,3 +1,4 @@
-# Servers in the swarm that are not in config.yml (see tasks/nodes.yml).
+# Servers in the swarm that are not in config.yml. cleanup_nodes is the list of servers
+# that tasks/nodes.yml reads from the cluster (register).
 # (k3s lists them as node/<name>.)
 cleanup_old_nodes: "{{ cleanup_nodes.stdout_lines | default([]) | map('regex_replace', '^node/', '') | difference(groups['swarm']) }}"

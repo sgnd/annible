@@ -7,7 +7,7 @@ Keep this file private. It has passwords.
 
 ## DNS
 
-Point `*.{{ domain }}` to the public IP of {{ swarm_leader }} (server address {{ hostvars[swarm_leader].node_host }}).
+Point `*.{{ domain }}` to the public IP of {% for n in traefik_nodes %}{{ n }} (server address {{ hostvars[n].node_host }}){{ ', ' if not loop.last else '' }}{% endfor %}.
 
 ## Servers
 

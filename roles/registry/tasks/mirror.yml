@@ -29,10 +29,11 @@
     cmd: |
       set -e
       {% if offline %}
-      docker load -q -i {{ bundle_dir }}/images/{{ item.item.0 }}.tar.gz
+      docker load -q -i {{ bundle_dir }}/images/{{ image_name }}.tar.gz
       docker tag {{ image.repo }}:{{ image.tag }} {{ dst }}
       docker push -q {{ dst }}
       {% else %}
+      # One "--platform linux/<cpu>" for each CPU type in the cluster.
       platforms="{{ registry_platforms | map('regex_replace', '^', '--platform linux/') | join(' ') }}"
       {% if src_mirror %}
       # Docker Hub allows few downloads without a login; Google's copy of it (same digest) has no limit.
@@ -42,17 +43,21 @@
       {% endif %}
     executable: /bin/bash
   vars:
-    image: "{{ images[item.item.0] }}"
-    dst: "{{ item.item.1 }}/{{ item.item.0 }}:{{ image.tag }}"
+    # Each item is one result of the check above: item.item is [image name, registry address].
+    image_name: "{{ item.item.0 }}"
+    registry_target: "{{ item.item.1 }}"
+    image: "{{ images[image_name] }}"
+    dst: "{{ registry_target }}/{{ image_name }}:{{ image.tag }}"
     # The first manager's registry gets it from the internet, the other managers from there (faster,
     # and Docker Hub counts fewer downloads). Images come first manager first, see the loop above.
     src: >-
-      {{ image.repo ~ '@' ~ image.digest if item.item.1 == registry_manager_addrs[0]
-      else registry_manager_addrs[0] ~ '/' ~ item.item.0 ~ ':' ~ image.tag }}
+      {{ image.repo ~ '@' ~ image.digest if registry_target == registry_manager_addrs[0]
+      else registry_manager_addrs[0] ~ '/' ~ image_name ~ ':' ~ image.tag }}
     src_mirror: >-
       {{ image.repo | regex_replace('^docker\\.io/', 'mirror.gcr.io/') ~ '@' ~ image.digest
       if src.startswith('docker.io/') else '' }}
     # Online, the image must also be there for every CPU type (a new arm64 server, for example).
+    # have = the CPU types this registry already has for the image.
     have: "{{ (item.json | default({})).manifests | default([]) | selectattr('platform', 'defined') | map(attribute='platform.architecture') }}"
   loop: "{{ registry_mirror_check.results }}"
   loop_control:

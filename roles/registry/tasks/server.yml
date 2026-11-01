@@ -10,6 +10,7 @@
 
 # Full certificate fields: newer tools (for example Python 3.13+) reject certificates without them.
 # The certificate is good for the registry name and the IP of every manager.
+# (regex_replace '^' puts "IP:" in front of each IP.)
 - name: Write certificate extensions
   ansible.builtin.copy:
     dest: "{{ registry_dir }}/ca/san.cnf"

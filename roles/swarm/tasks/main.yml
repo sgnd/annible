@@ -86,6 +86,7 @@
     {{ swarm_node_id.stdout }}
   vars:
     current_labels: "{{ swarm_node_labels.stdout | from_json or {} }}"
+  # Runs when a label from config.yml is missing on the server, or has another value.
   when: current_labels | combine(node_labels) != current_labels
   delegate_to: "{{ swarm_leader }}"
   changed_when: true
