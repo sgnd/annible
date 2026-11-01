@@ -80,14 +80,8 @@
   when: not authelia_users.stat.exists
   no_log: true
 
-- name: Remove the old Authelia middleware file (it is in Traefik's middlewares.yml now)
-  ansible.builtin.file:
-    path: "{{ apps_dir }}/traefik/dynamic/authelia.yml"
-    state: absent
-  loop: "{{ traefik_nodes }}"
-  delegate_to: "{{ item }}"
-
 - name: Write Authelia stack
+  when: orchestrator == 'swarm'
   ansible.builtin.template:
     src: stack.yml.j2
     dest: "{{ authelia_dir }}/stack.yml"
@@ -95,9 +89,20 @@
   register: authelia_stack
 
 - name: Deploy Authelia
+  when: orchestrator == 'swarm'
   ansible.builtin.include_role:
     name: swarm
     tasks_from: deploy
   vars:
     swarm_stack: authelia
     swarm_stack_changed: "{{ authelia_stack.changed }}"
+
+
+# k3s: a manifest in k3s's folder; k3s applies it by itself.
+- name: Write Authelia for k3s
+  ansible.builtin.template:
+    src: k3s.yaml.j2
+    dest: /var/lib/rancher/k3s/server/manifests/ansibro-authelia.yaml
+    mode: "0600"
+  diff: false  # has passwords
+  when: orchestrator == 'k3s'

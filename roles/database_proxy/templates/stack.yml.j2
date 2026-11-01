@@ -1,0 +1,20 @@
+# database-proxy on Docker Swarm: cluster apps connect to database-proxy_haproxy (5432 or 3306). Made by ansibro.
+services:
+  haproxy:
+    image: {{ registry_addr }}/haproxy:{{ images.haproxy.tag }}
+    configs:
+      - { source: haproxy, target: /usr/local/etc/haproxy/haproxy.cfg }
+    networks:
+      - public
+    deploy:
+      replicas: 2
+
+configs:
+  # The name changes with the file, so a new list of servers reaches the proxy.
+  haproxy:
+    name: database-proxy-{{ database_proxy_config.checksum[:12] }}
+    file: ./haproxy.cfg
+
+networks:
+  public:
+    external: true

@@ -47,7 +47,8 @@ CASES = [
     ("authelia without cache",
      lambda c: (c["apps"].update(authelia="swarm"), c["apps"].pop("redis")), "needs a cache (redis or valkey)"),
     ("long app form", lambda c: c["apps"].update(postgres={"on": "data1"}), "write it as"),
-    ("list for a one-server app", lambda c: c["apps"].update(redis=["data1", "swarm1"]), "runs on one server only"),
+    ("list for a one-server app", lambda c: c["apps"].update(rustfs=["data1", "swarm1"]), "runs on one server only"),
+    ("cache on 2 servers", lambda c: c["apps"].update(redis=["data1", "swarm1"]), "list 1 or 3 servers"),
     ("garage on 2 servers", lambda c: c["apps"].update(rustfs=None) or c["apps"].pop("rustfs")
      or c["apps"].update(garage=["data1", "swarm1"]), "list 1 or 3 servers"),
     ("replica on unknown node", lambda c: c["apps"].update(postgres=["data1", "nowhere"]), "nowhere is not a node name"),
@@ -67,7 +68,8 @@ CASES = [
     ("server ip inside the swarm range", lambda c: c["nodes"][1].update(ip="10.200.1.5"), "which the cluster uses"),
     ("server ip inside the k3s pod range", lambda c: c["nodes"][1].update(ip="10.42.0.5"), "which the cluster uses"),
     ("unknown orchestrator", lambda c: c.update(orchestrator="nomad"), "orchestrator must be swarm or k3s"),
-    ("swarm-only app on k3s", lambda c: c.update(orchestrator="k3s"), "runs only on Docker Swarm"),
+    ("swarmpit on k3s", lambda c: (c.update(orchestrator="k3s"), c["apps"].pop("portainer", None),
+     c["apps"].update(swarmpit="swarm")), "manages Docker Swarm"),
     ("firewall_allow as text", lambda c: c.update(firewall_allow="51820/udp"), "firewall_allow must be a list"),
     ("firewall_allow bad port", lambda c: c.update(firewall_allow=[{"port": 70000}]), "port must be a number"),
     ("firewall_allow bad proto", lambda c: c.update(firewall_allow=[{"port": 53, "proto": "icmp"}]), "proto must be tcp or udp"),
@@ -142,6 +144,10 @@ GOOD = [
     ("gpu on a node", lambda c: c["nodes"][1].update(gpu=True)),
     ("k3s with server apps and traefik", lambda c: (c.update(orchestrator="k3s"),
      [c["apps"].pop(a) for a in list(c["apps"]) if a not in ("traefik", "postgres", "redis", "rustfs")])),
+    ("k3s with portainer, kong and authelia", lambda c: (c.update(orchestrator="k3s"),
+     c["apps"].update(portainer="cluster", kong="cluster", authelia="cluster"))),
+    ("redis and mariadb on 3 servers", lambda c: (c["apps"].pop("postgres"), [c["apps"].pop(a, None) for a in ("kong",)],
+     c["apps"].update(redis=["data1", "swarm1", "swarm2"], mariadb=["data1", "swarm1", "swarm2"]))),
     ("postgres with a replica", lambda c: c["apps"].update(postgres=["data1", "swarm2"])),
 ]
 

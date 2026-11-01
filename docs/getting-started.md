@@ -177,6 +177,12 @@ You are done. Next:
 | **Portainer** | A web page to see and manage your containers. |
 | **PostgreSQL** | A popular database. |
 | **tag**, **digest** | The version name of an image (`18.1`), and a fingerprint of that exact image, so it can not change. |
+| **failover** | When the primary is down, a replica becomes the new primary. Ansibro does this by itself for PostgreSQL (Patroni). |
+| **Galera** | A way to run MariaDB on 3 servers that all have all the data. |
+| **Sentinel** | A helper for Redis and Valkey on 3 servers: it picks a new primary when the primary is down. |
+| **Patroni**, **etcd** | Patroni watches the PostgreSQL servers and picks the primary. It keeps that choice in etcd, a small database on the managers. |
+| **second factor**, **2FA** | A code from an app on your phone, asked after the password. Authelia and Keycloak ask for it on admin pages. |
+| **namespace** | A named group of things in k3s (Kubernetes). Ansibro puts its apps in the `ansibro` namespace. |
 | **dump** | One file with all the data of a database, used for backups and big upgrades. |
 | **Docker Compose** | A way to start containers from a file. Ansibro uses it for server apps. |
 | **YAML** | The format of `config.yml`: `name: value` lines, with spaces at the start to show what belongs together. Use spaces, not tabs. |

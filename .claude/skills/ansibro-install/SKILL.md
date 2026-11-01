@@ -32,7 +32,7 @@ You can run it again any time. It only changes what is different in `config.yml`
    ./build-bundle.sh arm64 26.04    # ARM, Ubuntu 26.04
    ```
 
-   This makes `dist/ansibro-<ubuntu>-<arch>.tar.gz` (about 2.5 GB).
+   This makes `dist/ansibro-<ubuntu>-<arch>.tar.gz` (about 4 GB).
 2. Copy it **and the SSH private key** to the **first manager** (plus any `tls_cert`, `tls_key` or
    `acme_ca_cert` files: the bundle leaves out keys and certificates). The key must be allowed on
    every server, the first manager itself too. Unpack, add `config.yml` with `tls: selfsigned`

@@ -2,3 +2,11 @@ port 6379
 requirepass {{ redis_password }}
 appendonly yes
 dir /data
+{% if redis_ha %}
+# Copies log in to the primary with the same password.
+masterauth {{ redis_password }}
+replica-announce-ip {{ node_ip }}
+{% if node_ip != redis_primary_ip %}
+replicaof {{ redis_primary_ip }} 6379
+{% endif %}
+{% endif %}

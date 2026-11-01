@@ -1,0 +1,30 @@
+# database-proxy: cluster apps reach the database here, and it goes to a server that takes writes.
+# PostgreSQL (Patroni): only the primary answers 200 on Patroni's /primary, so after a failover the
+# proxy goes to the new one. MariaDB (Galera): every server takes writes; the proxy uses the first one
+# and the others only when it is down. Made by ansibro.
+global
+  maxconn 2000
+
+defaults
+  mode tcp
+  timeout connect 5s
+  timeout client 30m
+  timeout server 30m
+  timeout check 3s
+
+listen database
+{% if database_app == 'postgres' %}
+  bind :5432
+  option httpchk GET /primary
+  http-check expect status 200
+  default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
+{% for host in app_nodes.postgres %}
+  server {{ host }} {{ hostvars[host].node_ip }}:5432 check port 8008
+{% endfor %}
+{% else %}
+  bind :3306
+  default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
+{% for host in app_nodes.mariadb %}
+  server {{ host }} {{ hostvars[host].node_ip }}:3306 check{{ ' backup' if not loop.first }}
+{% endfor %}
+{% endif %}

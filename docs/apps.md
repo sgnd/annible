@@ -20,6 +20,12 @@ Swarmpit and Uptime Kuma create their admin user on the first visit. So their pa
 the Traefik dashboard login (user `admin`, password in `state/secrets/traefik_admin`); after that you
 create the app's own admin user.
 
+## With Keycloak, admin pages use Keycloak
+
+When Keycloak is installed and Authelia is not, the installer makes the realm `ansibro` with the user
+`admin` (password in `state/secrets/keycloak_sso_admin`), who sets up an authenticator app at the
+first login. oauth2-proxy (`https://oauth.<domain>`) connects Traefik to Keycloak.
+
 ## With Authelia, admin pages use Authelia
 
 When you install Authelia, the Traefik dashboard, Swarmpit, Uptime Kuma, Kong Manager, Alertmanager

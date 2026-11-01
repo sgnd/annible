@@ -21,7 +21,7 @@
     dest: "{{ kong_dir }}/kong.env"
     content: |
       KONG_DATABASE=postgres
-      KONG_PG_HOST={{ database_ip }}
+      KONG_PG_HOST={{ database_host }}
       KONG_PG_DATABASE=kong
       KONG_PG_USER=kong
       KONG_PG_PASSWORD={{ kong_db_password }}
@@ -42,7 +42,8 @@
   ansible.builtin.shell:
     cmd: |
       set -e
-      run="docker run --rm --env-file {{ kong_dir }}/kong.env {{ registry_addr }}/kong:{{ images.kong.tag }} kong migrations"
+      run="docker run --rm --env-file {{ kong_dir }}/kong.env -e KONG_PG_HOST={{ kong_pg_primary }}"
+      run="$run {{ registry_addr }}/kong:{{ images.kong.tag }} kong migrations"
       $run bootstrap
       $run up
     executable: /bin/bash
@@ -50,6 +51,7 @@
   changed_when: "'migrated' in kong_migrations.stdout or 'executed' in kong_migrations.stdout"
 
 - name: Write Kong stack
+  when: orchestrator == 'swarm'
   ansible.builtin.template:
     src: stack.yml.j2
     dest: "{{ kong_dir }}/stack.yml"
@@ -57,6 +59,7 @@
   register: kong_stack
 
 - name: Deploy Kong
+  when: orchestrator == 'swarm'
   ansible.builtin.include_role:
     name: swarm
     tasks_from: deploy
@@ -64,9 +67,18 @@
     swarm_stack: kong
     swarm_stack_changed: "{{ kong_stack.changed or kong_env.changed }}"
 
+# k3s: a manifest in k3s's folder; k3s applies it by itself.
+- name: Write Kong for k3s
+  ansible.builtin.template:
+    src: k3s.yaml.j2
+    dest: /var/lib/rancher/k3s/server/manifests/ansibro-kong.yaml
+    mode: "0600"
+  diff: false  # has passwords
+  when: orchestrator == 'k3s'
+
 - name: Finish Kong database changes
   ansible.builtin.command: >-
-    docker run --rm --env-file {{ kong_dir }}/kong.env
+    docker run --rm --env-file {{ kong_dir }}/kong.env -e KONG_PG_HOST={{ kong_pg_primary }}
     {{ registry_addr }}/kong:{{ images.kong.tag }} kong migrations finish
   register: kong_finish
   changed_when: "'executed' in kong_finish.stdout"

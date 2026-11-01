@@ -30,10 +30,10 @@ common_wireguard_hosts: "{{ groups['all'] | difference([inventory_hostname]) | m
 # Ports the other cluster servers may use on this server. Every other port is closed to them too.
 # An app on its own server (Docker Compose) and the ports it needs:
 common_app_ports:
-  postgres: [5432]
-  mariadb: [3306]
-  redis: [6379]
-  valkey: [6379]
+  postgres: [5432, 8008]                    # 8008: Patroni (PostgreSQL on more servers)
+  mariadb: [3306, 4444, 4567, 4568]          # 4444, 4567, 4568: Galera (on 3 servers)
+  redis: [6379, 26379]                      # 26379: Sentinel (on 3 servers)
+  valkey: [6379, 26379]
   rustfs: [9000, 9001]
   garage: [3900, 3901]                      # S3, and Garage servers talking to each other
   rabbitmq: [5672, 15672, 15692]            # AMQP, web page, metrics
@@ -47,6 +47,7 @@ common_cluster_tcp_ports: >-
   {{ (([registry_port] if inventory_hostname in groups['managers'] else [])
   + (common_swarm_tcp_ports if orchestrator == 'swarm' else common_k3s_tcp_ports)
   + ([8082] if monitoring_app and 'traefik' in apps and orchestrator == 'swarm' and inventory_hostname in traefik_nodes else [])
+  + ([12379, 12380] if postgres_patroni and inventory_hostname in groups['managers'] else [])
   + ([9100, 9280, 9598, 9187, 9104, 9121] if monitoring_app else [])
   + ([9400] if monitoring_app and node_gpu else [])
   + ([45876] if 'beszel' in apps else [])

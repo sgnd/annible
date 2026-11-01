@@ -1,4 +1,6 @@
 # Redis. Apps connect to <server ip>:6379 with the password.
+# On 3 servers: one primary, two copies, and Sentinel (port 26379) for automatic failover.
+# Apps that know Sentinel ask it for the primary (Authelia does); see README "Database replicas".
 
 # The app in the container runs as user 999, so it must own its data folder.
 - name: Create Redis folders
@@ -11,6 +13,25 @@
   loop:
     - { path: "{{ redis_dir }}", owner: root }
     - { path: "{{ redis_dir }}/data", owner: "999" }
+    - { path: "{{ redis_dir }}/sentinel", owner: "999" }
+
+# The primary now: Sentinel knows it after a failover; on a new install it is the first server.
+- name: Ask Sentinel for the Redis primary
+  ansible.builtin.command: docker exec redis-sentinel redis-cli -p 26379 SENTINEL get-master-addr-by-name ansibro
+  register: redis_sentinel_answers
+  delegate_to: "{{ item }}"
+  loop: "{{ app_nodes.redis }}"
+  run_once: true
+  failed_when: false
+  changed_when: false
+  when: redis_ha
+
+- name: Remember the Redis primary
+  ansible.builtin.set_fact:
+    redis_primary_ip: >-
+      {{ ((redis_sentinel_answers.results | default([]) | selectattr('rc', 'defined') | selectattr('rc', 'equalto', 0)
+      | map(attribute='stdout_lines') | select | map('first') | list) + [hostvars[app_nodes.redis[0]].node_ip])[0] }}
+  run_once: true
 
 - name: Write Redis config
   ansible.builtin.template:
@@ -19,6 +40,18 @@
     mode: "0644"
   diff: false  # has a password
   register: redis_config
+
+# Only the first time: Sentinel rewrites this file itself (who the primary is, the other Sentinels).
+- name: Write Sentinel config
+  ansible.builtin.template:
+    src: sentinel.conf.j2
+    dest: "{{ redis_dir }}/sentinel/sentinel.conf"
+    owner: "999"
+    group: "999"
+    mode: "0600"
+    force: false
+  when: redis_ha
+  no_log: true
 
 - name: Mirror Redis image
   ansible.builtin.include_role:

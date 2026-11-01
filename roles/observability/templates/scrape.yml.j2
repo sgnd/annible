@@ -37,6 +37,16 @@ scrape_configs:
         labels: { node: {{ host }} }
 {% endfor %}
 {% endfor %}
+{% if postgres_patroni %}
+
+  # Patroni: which PostgreSQL server is the primary, and how far each replica is behind.
+  - job_name: patroni
+    static_configs:
+{% for host in app_nodes.postgres %}
+      - targets: ["{{ hostvars[host].node_ip }}:8008"]
+        labels: { node: {{ host }} }
+{% endfor %}
+{% endif %}
 {% if groups['all'] | map('extract', hostvars, 'node_gpu') | select | list %}
 
   # NVIDIA GPUs (dcgm-exporter), on servers with gpu: true.

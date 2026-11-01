@@ -246,6 +246,13 @@ groups:
         annotations:
           summary: "PostgreSQL on {{ $labels.node }} uses {{ $value | humanizePercentage }} of its connections."
 
+      - alert: PostgresNoPrimary
+        expr: count(patroni_postgres_running) > 0 and sum(patroni_primary) == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "No PostgreSQL server is the primary: apps cannot write. Check: sudo docker exec postgres patronictl list"
+
       - alert: PostgresReplicaBehind
         expr: pg_replication_lag_seconds > 300
         for: 10m
@@ -260,6 +267,13 @@ groups:
         annotations:
           summary: "MariaDB on {{ $labels.node }} does not answer the exporter."
 
+      - alert: MariadbClusterSmall
+        expr: mysql_global_status_wsrep_cluster_size > 0 and mysql_global_status_wsrep_cluster_size < 3
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "The MariaDB Galera cluster seen from {{ $labels.node }} has only {{ $value }} servers."
+
       - alert: MariadbTooManyConnections
         expr: mysql_global_status_threads_connected / mysql_global_variables_max_connections > 0.8
         for: 5m
@@ -273,6 +287,13 @@ groups:
         labels: { severity: critical }
         annotations:
           summary: "{{ $labels.job }} on {{ $labels.node }} does not answer the exporter."
+
+      - alert: CacheNoPrimary
+        expr: count(redis_instance_info) > 1 and count(redis_instance_info{role="master"}) == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "No cache server is the primary: apps cannot write. Check: sudo docker exec valkey-sentinel valkey-cli -p 26379 SENTINEL masters"
 
       - alert: CacheMemoryFull
         expr: redis_memory_max_bytes > 0 and redis_memory_used_bytes / redis_memory_max_bytes > 0.9

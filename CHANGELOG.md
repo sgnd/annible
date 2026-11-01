@@ -20,15 +20,19 @@ Tested on DigitalOcean (Ubuntu 24.04, amd64), with `tests/check.py` passing and 
 - The release workflow builds all four bundles.
 
 Not tested yet (test before the next release):
+- PostgreSQL with Patroni, MariaDB Galera, Redis/Valkey with Sentinel; the Keycloak login for admin pages; portainer, kong, keycloak, authelia and restore on k3s.
 - Mixed amd64 + arm64 clusters (DigitalOcean has no arm64 servers), GPU servers, Telegram alerts,
   a restore of a cluster with monitoring, offline installs with k3s, uploading bundles to a release.
 
 New
+- Keycloak as the login for admin pages (when Authelia is not installed): realm `ansibro`, user
+  `admin` with a second factor, through oauth2-proxy. Works on Swarm and k3s.
 - k3s: `orchestrator: k3s` makes a k3s (Kubernetes) cluster instead of Docker Swarm: managers are
   k3s servers (embedded etcd), workers agents. Pinned version, offline bundle, WireGuard, registry
   mirror, firewall, built-in Traefik with routes to server apps, metrics and alerts (K3sNodeDown,
-  K3sDeploymentDown, K3sPodsStuck), etcd snapshot in the backup, node removal. Swarm-only apps for
-  now: kong, portainer, swarmpit, keycloak, authelia. In `apps`, `cluster` is the same as `swarm`.
+  K3sDeploymentDown, K3sPodsStuck), etcd snapshot in the backup and `-e restore=true`, node removal.
+  portainer, kong, keycloak and authelia run on k3s too; swarmpit is Swarm only. In `apps`, `cluster`
+  is the same as `swarm`.
 - `gpu: true` on a node: NVIDIA driver, NVIDIA Container Toolkit (pinned), `nvidia` as Docker's
   default runtime, label `gpu=true`, and GPU monitoring with dcgm-exporter (3 GPU alerts).
 - Each GitHub release gets the offline bundles for amd64 and arm64, Ubuntu 24.04 and 26.04,
@@ -47,8 +51,12 @@ New
   - `state/` can be kept encrypted as `state.age` (with [age](https://age-encryption.org)):
     create a key in `~/.config/ansibro/age.key` and the installer does the rest. `scripts/state.sh`.
   - CI scans every pinned image for known security problems (`scripts/scan-images.sh`), each Monday.
-- PostgreSQL replicas: `postgres: [db1, db2]`. The first server is the primary, the others follow
-  it (streaming replication). Failover is one command (see README), not automatic yet.
+- PostgreSQL on 2 or more servers (`postgres: [db1, db2, db3]`) runs with Patroni (Spilo image) and
+  etcd on the managers: automatic failover. Cluster apps connect through database-proxy (HAProxy),
+  which always goes to the primary. Alert `PostgresNoPrimary`.
+- MariaDB on 3 servers is a Galera cluster (through database-proxy). Redis or Valkey on 3 servers
+  run with Sentinel (automatic failover; Authelia uses Sentinel). Alerts `MariadbClusterSmall`,
+  `CacheNoPrimary`.
 - Garage on 3 servers: `garage: [s1, s2, s3]` keeps 3 copies of every file.
 - HA: every manager runs the image registry with the same images (apps use the name
   `registry.ansibro`), so images can be pulled when a manager is down. Traefik runs on every

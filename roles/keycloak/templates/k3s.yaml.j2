@@ -1,0 +1,108 @@
+# app: keycloak (the installer removes this file when the app is removed)
+# Keycloak on k3s. Made by ansibro.
+apiVersion: v1
+kind: Secret
+metadata: { name: keycloak, namespace: ansibro }
+stringData:
+  KC_DB_PASSWORD: "{{ keycloak_db_password }}"
+  KC_BOOTSTRAP_ADMIN_PASSWORD: "{{ keycloak_admin_password }}"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: keycloak, namespace: ansibro }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: keycloak } }
+  template:
+    metadata: { labels: { app: keycloak } }
+    spec:
+{% if swarm_app_constraint %}
+      nodeSelector: { tier: app }
+{% endif %}
+      containers:
+        - name: keycloak
+          image: {{ registry_addr }}/keycloak:{{ images.keycloak.tag }}
+          args: [start]
+          envFrom: [{ secretRef: { name: keycloak } }]
+          env:
+            - { name: KC_DB, value: "{{ database_app }}" }
+            - { name: KC_DB_URL_HOST, value: "{{ database_host }}" }
+            - { name: KC_DB_URL_DATABASE, value: keycloak }
+            - { name: KC_DB_USERNAME, value: keycloak }
+            - { name: KC_HOSTNAME, value: "https://{{ keycloak_host }}" }
+            # Traefik handles HTTPS and tells Keycloak the real address.
+            - { name: KC_HTTP_ENABLED, value: "true" }
+            - { name: KC_PROXY_HEADERS, value: xforwarded }
+            - { name: KC_HEALTH_ENABLED, value: "true" }
+            # Only used the first time, to create the admin user.
+            - { name: KC_BOOTSTRAP_ADMIN_USERNAME, value: admin }
+          ports: [{ containerPort: 8080 }]
+          readinessProbe:
+            httpGet: { path: /health/ready, port: 9000 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata: { name: keycloak, namespace: ansibro }
+spec:
+  selector: { app: keycloak }
+  ports: [{ port: 8080 }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: keycloak, namespace: ansibro }
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`{{ keycloak_host }}`)
+      kind: Rule
+      services: [{ name: keycloak, port: 8080 }]
+  tls: {}
+{% if admin_sso == 'keycloak' %}
+---
+# The Keycloak login in front of the admin pages (Traefik middleware "oauth").
+apiVersion: v1
+kind: Secret
+metadata: { name: oauth2-proxy, namespace: ansibro }
+stringData:
+  OAUTH2_PROXY_CLIENT_SECRET: "{{ keycloak_oauth_client_secret }}"
+  OAUTH2_PROXY_COOKIE_SECRET: "{{ keycloak_oauth_cookie_secret }}"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: oauth2-proxy, namespace: ansibro }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: oauth2-proxy } }
+  template:
+    metadata: { labels: { app: oauth2-proxy } }
+    spec:
+      containers:
+        - name: oauth2-proxy
+          image: {{ registry_addr }}/oauth2-proxy:{{ images['oauth2-proxy'].tag }}
+          args:
+{% for arg in keycloak_oauth_args %}
+            - "{{ arg }}"
+{% endfor %}
+          envFrom: [{ secretRef: { name: oauth2-proxy } }]
+          ports: [{ containerPort: 4180 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: oauth2-proxy, namespace: ansibro }
+spec:
+  selector: { app: oauth2-proxy }
+  ports: [{ port: 4180 }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: oauth2-proxy, namespace: ansibro }
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`{{ keycloak_oauth_host }}`)
+      kind: Rule
+      services: [{ name: oauth2-proxy, port: 4180 }]
+  tls: {}
+{% endif %}

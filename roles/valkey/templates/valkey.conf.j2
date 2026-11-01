@@ -2,3 +2,11 @@ port 6379
 requirepass {{ valkey_password }}
 appendonly yes
 dir /data
+{% if valkey_ha %}
+# Copies log in to the primary with the same password.
+masterauth {{ valkey_password }}
+replica-announce-ip {{ node_ip }}
+{% if node_ip != valkey_primary_ip %}
+replicaof {{ valkey_primary_ip }} 6379
+{% endif %}
+{% endif %}

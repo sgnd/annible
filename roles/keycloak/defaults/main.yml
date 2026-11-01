@@ -4,3 +4,36 @@ keycloak_host: "keycloak.{{ domain }}"
 # Generated once and saved in state/secrets/ on the installer machine.
 keycloak_admin_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/keycloak_admin', chars=['ascii_letters', 'digits'], length=24) }}"
 keycloak_db_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/keycloak_db', chars=['ascii_letters', 'digits'], length=24) }}"
+
+# Keycloak also guards the admin pages when Authelia is not installed (admin_sso), through oauth2-proxy
+# at https://oauth.<domain>. Realm "ansibro", user admin (password state/secrets/keycloak_sso_admin).
+keycloak_oauth_host: "oauth.{{ domain }}"
+keycloak_sso_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/keycloak_sso_admin', chars=['ascii_letters', 'digits'], length=24) }}"
+keycloak_oauth_client_secret: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/keycloak_oauth_client', chars=['ascii_letters', 'digits'], length=32) }}"
+keycloak_oauth_cookie_secret: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/keycloak_oauth_cookie', chars=['ascii_letters', 'digits'], length=32) }}"
+# Keycloak inside the cluster, for oauth2-proxy (the swarm service name, or the k3s service).
+keycloak_internal_url: "{{ 'http://keycloak_keycloak:8080' if orchestrator == 'swarm' else 'http://keycloak.ansibro.svc.cluster.local:8080' }}"
+keycloak_realm_url: "https://{{ keycloak_host }}/realms/ansibro"
+# oauth2-proxy settings. Traefik asks it about every admin page request (forwardAuth): it answers 202
+# for a logged-in admin, or sends the browser to Keycloak's login. It talks to Keycloak inside the
+# cluster, so the domain does not need to resolve on the servers.
+keycloak_oauth_args:
+  - --http-address=0.0.0.0:4180
+  - --provider=keycloak-oidc
+  - --client-id=ansibro-admin
+  - --oidc-issuer-url={{ keycloak_realm_url }}
+  - --skip-oidc-discovery
+  - --login-url={{ keycloak_realm_url }}/protocol/openid-connect/auth
+  - --redeem-url={{ keycloak_internal_url }}/realms/ansibro/protocol/openid-connect/token
+  - --oidc-jwks-url={{ keycloak_internal_url }}/realms/ansibro/protocol/openid-connect/certs
+  - --redirect-url=https://{{ keycloak_oauth_host }}/oauth2/callback
+  - --cookie-domain=.{{ domain }}
+  - --whitelist-domain=.{{ domain }}
+  - --email-domain=*
+  - --reverse-proxy=true
+  - --upstream=static://202
+  - --skip-provider-button=true
+  - --set-xauthrequest=true
+keycloak_api_headers:
+  Host: "{{ keycloak_host }}"
+  Authorization: "Bearer {{ keycloak_token.json.access_token | default('') }}"

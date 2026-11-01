@@ -28,8 +28,9 @@
 
 # The swarm comes back on the first manager with its stacks, secrets and networks.
 # --force-new-cluster makes it a new swarm with this server as its only manager; the others join again.
+# (k3s: the k3s role puts its etcd snapshot back before k3s starts.)
 - name: Restore the swarm
-  when: inventory_hostname == swarm_leader
+  when: inventory_hostname == swarm_leader and orchestrator == 'swarm'
   block:
     - name: Stop Docker to put the swarm state back
       ansible.builtin.service:

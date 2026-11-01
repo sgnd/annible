@@ -6,10 +6,23 @@ services:
     # Host network: the firewall decides who can connect.
     network_mode: host
     env_file: .env
+{% if mariadb_galera and mariadb_start_flag | default(false) %}
+    # Only while the cluster is new: this server starts it, then the installer restarts it without this.
+    command: ["mariadbd", "--wsrep-new-cluster"]
+{% endif %}
     volumes:
       - ./data:/var/lib/mysql
+{% if mariadb_galera %}
+      - ./galera.cnf:/etc/mysql/conf.d/galera.cnf:ro
+{% endif %}
     healthcheck:
+{% if mariadb_galera %}
+      # Galera copies the data folder from another server, without the image's own health check
+      # login. So log in as root (the same on every server) and ask if this server is in sync.
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MARIADB_ROOT_PASSWORD\" mariadb -uroot -N -e \"SHOW STATUS LIKE 'wsrep_ready'\" | grep -q ON"]
+{% else %}
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+{% endif %}
       interval: 10s
       timeout: 5s
       retries: 5

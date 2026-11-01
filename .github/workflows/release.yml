@@ -23,8 +23,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # A tag with a dash (v1.1.0-rc1) is a test release: marked as pre-release.
+          pre=$([[ "$GITHUB_REF_NAME" == *-* ]] && echo true || echo false)
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md. Offline bundles: docs/offline.md."
+            gh release create "$GITHUB_REF_NAME" --prerelease="$pre" --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md. Offline bundles: docs/offline.md."
 
   bundle:
     name: Bundle ${{ matrix.ubuntu }} ${{ matrix.arch }}

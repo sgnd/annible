@@ -1,0 +1,94 @@
+# app: kong (the installer removes this file when the app is removed)
+# Kong on k3s. Made by ansibro.
+apiVersion: v1
+kind: Secret
+metadata: { name: kong, namespace: ansibro }
+stringData:
+  KONG_PG_PASSWORD: "{{ kong_db_password }}"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: kong, namespace: ansibro }
+spec:
+  replicas: {{ kong_replicas }}
+  selector: { matchLabels: { app: kong } }
+  template:
+    metadata: { labels: { app: kong } }
+    spec:
+{% if swarm_app_constraint %}
+      nodeSelector: { tier: app }
+{% endif %}
+      containers:
+        - name: kong
+          image: {{ registry_addr }}/kong:{{ images.kong.tag }}
+          envFrom: [{ secretRef: { name: kong } }]
+          env:
+            - { name: KONG_DATABASE, value: postgres }
+            - { name: KONG_PG_HOST, value: "{{ database_host }}" }
+            - { name: KONG_PG_DATABASE, value: kong }
+            - { name: KONG_PG_USER, value: kong }
+            - { name: KONG_PROXY_LISTEN, value: "0.0.0.0:8000" }
+            - { name: KONG_ADMIN_LISTEN, value: "0.0.0.0:8001" }
+            - { name: KONG_ADMIN_GUI_LISTEN, value: "0.0.0.0:8002" }
+            - { name: KONG_ADMIN_GUI_URL, value: "https://{{ kong_manager_host }}" }
+            # Kong Manager calls the Admin API through Traefik, on the same address.
+            - { name: KONG_ADMIN_GUI_API_URL, value: "https://{{ kong_manager_host }}/api" }
+            # Requests come through Traefik (a pod): use the client IP that Traefik passes on.
+            - { name: KONG_TRUSTED_IPS, value: 10.42.0.0/16 }
+            - { name: KONG_REAL_IP_HEADER, value: X-Forwarded-For }
+            - { name: KONG_PROXY_ACCESS_LOG, value: /dev/stdout }
+            - { name: KONG_ADMIN_ACCESS_LOG, value: /dev/stdout }
+            - { name: KONG_PROXY_ERROR_LOG, value: /dev/stderr }
+            - { name: KONG_ADMIN_ERROR_LOG, value: /dev/stderr }
+          ports: [{ containerPort: 8000 }, { containerPort: 8001 }, { containerPort: 8002 }]
+          readinessProbe:
+            exec: { command: [kong, health] }
+            periodSeconds: 10
+---
+# Only Traefik (in kube-system) may reach Kong, so other pods cannot use its admin API (8001).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: kong, namespace: ansibro }
+spec:
+  podSelector: { matchLabels: { app: kong } }
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: kong, namespace: ansibro }
+spec:
+  selector: { app: kong }
+  ports:
+    - { name: proxy, port: 8000 }
+    - { name: admin, port: 8001 }
+    - { name: manager, port: 8002 }
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: kong-admin-strip, namespace: ansibro }
+spec:
+  stripPrefix: { prefixes: [/api] }
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: kong, namespace: ansibro }
+spec:
+  entryPoints: [websecure]
+  routes:
+    # Your APIs
+    - match: Host(`{{ kong_host }}`)
+      kind: Rule
+      services: [{ name: kong, port: 8000 }]
+    # Kong Manager
+    - match: Host(`{{ kong_manager_host }}`)
+      kind: Rule
+      middlewares: [{ name: admin-ip }, { name: "{{ k3s_admin_login }}" }]
+      services: [{ name: kong, port: 8002 }]
+    # Admin API, only under Kong Manager's address
+    - match: Host(`{{ kong_manager_host }}`) && PathPrefix(`/api`)
+      kind: Rule
+      middlewares: [{ name: admin-ip }, { name: "{{ k3s_admin_login }}" }, { name: kong-admin-strip }]
+      services: [{ name: kong, port: 8001 }]
+  tls: {}

@@ -22,6 +22,7 @@
     registry_mirror_images: [portainer, portainer-agent]
 
 - name: Write Portainer stack
+  when: orchestrator == 'swarm'
   ansible.builtin.template:
     src: stack.yml.j2
     dest: "{{ portainer_dir }}/stack.yml"
@@ -30,9 +31,20 @@
   register: portainer_stack
 
 - name: Deploy Portainer
+  when: orchestrator == 'swarm'
   ansible.builtin.include_role:
     name: swarm
     tasks_from: deploy
   vars:
     swarm_stack: portainer
     swarm_stack_changed: "{{ portainer_stack.changed }}"
+
+
+# k3s: a manifest in k3s's folder; k3s applies it by itself.
+- name: Write Portainer for k3s
+  ansible.builtin.template:
+    src: k3s.yaml.j2
+    dest: /var/lib/rancher/k3s/server/manifests/ansibro-portainer.yaml
+    mode: "0600"
+  diff: false  # has passwords
+  when: orchestrator == 'k3s'

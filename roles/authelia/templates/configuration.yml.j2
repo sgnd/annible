@@ -30,15 +30,28 @@ session:
     - domain: {{ domain }}
       authelia_url: https://{{ authelia_host }}
   redis:
+{% if cache_ha %}
+    # Ask Sentinel where the primary is, so a failover does not break the logins.
+    host: {{ cache_ip }}
+    port: 26379
+    high_availability:
+      sentinel_name: ansibro
+      sentinel_password: {{ cache_password }}
+      nodes:
+{% for host in app_nodes[cache_app][1:] %}
+        - { host: {{ hostvars[host].node_ip }}, port: 26379 }
+{% endfor %}
+{% else %}
     host: {{ cache_ip }}
     port: 6379
+{% endif %}
     password: {{ cache_password }}
 
 storage:
   encryption_key: {{ authelia_storage_key }}
 {% if database_app == 'postgres' %}
   postgres:
-    address: tcp://{{ database_ip }}:5432
+    address: tcp://{{ database_host }}:5432
 {% else %}
   mysql:
     address: tcp://{{ database_ip }}:3306

@@ -22,9 +22,10 @@
     name: registry
     tasks_from: mirror
   vars:
-    registry_mirror_images: [keycloak]
+    registry_mirror_images: "{{ ['keycloak'] + (['oauth2-proxy'] if admin_sso == 'keycloak' else []) }}"
 
 - name: Write Keycloak stack
+  when: orchestrator == 'swarm'
   ansible.builtin.template:
     src: stack.yml.j2
     dest: "{{ keycloak_dir }}/stack.yml"
@@ -33,9 +34,24 @@
   register: keycloak_stack
 
 - name: Deploy Keycloak
+  when: orchestrator == 'swarm'
   ansible.builtin.include_role:
     name: swarm
     tasks_from: deploy
   vars:
     swarm_stack: keycloak
     swarm_stack_changed: "{{ keycloak_stack.changed }}"
+
+
+# k3s: a manifest in k3s's folder; k3s applies it by itself.
+- name: Write Keycloak for k3s
+  ansible.builtin.template:
+    src: k3s.yaml.j2
+    dest: /var/lib/rancher/k3s/server/manifests/ansibro-keycloak.yaml
+    mode: "0600"
+  diff: false  # has passwords
+  when: orchestrator == 'k3s'
+
+- name: Set up Keycloak as the login for admin pages
+  ansible.builtin.include_tasks: sso.yml
+  when: admin_sso == 'keycloak' and 'traefik' in apps

@@ -145,17 +145,33 @@ A new Docker version is installed one server at a time, so the swarm keeps runni
 
 ## Database replicas
 
-Give PostgreSQL a list of servers: `postgres: [db1, db2]`. The first is
-the primary; apps use it. The others are replicas: read-only copies that follow it all the time
-(alert `PostgresReplicaBehind` if one falls behind). If the primary dies, make a replica the new primary:
+**PostgreSQL**: give it a list of servers, `postgres: [db1, db2, db3]`. It then runs with
+[Patroni](https://patroni.readthedocs.io).
+- What it does: one server is the primary, the others are copies that follow it. When the primary
+  is down, another one becomes the primary by itself, in about 30 seconds.
+- How apps connect: cluster apps (kong, keycloak, authelia) use `database-proxy`, which always goes
+  to the primary. Your own apps in the cluster: `database-proxy_haproxy:5432` (Swarm) or
+  `database-proxy.ansibro.svc.cluster.local:5432` (k3s).
+- How to see it: `sudo docker exec postgres patronictl list`, on a database server.
+- Needs: etcd, which runs on the managers. With 3 managers one can be down; with 1 manager,
+  failover needs that manager.
+- Alerts: `PostgresNoPrimary`, `PostgresReplicaBehind`.
 
-```bash
-sudo docker exec -u postgres postgres pg_ctl promote -D /var/lib/postgresql/18/docker   # on the replica
-```
+**MariaDB**: on 3 servers, `mariadb: [m1, m2, m3]`, it is a [Galera](https://mariadb.com/kb/en/galera-cluster/) cluster.
+- What it does: every server has all the data, and stays up when one server is down.
+- How apps connect: through `database-proxy` (port 3306). It uses the first server, and the
+  others when the first is down.
+- If all 3 servers stop at the same time, start the cluster again by hand: see
+  [Galera: restarting the cluster](https://mariadb.com/kb/en/getting-started-with-mariadb-galera-cluster/#restarting-the-cluster).
+- Alert: `MariadbClusterSmall`.
 
-Then put that server first in the list, take the old primary out of it (delete its
-`/opt/ansibro/postgres` folder before you add it back, so it comes back as a replica), and run
-`./install.sh` so the apps use the new primary. This is not automatic yet.
+**Redis or Valkey**: on 3 servers, `valkey: [c1, c2, c3]`.
+- What it does: one primary and two copies. Sentinel (port 26379) runs on each server and makes a
+  copy the primary when the primary is down.
+- How apps connect: they ask Sentinel where the primary is (Sentinel name `ansibro`, the cache
+  password). Authelia does this. For your own app, its Redis client library must support Sentinel
+  (most do); give it the three servers with port 26379 instead of one address with port 6379.
+- Alert: `CacheNoPrimary`.
 
 ## Garage on 3 servers
 

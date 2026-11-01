@@ -1,0 +1,53 @@
+# database-proxy: the address cluster apps use for the database when it runs on more servers
+# (database_host): PostgreSQL with Patroni, or MariaDB with Galera. Runs on the first manager,
+# before the cluster apps.
+
+- name: Create database-proxy folder
+  ansible.builtin.file:
+    path: "{{ apps_dir }}/database-proxy"
+    state: directory
+    mode: "0700"
+
+- name: Write database-proxy settings
+  ansible.builtin.template:
+    src: haproxy.cfg.j2
+    dest: "{{ apps_dir }}/database-proxy/haproxy.cfg"
+    mode: "0644"
+  register: database_proxy_config
+
+- name: Mirror HAProxy image
+  ansible.builtin.include_role:
+    name: registry
+    tasks_from: mirror
+  vars:
+    registry_mirror_images: [haproxy]
+
+- name: Write database-proxy stack
+  ansible.builtin.template:
+    src: stack.yml.j2
+    dest: "{{ apps_dir }}/database-proxy/stack.yml"
+    mode: "0600"
+  register: database_proxy_stack
+  when: orchestrator == 'swarm'
+
+- name: Deploy database-proxy
+  ansible.builtin.include_role:
+    name: swarm
+    tasks_from: deploy
+  vars:
+    swarm_stack: database-proxy
+    swarm_stack_changed: "{{ database_proxy_stack.changed }}"
+  when: orchestrator == 'swarm'
+
+- name: Write database-proxy for k3s
+  ansible.builtin.template:
+    src: k3s.yaml.j2
+    dest: /var/lib/rancher/k3s/server/manifests/ansibro-database-proxy.yaml
+    mode: "0600"
+  when: orchestrator == 'k3s'
+
+- name: Find the PostgreSQL primary
+  ansible.builtin.include_role:
+    name: postgres
+    tasks_from: find_primary
+  when: database_app == 'postgres'

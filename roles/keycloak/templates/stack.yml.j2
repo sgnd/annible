@@ -4,7 +4,7 @@ services:
     command: start
     environment:
       KC_DB: {{ database_app }}
-      KC_DB_URL_HOST: {{ database_ip }}
+      KC_DB_URL_HOST: {{ database_host }}
       KC_DB_URL_DATABASE: keycloak
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: {{ keycloak_db_password }}
@@ -36,6 +36,28 @@ services:
         traefik.enable: "true"
         traefik.http.routers.keycloak.rule: Host(`{{ keycloak_host }}`)
         traefik.http.services.keycloak.loadbalancer.server.port: "8080"
+
+{% if admin_sso == 'keycloak' %}
+
+  # The Keycloak login in front of the admin pages (Traefik middleware "admin").
+  oauth2-proxy:
+    image: {{ registry_addr }}/oauth2-proxy:{{ images['oauth2-proxy'].tag }}
+    command:
+{% for arg in keycloak_oauth_args %}
+      - "{{ arg }}"
+{% endfor %}
+    environment:
+      OAUTH2_PROXY_CLIENT_SECRET: {{ keycloak_oauth_client_secret }}
+      OAUTH2_PROXY_COOKIE_SECRET: {{ keycloak_oauth_cookie_secret }}
+    networks:
+      - public
+    deploy:
+      replicas: 1
+      labels:
+        traefik.enable: "true"
+        traefik.http.routers.oauth.rule: Host(`{{ keycloak_oauth_host }}`)
+        traefik.http.services.oauth.loadbalancer.server.port: "4180"
+{% endif %}
 
 networks:
   public:

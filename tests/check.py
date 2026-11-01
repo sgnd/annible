@@ -41,6 +41,8 @@ LEADER_HOST = HOSTS[LEADER]["node_host"]  # where SSH connects
 REGISTRY = f"{LEADER_IP}:{CFG['registry_port']}"
 IMAGES = CFG["images"]
 WEB = "traefik" in APPS  # web pages only exist with traefik
+# psql comes from the PostgreSQL image in the registry: spilo with Patroni (2 or more servers).
+PG_IMAGE = "spilo" if len(CFG["app_nodes"].get("postgres", [])) > 1 else "postgres"
 ON_LEADER = socket.gethostname() == LEADER  # the installer sets each server's hostname to its name
 results = []
 
@@ -109,11 +111,15 @@ def python_on_leader(code, data):
 
 
 def admin_login(name, sub, path="/", ok=("200",)):
-    """An admin page needs a login: the Traefik password, or Authelia (with a second factor) when installed.
-    Returns (status, body) after logging in with the Traefik password, or None with Authelia."""
-    check(f"{name} needs a login", https(sub, path)[0] in ("401", "302"))
-    if "authelia" in APPS:
-        print(f"SKIP  {name} opens after login  (Authelia login with a second factor)")
+    """An admin page needs a login: the Traefik password, or Authelia or Keycloak (with a second factor)
+    when installed. Returns (status, body) after logging in with the Traefik password, or None with SSO."""
+    sso = "Authelia" if "authelia" in APPS else "Keycloak" if "keycloak" in APPS else ""
+    code, body = https(sub, path)
+    check(f"{name} needs a login", code in ("401", "302", "403"), code)
+    if sso == "Keycloak":
+        check(f"{name} sends you to the Keycloak login", f"keycloak.{DOMAIN}/realms/ansibro" in body or code == "302", body[-120:])
+    if sso:
+        print(f"SKIP  {name} opens after login  ({sso} login with a second factor)")
         return None
     code, body = https(sub, path, user="admin:" + secret("traefik_admin"))
     check(f"{name} opens with the password", code in ok, code)
@@ -164,8 +170,8 @@ print(s.recv(4096).decode().strip())
 def check_swarm():
     _, out = on_leader(["sudo", "docker", "service", "ls", "--format", "{{.Name}} {{.Replicas}}"])
     for line in out.splitlines():
-        name, replicas = line.split()[:2]
-        running, wanted = replicas.split("/")
+        name, replicas = (line.split() + ["?"])[:2]
+        running, _, wanted = replicas.partition("/")
         check(f"swarm service {name} running ({replicas})", running == wanted)
     _, out = on_leader(["sudo", "docker", "node", "ls", "--format", "{{.Hostname}} {{.Status}}"])
     for node in inv["managers"]["hosts"] + inv["workers"]["hosts"]:
@@ -269,16 +275,24 @@ def check_kong():
     result = admin_login("kong admin API", "kong-manager", "/api/")
     if result:
         check("kong admin API works", "version" in result[1])
-    # From the public network (where other apps are), the admin API must not be reachable.
-    _, out = on_leader(["sudo", "docker", "run", "--rm", "--network", "public", f"{REGISTRY}/kong:{IMAGES['kong']['tag']}",
-                        "curl", "-s", "-m", "5", "-o", "/dev/null", "-w", "%{http_code}", "http://kong_kong:8001/"])
-    check("kong admin API is not reachable from other apps", not out.endswith("200"), out[-80:])
+    # From where other apps are, the admin API must not be reachable.
+    curl = ["curl", "-s", "-m", "5", "-o", "/dev/null", "-w", "%{http_code}"]
+    if CFG.get("orchestrator") == "k3s":
+        _, out = on_leader(["sudo", "k3s", "kubectl", "run", "ansibro-check-kong", "-n", "default", "--rm", "-i",
+                            "--restart=Never", f"--image=registry.ansibro:{CFG['registry_port']}/kong:{IMAGES['kong']['tag']}",
+                            "--command", "--", *curl, "http://kong.ansibro.svc.cluster.local:8001/"])
+    else:
+        _, out = on_leader(["sudo", "docker", "run", "--rm", "--network", "public", f"{REGISTRY}/kong:{IMAGES['kong']['tag']}",
+                            *curl, "http://kong_kong:8001/"])
+    check("kong admin API is not reachable from other apps", "200" not in out, out[-80:])
 
 
 def check_keycloak():
     form = f"grant_type=password&client_id=admin-cli&username=admin&password={secret('keycloak_admin')}"
     code, body = https("keycloak", "/realms/master/protocol/openid-connect/token", data=form)
     check("keycloak admin login", code == "200" and "access_token" in body, code)
+    if "authelia" not in APPS:
+        check("keycloak has the ansibro realm for admin pages", https("keycloak", "/realms/ansibro")[0] == "200")
 
 
 def check_authelia():
@@ -290,27 +304,34 @@ def check_authelia():
 
 
 def check_postgres():
-    _, out = client("postgres", "psql", "-h", ip_of("postgres"), "-U", "postgres", "-tAc", "select 1", env=[f"PGPASSWORD={secret('postgres')}"])
+    _, out = client(PG_IMAGE, "psql", "-h", ip_of("postgres"), "-U", "postgres", "-tAc", "select 1", env=[f"PGPASSWORD={secret('postgres')}"])
     check("postgres login", out.strip() == "1", out[-200:])
     for app in ("kong", "keycloak", "authelia"):
         if app in APPS:
-            _, out = client("postgres", "psql", "-h", ip_of("postgres"), "-U", app, "-tAc", "select 1",
+            _, out = client(PG_IMAGE, "psql", "-h", ip_of("postgres"), "-U", app, "-tAc", "select 1",
                             env=[f"PGPASSWORD={secret(app + '_db')}"])
             check(f"postgres database for {app}", out.strip() == "1", out[-200:])
 
 
 def check_postgres_replicas():
-    """Each replica follows the primary: a row written on the primary shows up there."""
+    """Patroni: one primary, and a row written there shows up on every replica."""
+    nodes = CFG["app_nodes"]["postgres"]
+    primary = [n for n in nodes if curl(f"http://{HOSTS[n]['node_ip']}:8008/primary")[0] == "200"]
+    check("postgres has exactly one primary (Patroni)", len(primary) == 1, str(primary))
+    if len(primary) != 1:
+        return
     stamp = str(int(time.time()))
     env = [f"PGPASSWORD={secret('postgres')}"]
-    _, out = client("postgres", "psql", "-h", ip_of("postgres"), "-U", "postgres", "-tAc",
-                    f"CREATE TABLE IF NOT EXISTS ansibro_check (v text); INSERT INTO ansibro_check VALUES ('{stamp}')", env=env)
-    for node in CFG["app_nodes"]["postgres"][1:]:
+    client(PG_IMAGE, "psql", "-h", HOSTS[primary[0]]["node_ip"], "-U", "postgres", "-tAc",
+           f"CREATE TABLE IF NOT EXISTS ansibro_check (v text); INSERT INTO ansibro_check VALUES ('{stamp}')", env=env)
+    for node in nodes:
+        if node == primary[0]:
+            continue
         ip = HOSTS[node]["node_ip"]
-        _, out = client("postgres", "psql", "-h", ip, "-U", "postgres", "-tAc", "SELECT pg_is_in_recovery()", env=env)
+        _, out = client(PG_IMAGE, "psql", "-h", ip, "-U", "postgres", "-tAc", "SELECT pg_is_in_recovery()", env=env)
         check(f"postgres on {node} is a replica", out.strip() == "t", out[-200:])
         for _ in range(10):
-            _, out = client("postgres", "psql", "-h", ip, "-U", "postgres", "-tAc",
+            _, out = client(PG_IMAGE, "psql", "-h", ip, "-U", "postgres", "-tAc",
                             f"SELECT count(*) FROM ansibro_check WHERE v = '{stamp}'", env=env)
             if out.strip() == "1":
                 break
@@ -341,6 +362,47 @@ def check_mariadb():
             _, out = client("mariadb", "mariadb", "-h", ip_of("mariadb"), f"-u{app}", "-N", "-e", "select 1",
                             env=[f"MYSQL_PWD={secret(app + '_db')}"])
             check(f"mariadb database for {app}", out.strip() == "1", out[-200:])
+
+
+def check_cache_replicas(app):
+    """3 cache servers: one primary, copies get its data, and Sentinel knows the primary."""
+    cli = "redis-cli" if app == "redis" else "valkey-cli"
+    env = [f"REDISCLI_AUTH={secret(app)}"]
+    nodes = CFG["app_nodes"][app]
+    roles = {}
+    for node in nodes:
+        _, out = client(app, cli, "-h", HOSTS[node]["node_ip"], "INFO", "replication", env=env)
+        roles[node] = "master" if "role:master" in out else "replica" if "role:slave" in out else "?"
+    primary = [n for n, r in roles.items() if r == "master"]
+    check(f"{app} has exactly one primary", len(primary) == 1, str(roles))
+    if len(primary) != 1:
+        return
+    _, out = client(app, cli, "-h", HOSTS[nodes[0]]["node_ip"], "-p", "26379", "SENTINEL", "get-master-addr-by-name", "ansibro", env=env)
+    check(f"{app} Sentinel knows the primary", HOSTS[primary[0]]["node_ip"] in out, out[-120:])
+    stamp = str(int(time.time()))
+    client(app, cli, "-h", HOSTS[primary[0]]["node_ip"], "SET", "ansibro-check", stamp, env=env)
+    for node in nodes:
+        if node != primary[0]:
+            time.sleep(1)
+            _, out = client(app, cli, "-h", HOSTS[node]["node_ip"], "GET", "ansibro-check", env=env)
+            check(f"{app} copy on {node} has the new value", stamp in out, out[-80:])
+
+
+def check_galera():
+    """3 MariaDB servers: one Galera cluster, every server synced, and data written on one is on all."""
+    env = [f"MYSQL_PWD={secret('mariadb')}"]
+    nodes = CFG["app_nodes"]["mariadb"]
+    stamp = str(int(time.time()))
+    client("mariadb", "mariadb", "-h", HOSTS[nodes[0]]["node_ip"], "-uroot", "-e",
+           f"CREATE DATABASE IF NOT EXISTS ansibro_check; CREATE TABLE IF NOT EXISTS ansibro_check.t (v varchar(20) PRIMARY KEY); "
+           f"INSERT INTO ansibro_check.t VALUES ('{stamp}')", env=env)
+    for node in nodes:
+        ip = HOSTS[node]["node_ip"]
+        _, out = client("mariadb", "mariadb", "-h", ip, "-uroot", "-N", "-e",
+                        "SHOW STATUS WHERE Variable_name IN ('wsrep_cluster_size', 'wsrep_local_state_comment')", env=env)
+        check(f"mariadb on {node} is synced in a cluster of {len(nodes)}", f"wsrep_cluster_size\t{len(nodes)}" in out and "Synced" in out, out[-160:])
+        _, out = client("mariadb", "mariadb", "-h", ip, "-uroot", "-N", "-e", f"SELECT count(*) FROM ansibro_check.t WHERE v = '{stamp}'", env=env)
+        check(f"mariadb on {node} has the new row", out.strip() == "1", out[-120:])
 
 
 def check_cache(app):
@@ -459,6 +521,11 @@ if __name__ == "__main__":
         check_backup()
     if len(CFG["app_nodes"].get("postgres", [])) > 1:
         check_postgres_replicas()
+    if len(CFG["app_nodes"].get("mariadb", [])) > 1:
+        check_galera()
+    for cache in ("redis", "valkey"):
+        if len(CFG["app_nodes"].get(cache, [])) > 1:
+            check_cache_replicas(cache)
     for app in APPS:
         try:
             CHECKS[app]()

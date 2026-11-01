@@ -1,7 +1,7 @@
 # Use in app labels:
 #   admin-ip@file  only allow admin_allow_from
-#   admin@file     admin-ip plus a login: the dashboard password, or Authelia (with a second
-#                  factor) when Authelia is installed
+#   admin@file     admin-ip plus a login: Authelia or Keycloak (both with a second factor) when
+#                  installed (admin_sso), else the dashboard password
 #   authelia@file  Authelia login (only when Authelia is installed)
 http:
   middlewares:
@@ -19,11 +19,19 @@ http:
       chain:
         middlewares:
           - admin-ip
-          - {{ 'authelia' if 'authelia' in apps else 'admin-auth' }}
+          - {{ {'authelia': 'authelia', 'keycloak': 'oauth'}[admin_sso] | default('admin-auth') }}
 {% if 'authelia' in apps %}
     authelia:
       forwardAuth:
         address: http://authelia_authelia:9091/api/authz/forward-auth
         trustForwardHeader: true
         authResponseHeaders: [Remote-User, Remote-Groups, Remote-Email, Remote-Name]
+{% endif %}
+{% if admin_sso == 'keycloak' %}
+    # Keycloak login through oauth2-proxy (in the keycloak stack).
+    oauth:
+      forwardAuth:
+        address: http://keycloak_oauth2-proxy:4180/
+        trustForwardHeader: true
+        authResponseHeaders: [X-Auth-Request-User, X-Auth-Request-Email]
 {% endif %}

@@ -39,7 +39,8 @@ firewall_allow: []
 wireguard: false
 
 # The cluster: swarm (Docker Swarm, the default) or k3s (small Kubernetes). See docs/k3s.md.
-# With k3s, write traefik: cluster in apps; kong, portainer, swarmpit, keycloak and authelia are Swarm only.
+# With k3s, write cluster instead of swarm for traefik, kong, portainer, keycloak and authelia.
+# swarmpit manages Docker Swarm only.
 # orchestrator: k3s
 
 # Optional: back up every server each night with restic (encrypted). Use storage outside this cluster.
@@ -109,8 +110,8 @@ apps:
   portainer: swarm         # or swarmpit
   # kong: swarm            # API gateway, needs postgres
   # keycloak: swarm        # login, or authelia (needs a database; authelia also a cache)
-  postgres: data1          # or mariadb. Replicas: postgres: [data1, data2] (first = primary)
-  redis: data1             # or valkey
+  postgres: data1          # or mariadb. Failover: postgres: [data1, data2], mariadb: [data1, data2, data3]
+  redis: data1             # or valkey. On 3 servers with Sentinel (failover): redis: [data1, data2, data3]
   rustfs: data1            # or garage. 3 copies of every file: garage: [data1, data2, data3]
   rabbitmq: data1          # or nats
   # uptimekuma: swarm2     # or beszel. With victoria or prometheus, put it on another server

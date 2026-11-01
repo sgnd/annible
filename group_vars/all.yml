@@ -20,6 +20,12 @@ traefik_nodes: >-
   {{ groups['swarm'] if orchestrator == 'k3s'
   else [swarm_leader] if tls | default('letsencrypt') == 'letsencrypt' else groups['managers'] }}
 
+# The login on admin pages: Authelia, or Keycloak (through oauth2-proxy), or else the Traefik
+# dashboard password. Authelia and Keycloak ask for a second factor (an authenticator app).
+admin_sso: "{{ 'authelia' if 'authelia' in apps else 'keycloak' if 'keycloak' in apps else '' }}"
+# k3s: that login as a Traefik middleware in the "ansibro" namespace.
+k3s_admin_login: "{{ {'authelia': 'authelia', 'keycloak': 'oauth'}[admin_sso] | default('admin-auth') }}"
+
 # Swarm apps without data run on servers with the label tier=app, if there are any
 # (servers without server apps get it; see inventory.py).
 swarm_app_constraint: >-
@@ -39,8 +45,20 @@ secrets_dir: "{{ playbook_dir }}/state/secrets"
 # Where the database and cache run, for apps that need them (empty if not installed).
 database_app: "{{ 'postgres' if 'postgres' in apps else 'mariadb' if 'mariadb' in apps else '' }}"
 database_ip: "{{ hostvars[apps[database_app]].node_ip if database_app else '' }}"
+# The database on more servers: PostgreSQL with Patroni or MariaDB with Galera (automatic failover).
+postgres_patroni: "{{ app_nodes.postgres | default([]) | length > 1 }}"
+mariadb_galera: "{{ app_nodes.mariadb | default([]) | length > 1 }}"
+database_ha: "{{ postgres_patroni or mariadb_galera }}"
+database_port: "{{ 5432 if database_app == 'postgres' else 3306 }}"
+# Where cluster apps (kong, keycloak, authelia) reach the database. On more servers: database-proxy,
+# which always goes to a server that takes writes.
+database_host: >-
+  {{ ('database-proxy_haproxy' if orchestrator == 'swarm' else 'database-proxy.ansibro.svc.cluster.local')
+  if database_ha else database_ip }}
 cache_app: "{{ 'redis' if 'redis' in apps else 'valkey' if 'valkey' in apps else '' }}"
 cache_ip: "{{ hostvars[apps[cache_app]].node_ip if cache_app else '' }}"
+# The cache on 3 servers: Sentinel (port 26379) on each one knows the primary.
+cache_ha: "{{ cache_app != '' and app_nodes[cache_app] | length > 1 }}"
 cache_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/' ~ cache_app, chars=['ascii_letters', 'digits'], length=24) if cache_app else '' }}"
 
 # ./install.sh -e remove_nodes=true removes servers from the swarm that are not in config.yml.

@@ -61,6 +61,22 @@
     mode: "0644"
   notify: Restart k3s
 
+# Restore (./install.sh -e restore=true): the cluster comes back from the etcd snapshot in the backup,
+# with everything you deployed. The other servers then join it as new.
+- name: Find the k3s snapshot in the backup
+  ansible.builtin.find:
+    paths: "{{ apps_dir }}/backup/stage/k3s"
+    patterns: "ansibro-*"
+  register: k3s_snapshot
+  when: restore | bool and inventory_hostname == swarm_leader
+
+- name: Put the k3s cluster back from the backup
+  ansible.builtin.command: >-
+    k3s server --cluster-reset
+    --cluster-reset-restore-path={{ (k3s_snapshot.files | sort(attribute='mtime') | last).path }}
+  when: restore | bool and inventory_hostname == swarm_leader and k3s_snapshot.files | length > 0
+  changed_when: true
+
 # The first manager first: the others join it.
 - name: Start k3s on the first manager
   ansible.builtin.systemd_service:

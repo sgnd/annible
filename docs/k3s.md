@@ -14,6 +14,6 @@ With k3s:
 - Traefik is k3s's built-in one: `traefik: cluster` in `apps`. Server apps get their web pages through it
   like with Swarm. Point DNS to any cluster server. Your own apps: an `Ingress` or Traefik `IngressRoute`.
 - Pods pull from the cluster's registry: `registry.ansibro:5000/<image>:<tag>` (push your images there).
-- For now these apps are Swarm only: kong, portainer, swarmpit, keycloak, authelia.
-- The backup has a k3s (etcd) snapshot. `-e restore=true` is Swarm only for now; to restore k3s, see
-  [k3s backup and restore](https://docs.k3s.io/datastore/backup-restore).
+- portainer, kong, keycloak and authelia run on k3s too, in the `ansibro` namespace (`kong: cluster`, ...).
+  Only Traefik can reach Kong (a NetworkPolicy). swarmpit is for Swarm only.
+- The backup has a k3s (etcd) snapshot, and `-e restore=true` puts the cluster back from it.

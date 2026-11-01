@@ -2,3 +2,8 @@ redis_dir: "{{ apps_dir }}/redis"
 
 # Generated once and saved in state/secrets/ on the installer machine.
 redis_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/redis', chars=['ascii_letters', 'digits'], length=24) }}"
+
+# On 3 servers (redis: [c1, c2, c3]): one primary and two copies (replicas). Sentinel runs on each
+# server and makes a copy the primary when the primary is down (when most Sentinels agree).
+redis_ha: "{{ app_nodes.redis | length > 1 }}"
+redis_quorum: "{{ (app_nodes.redis | length // 2) + 1 }}"

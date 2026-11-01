@@ -42,16 +42,23 @@ copy_app() {
 }
 
 # 1. Databases: a dump is consistent while the database runs.
-{% if apps.postgres | default('') == inventory_hostname %}
-# (Only on the primary. A PostgreSQL replica is a copy of it.)
+{% if 'postgres' in node_apps %}
+# (Only on the primary. A PostgreSQL replica is a copy of it; with Patroni the primary can move.)
+{% if postgres_patroni %}
+if [ "$(curl -s -o /dev/null -w '%{http_code}' http://{{ node_ip }}:8008/primary)" = 200 ]; then
+{% else %}
 if docker ps -q --filter name=^postgres$ | grep -q .; then
+{% endif %}
   docker exec postgres pg_dumpall -U postgres --clean --if-exists > "$stage/dumps/postgres.sql"
 fi
 {% endif %}
+{% if apps.mariadb | default('') == inventory_hostname %}
+# (Only on the first server: with Galera every server has the same data.)
 if docker ps -q --filter name=^mariadb$ | grep -q .; then
   docker exec mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb-dump -uroot --all-databases \
     --single-transaction --routines --events --add-drop-database --flush-privileges' > "$stage/dumps/mariadb.sql"
 fi
+{% endif %}
 
 # 2. App folders.
 paths=("$stage")
