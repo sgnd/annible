@@ -3,15 +3,15 @@
 
 - name: Create Garage folders
   ansible.builtin.file:
-    path: "{{ item.path }}"
+    path: "{{ item }}"
     state: directory
-    owner: "{{ item.owner }}"
-    group: "{{ item.owner }}"
+    owner: root
+    group: root
     mode: "0700"
   loop:
-    - { path: "{{ garage_dir }}", owner: root }
-    - { path: "{{ garage_dir }}/meta", owner: "root" }
-    - { path: "{{ garage_dir }}/data", owner: "root" }
+    - "{{ garage_dir }}"
+    - "{{ garage_dir }}/meta"
+    - "{{ garage_dir }}/data"
 
 - name: Write Garage config
   ansible.builtin.template:
