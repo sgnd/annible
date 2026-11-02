@@ -91,6 +91,13 @@
       run_once: true
       when: postgres_dump_node != postgres_primary_node
 
+    - name: Create the dump folder on the primary
+      ansible.builtin.file:
+        path: "{{ postgres_dump | dirname }}"
+        state: directory
+        mode: "0700"
+      when: inventory_hostname == postgres_primary_node and postgres_dump_node != postgres_primary_node
+
     - name: Copy the dump to the primary
       ansible.builtin.copy:
         src: "{{ playbook_dir }}/state/postgres-restore.sql"
