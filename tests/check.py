@@ -430,9 +430,10 @@ def check_garage():
     endpoint, keys = f"http://{ip_of('garage')}:3900", ("GK" + secret("garage_access_key"), secret("garage_secret_key"))
     status = s3_list_buckets(endpoint, *keys, "garage")
     check("garage S3 login with the keys", status == "200", status)
-    # Making the same bucket again is fine: the key already owns it.
-    status = s3_list_buckets(endpoint, *keys, "garage", method="PUT", path="/ansibro-check")
+    bucket = f"/ansibro-check-{int(time.time())}"
+    status = s3_list_buckets(endpoint, *keys, "garage", method="PUT", path=bucket)
     check("garage key can make a bucket", status == "200", status)
+    s3_list_buckets(endpoint, *keys, "garage", method="DELETE", path=bucket)
 
 
 def check_rabbitmq():

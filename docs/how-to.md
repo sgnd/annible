@@ -38,7 +38,7 @@ and run `./install.sh`. Every server then backs up each night with [restic](http
 - databases (PostgreSQL, MariaDB) as a dump (one file with all the data), while they run
 - every other folder in `/opt/ansibro/`: the app is paused for a moment while its files are copied
 - RustFS and Garage data as it is, while it runs
-- on the first manager: the swarm (your stacks, secrets, configs, networks), `config.yml` and `state/`
+- on the first manager: the swarm (your stacks, secrets, configs, networks), `config.yml` and the passwords in `state/secrets/`
 
 Not saved: the image registry (the installer fills it again; push your own images again)
 and Docker volumes. Keep your own stacks' files in `/opt/ansibro/<stack name>/` so they are saved too:
