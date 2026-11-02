@@ -15,10 +15,10 @@ registry_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/regist
 # Traefik runs on every manager, so the apps stay reachable when one manager is down. Point DNS
 # to all of them. Let's Encrypt (and acme_server) checks a domain by calling it, and the call can
 # reach another manager, so with them Traefik runs only on the first manager.
-# On k3s, every cluster server answers on 80 and 443 (k3s's built-in load balancer).
+# On k3s it is the same with Let's Encrypt (first manager only); else Traefik runs on every cluster server.
 traefik_nodes: >-
-  {{ groups['swarm'] if orchestrator == 'k3s'
-  else [swarm_leader] if tls == 'letsencrypt' else groups['managers'] }}
+  {{ [swarm_leader] if tls == 'letsencrypt'
+  else groups['swarm'] if orchestrator == 'k3s' else groups['managers'] }}
 
 # The login on admin pages: Authelia, or Keycloak (through oauth2-proxy), or else the Traefik
 # dashboard password. Authelia and Keycloak ask for a second factor (an authenticator app).
@@ -50,6 +50,8 @@ postgres_patroni: "{{ app_nodes.postgres | default([]) | length > 1 }}"
 mariadb_galera: "{{ app_nodes.mariadb | default([]) | length > 1 }}"
 database_ha: "{{ postgres_patroni or mariadb_galera }}"
 database_port: "{{ 5432 if database_app == 'postgres' else 3306 }}"
+# MariaDB with Galera: database-proxy asks this port on each server if it is in sync (roles/mariadb).
+mariadb_check_port: 9200
 # Where cluster apps (kong, keycloak, authelia) reach the database. On more servers: database-proxy,
 # which always goes to a server that takes writes.
 database_host: >-

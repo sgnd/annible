@@ -40,6 +40,13 @@ is off for a few seconds.
 
 **Warning:** a port you open yourself with `docker run -p`, or with `ports:` in your own swarm stack,
 is open to everyone: the firewall cannot block it (that is how Docker works). Use Traefik for web apps.
+(Traefik's own metrics port 8082 is limited to the other servers with a rule in Docker's `DOCKER-USER` chain.)
+
+**Between your servers.** A container on one server reaches another server with its server's IP,
+so it can use the same ports as that server. Most of them need a password. These do not, so they
+show their data to every container in the cluster: the monitoring agents and the monitoring
+server's pages (metrics, logs, Alertmanager), etcd for Patroni, and Patroni's API for reading
+(changes on it need a login). Run only containers you trust.
 
 ## Good to know
 
@@ -47,7 +54,8 @@ is open to everyone: the firewall cannot block it (that is how Docker works). Us
   keep their data there. Keep it first in the `nodes` list: the installer stops if the first manager
   is not the one that made the swarm.
 - **With 3 managers, one can go down.** The swarm keeps working, and every manager has the registry
-  with all images.
+  with all images. Workers and standalone servers pull from the first manager's registry: while it is
+  down, they can still run the images they have, but not pull new ones.
 - **Where Traefik runs.** With `tls: letsencrypt`, Traefik runs only on the first manager: point DNS there.
   (Let's Encrypt checks a domain by calling it, and the call could reach another manager.)
   With `tls: selfsigned` or `tls: custom` (for example a wildcard certificate), Traefik runs on every

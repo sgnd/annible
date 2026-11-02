@@ -45,7 +45,22 @@ copy_app() {
 {% if 'postgres' in node_apps %}
 # (Only on the primary. A PostgreSQL replica is a copy of it; with Patroni the primary can move.)
 {% if postgres_patroni %}
-if [ "$(curl -s -o /dev/null -w '%{http_code}' http://{{ node_ip }}:8008/primary)" = 200 ]; then
+# Find the primary. During a failover there is none for a moment: wait for one (up to 2 minutes).
+primary=""
+for _ in $(seq 24); do
+  for ip in {{ app_nodes.postgres | map('extract', hostvars, 'node_ip') | join(' ') }}; do
+    if [ "$(curl -s -o /dev/null -w '%{http_code}' "http://$ip:8008/primary")" = 200 ]; then
+      primary=$ip
+      break 2
+    fi
+  done
+  sleep 5
+done
+if [ -z "$primary" ]; then
+  echo "error: no PostgreSQL server is the primary, so the database was not saved" >&2
+  exit 1
+fi
+if [ "$primary" = "{{ node_ip }}" ]; then
 {% else %}
 if docker ps -q --filter name=^postgres$ | grep -q .; then
 {% endif %}
@@ -70,6 +85,7 @@ for dir in {{ apps_dir }}/*/; do
   app=$(basename "$dir")
   case "$app" in
     backup | bundle | registry) ;;          # not saved
+    etcd) ;;                                # Patroni's state: made again from the new database
     postgres | mariadb) ;;                  # saved as a dump above
     rustfs) paths+=("$dir") ;;              # big: saved while it runs
     prometheus | victoria) copy_app "$app" data ;;  # metrics and logs history: not saved

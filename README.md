@@ -68,7 +68,7 @@ It asks Let's Encrypt for the certificates again.
 At the end it prints how to reach each app, and saves it with all passwords in `state/summary.md`.
 
 Run `./install.sh` again any time. It changes what is different in `config.yml`
-(removing apps or servers is done by hand, see [How to](docs/how-to.md)).
+(an app removed from `config.yml` stops; to remove a server, see [How to](docs/how-to.md#remove-a-server)).
 
 > **Back up the `state/` folder.** It holds all generated passwords. If you lose it,
 > the next run makes new passwords that do not match your running databases.

@@ -26,10 +26,17 @@ services:
     command:
       - --listen_ip={{ node_ip }}
       - --port={{ observability_cadvisor_port }}
+{% if orchestrator == 'k3s' and inventory_hostname in groups['swarm'] %}
+      # k3s pods run in k3s's own containerd, not in Docker: read those too.
+      - --docker_only=false
+      - --containerd=/var/run/k3s/containerd/containerd.sock
+      - --whitelisted_container_labels=com.docker.compose.project,com.docker.swarm.service.name,io.kubernetes.container.name,io.kubernetes.pod.namespace
+{% else %}
       - --docker_only=true
+      - --whitelisted_container_labels=com.docker.compose.project,com.docker.swarm.service.name
+{% endif %}
       - --housekeeping_interval=30s
       - --store_container_labels=false
-      - --whitelisted_container_labels=com.docker.compose.project,com.docker.swarm.service.name
       # Fewer metrics: less memory and disk on the monitoring server.
       - --disable_metrics=advtcp,cpu_topology,cpuset,hugetlb,memory_numa,percpu,process,referenced_memory,resctrl,sched,tcp,udp
     # The image checks localhost:8080; cAdvisor listens on this server's ip instead.
@@ -55,6 +62,9 @@ services:
       # Logs wait here while the monitoring server is down, and are sent later.
       - ./vector-data:/var/lib/vector
       - /var/run/docker.sock:/var/run/docker.sock:ro
+{% if orchestrator == 'k3s' and inventory_hostname in groups['swarm'] %}
+      - /var/log/pods:/var/log/pods:ro  # the logs of k3s pods
+{% endif %}
       - /var/log/journal:/var/log/journal:ro
       - /run/log/journal:/run/log/journal:ro
       - /etc/machine-id:/etc/machine-id:ro

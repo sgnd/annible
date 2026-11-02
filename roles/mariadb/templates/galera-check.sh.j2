@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Galera check for database-proxy (HAProxy). Made by ansibro, do not change it here.
+# Answers 200 when MariaDB on this server is in sync with the cluster (it takes queries), else 503.
+# systemd runs it for each connection on port {{ mariadb_check_port }} (ansibro-galera-check.socket).
+# A server that is cut off from the others still accepts logins, but refuses queries: so ask MariaDB.
+state=$(echo "SHOW STATUS LIKE 'wsrep_local_state'" |
+  timeout 3 docker exec -i mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" exec mariadb -uroot -N' 2>/dev/null | cut -f2)
+# 4 = Synced
+if [ "$state" = 4 ]; then
+  printf 'HTTP/1.0 200 OK\r\nContent-Length: 7\r\n\r\nsynced\n'
+else
+  printf 'HTTP/1.0 503 Service Unavailable\r\nContent-Length: 11\r\n\r\nnot synced\n'
+fi

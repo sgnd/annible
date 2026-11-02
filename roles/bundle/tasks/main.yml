@@ -47,3 +47,11 @@
     dest: "{{ bundle_dir }}/images/"
     mode: "0644"
   when: inventory_hostname == swarm_leader
+
+# Every manager runs a registry, so each one needs the registry's own image to start it.
+- name: Copy the registry image to the other managers
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/bundle/images/registry.tar.gz"
+    dest: "{{ bundle_dir }}/images/"
+    mode: "0644"
+  when: inventory_hostname in groups['managers'] and inventory_hostname != swarm_leader

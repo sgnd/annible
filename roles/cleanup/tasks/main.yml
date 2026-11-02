@@ -20,13 +20,17 @@
       {{ (catalog | dict2items | selectattr('value.runs_on', 'equalto', 'node') | map(attribute='key') | difference(node_apps))
       + ([] if 'beszel' in apps else ['beszel-agent'])
       + ([] if monitoring_app else ['monitoring-agent'])
-      + ([] if inventory_hostname in groups['managers'] else ['registry']) }}
+      + ([] if inventory_hostname in groups['managers'] else ['registry'])
+      + ([] if postgres_patroni and inventory_hostname in groups['managers'] else ['etcd']) }}
   changed_when: true
 
 - name: Look for timers of removed features
   ansible.builtin.stat:
     path: /etc/systemd/system/{{ item }}
-  loop: "{{ ([] if monitoring_app else ['ansibro-metrics.timer']) + ([] if backup is defined else ['ansibro-backup.timer']) }}"
+  loop: >-
+    {{ ([] if monitoring_app else ['ansibro-metrics.timer'])
+    + ([] if backup is defined else ['ansibro-backup.timer'])
+    + ([] if mariadb_galera and inventory_hostname in app_nodes.mariadb else ['ansibro-galera-check.socket']) }}
   register: cleanup_timers
 
 - name: Stop timers of removed features
@@ -75,6 +79,15 @@
 
 - name: Remove swarm apps that are no longer in config.yml
   ansible.builtin.command: docker stack rm {{ item }}
-  loop: "{{ cleanup_stacks.stdout_lines | default([]) | intersect(catalog.keys()) | difference(swarm_apps) }}"
+  loop: >-
+    {{ cleanup_stacks.stdout_lines | default([]) | intersect(catalog.keys() | list + ['database-proxy'])
+    | difference(swarm_apps + (['database-proxy'] if database_ha else [])) }}
   when: inventory_hostname == swarm_leader and orchestrator == 'swarm'
   changed_when: true
+
+# database-proxy on k3s: k3s removes what a deleted manifest made.
+- name: Remove database-proxy from k3s when the database runs on one server again
+  ansible.builtin.file:
+    path: /var/lib/rancher/k3s/server/manifests/ansibro-database-proxy.yaml
+    state: absent
+  when: inventory_hostname == swarm_leader and orchestrator == 'k3s' and not database_ha

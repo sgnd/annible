@@ -115,5 +115,21 @@
       accessKeyId: "{{ garage_access_key }}"
       secretAccessKey: "{{ garage_secret_key }}"
   when: garage_first and garage_access_key not in garage_keys.json | map(attribute='id')
+  register: garage_key_added
+  changed_when: true
+  no_log: true
+
+# A new key may not make buckets. Allow it, so apps can make their own buckets with this key.
+- name: Let the Garage key make buckets
+  ansible.builtin.uri:
+    url: http://127.0.0.1:3903/v2/UpdateKey?id={{ garage_access_key }}
+    method: POST
+    headers:
+      Authorization: "Bearer {{ garage_admin_token }}"
+    body_format: json
+    body:
+      allow:
+        createBucket: true
+  when: garage_key_added is changed  # noqa: no-handler
   changed_when: true
   no_log: true

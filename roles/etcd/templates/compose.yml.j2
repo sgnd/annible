@@ -19,5 +19,9 @@ services:
 
       - --initial-cluster-token={{ etcd_token }}
       - --initial-cluster-state=new
+      # Patroni writes every few seconds; etcd keeps old values until they are compacted.
+      # Without this, etcd fills up after some weeks and Patroni stops the primary.
+      - --auto-compaction-mode=periodic
+      - --auto-compaction-retention=1h
     volumes:
       - ./data:/etcd-data

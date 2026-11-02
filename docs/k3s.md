@@ -12,7 +12,8 @@ With k3s:
 - Use `kubectl` on a manager: `sudo k3s kubectl get nodes`. To use it from your laptop, copy
   `/etc/rancher/k3s/k3s.yaml` from a manager and change `127.0.0.1` in it to the manager's address.
 - Traefik is k3s's built-in one: `traefik: cluster` in `apps`. Server apps get their web pages through it
-  like with Swarm. Point DNS to any cluster server. Your own apps: an `Ingress` or Traefik `IngressRoute`.
+  like with Swarm. With `tls: letsencrypt` it runs on the first manager only: point DNS there.
+  Else it runs on every cluster server: point DNS to all of them. Your own apps: an `Ingress` or Traefik `IngressRoute`.
 - Pods pull from the cluster's registry: `registry.ansibro:5000/<image>:<tag>` (push your images there).
 - portainer, kong, keycloak and authelia run on k3s too, in the `ansibro` namespace (`kong: cluster`, ...).
   Only Traefik can reach Kong (a NetworkPolicy). swarmpit is for Swarm only.

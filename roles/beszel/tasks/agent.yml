@@ -58,6 +58,7 @@
   delegate_to: "{{ apps.beszel }}"
   run_once: true
   register: beszel_systems
+  no_log: true  # the login token is in the headers
 
 - name: Add this server to the hub
   ansible.builtin.uri:
@@ -74,3 +75,4 @@
   delegate_to: "{{ apps.beszel }}"
   when: inventory_hostname not in beszel_systems.json['items'] | map(attribute='name')
   changed_when: true
+  no_log: true

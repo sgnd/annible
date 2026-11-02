@@ -68,9 +68,11 @@ def on_leader(cmd, stdin=None):
     return p.returncode, (p.stdout + p.stderr).strip()
 
 
-def curl(url, user=None, data=None, headers=(), resolve=None):
+def curl(url, user=None, data=None, headers=(), resolve=None, method=None):
     """HTTP request from the first manager. Returns (status, body). Secrets go in through stdin."""
     config = [f'url = "{url}"', 'silent', 'insecure', 'max-time = 20', 'write-out = "\\n%{http_code}"']
+    if method:
+        config.append(f'request = "{method}"')
     if resolve:
         config.append(f'resolve = "{resolve}"')
     if user:
@@ -131,13 +133,14 @@ def check(name, ok, detail=""):
     print(f"{'PASS' if ok else 'FAIL'}  {name}" + (f"  ({detail})" if not ok and detail else ""))
 
 
-def s3_list_buckets(endpoint, access_key, secret_key, region):
-    """Call S3 ListBuckets with AWS signature v4. Returns the HTTP status."""
+def s3_list_buckets(endpoint, access_key, secret_key, region, method="GET", path="/"):
+    """Call S3 with AWS signature v4: ListBuckets, or with method="PUT", path="/<name>" CreateBucket.
+    Returns the HTTP status."""
     now = datetime.datetime.now(datetime.timezone.utc)
     amz_date, day = now.strftime("%Y%m%dT%H%M%SZ"), now.strftime("%Y%m%d")
     host = endpoint.split("//")[1]
     payload = hashlib.sha256(b"").hexdigest()
-    canonical = f"GET\n/\n\nhost:{host}\nx-amz-content-sha256:{payload}\nx-amz-date:{amz_date}\n\nhost;x-amz-content-sha256;x-amz-date\n{payload}"
+    canonical = f"{method}\n{path}\n\nhost:{host}\nx-amz-content-sha256:{payload}\nx-amz-date:{amz_date}\n\nhost;x-amz-content-sha256;x-amz-date\n{payload}"
     scope = f"{day}/{region}/s3/aws4_request"
     to_sign = f"AWS4-HMAC-SHA256\n{amz_date}\n{scope}\n{hashlib.sha256(canonical.encode()).hexdigest()}"
     key = ("AWS4" + secret_key).encode()
@@ -145,7 +148,8 @@ def s3_list_buckets(endpoint, access_key, secret_key, region):
         key = hmac.new(key, part.encode(), hashlib.sha256).digest()
     signature = hmac.new(key, to_sign.encode(), hashlib.sha256).hexdigest()
     auth = f"AWS4-HMAC-SHA256 Credential={access_key}/{scope}, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature={signature}"
-    code, _ = curl(endpoint + "/", headers=[f"Authorization: {auth}", f"x-amz-date: {amz_date}", f"x-amz-content-sha256: {payload}"])
+    code, _ = curl(endpoint + path, method=method,
+                   headers=[f"Authorization: {auth}", f"x-amz-date: {amz_date}", f"x-amz-content-sha256: {payload}"])
     return code
 
 
@@ -403,6 +407,8 @@ def check_galera():
         check(f"mariadb on {node} is synced in a cluster of {len(nodes)}", f"wsrep_cluster_size\t{len(nodes)}" in out and "Synced" in out, out[-160:])
         _, out = client("mariadb", "mariadb", "-h", ip, "-uroot", "-N", "-e", f"SELECT count(*) FROM ansibro_check.t WHERE v = '{stamp}'", env=env)
         check(f"mariadb on {node} has the new row", out.strip() == "1", out[-120:])
+        code, _ = curl(f"http://{ip}:9200/")  # mariadb_check_port in group_vars/all.yml
+        check(f"mariadb on {node}: the check for database-proxy says synced", code == "200", code)
 
 
 def check_cache(app):
@@ -421,8 +427,12 @@ def check_rustfs():
 
 
 def check_garage():
-    status = s3_list_buckets(f"http://{ip_of('garage')}:3900", "GK" + secret("garage_access_key"), secret("garage_secret_key"), "garage")
+    endpoint, keys = f"http://{ip_of('garage')}:3900", ("GK" + secret("garage_access_key"), secret("garage_secret_key"))
+    status = s3_list_buckets(endpoint, *keys, "garage")
     check("garage S3 login with the keys", status == "200", status)
+    # Making the same bucket again is fine: the key already owns it.
+    status = s3_list_buckets(endpoint, *keys, "garage", method="PUT", path="/ansibro-check")
+    check("garage key can make a bucket", status == "200", status)
 
 
 def check_rabbitmq():

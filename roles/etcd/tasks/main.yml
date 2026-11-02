@@ -14,6 +14,26 @@
   vars:
     registry_mirror_images: [etcd]
 
+# etcd's members are fixed when it first starts. With a manager added or removed later, the new
+# members would start a second, separate etcd (and Patroni could get two primaries). Stop instead.
+- name: Read etcd's managers
+  ansible.builtin.slurp:
+    src: "{{ etcd_dir }}/managers"
+  register: etcd_managers
+  failed_when: false
+
+- name: Check the managers did not change
+  ansible.builtin.assert:
+    that: etcd_seen | unique in [[''], [groups['managers'] | join(',')]]
+    fail_msg: >-
+      The managers changed, and etcd (for PostgreSQL with Patroni) cannot follow by itself.
+      See "Add or remove a manager with PostgreSQL on more servers" in docs/how-to.md.
+  vars:
+    etcd_seen: >-
+      {{ groups['managers'] | map('extract', hostvars, 'etcd_managers') | map(attribute='content', default='')
+      | map('b64decode') | map('trim') | list }}
+  run_once: true
+
 - name: Write etcd compose file
   ansible.builtin.template:
     src: compose.yml.j2
@@ -35,3 +55,9 @@
   retries: 30
   delay: 5
   changed_when: false
+
+- name: Remember etcd's managers
+  ansible.builtin.copy:
+    dest: "{{ etcd_dir }}/managers"
+    content: "{{ groups['managers'] | join(',') }}\n"
+    mode: "0600"

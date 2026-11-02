@@ -135,6 +135,16 @@ Add it to `config.yml`, after the first manager, and run `./install.sh`.
 From worker to manager, or back. The installer does not do this; it stops and
 shows the command: `sudo docker node promote <name>` or `sudo docker node demote <name>` on a manager.
 
+## Add or remove a manager with PostgreSQL on more servers
+
+With PostgreSQL on 2 or more servers (Patroni), etcd runs on every manager. etcd cannot add or
+remove its members by itself, so the installer stops when the managers change. Then:
+
+1. On every manager that runs etcd now, stop it and delete its data (it holds only Patroni's state):
+   `cd /opt/ansibro/etcd && sudo docker compose down && sudo rm -rf data managers`
+2. Run `./install.sh`. etcd starts again, empty, on the new list of managers, and Patroni writes its
+   state into it again. PostgreSQL takes no writes for about a minute while etcd is down.
+
 ## Upgrade an app
 
 Change its tag (the version name) and digest (a fingerprint of that exact image)

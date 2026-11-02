@@ -26,6 +26,11 @@
       PGPASSWORD_SUPERUSER={{ postgres_password }}
       PGPASSWORD_STANDBY={{ postgres_replication_password }}
       PGPASSWORD_ADMIN={{ postgres_password }}
+      {% if postgres_patroni %}
+      # Patroni's API: reading (health, which server is the primary) is open, changes need this login.
+      PATRONI_RESTAPI_USERNAME=patroni
+      PATRONI_RESTAPI_PASSWORD={{ postgres_patroni_api_password }}
+      {% endif %}
     mode: "0600"
   no_log: true
 
@@ -54,9 +59,56 @@
   ansible.builtin.include_tasks: find_primary.yml
 
 # Restore (./install.sh -e restore=true): load the dump from the backup into the new, empty database.
+# With Patroni the dump is on the server that was the primary at backup time. The new primary
+# can be another server: then the dump goes there through this machine (the one running the installer).
+- name: Restore with Patroni
+  when: restore | bool and postgres_patroni
+  block:
+    - name: Look for the PostgreSQL dump
+      ansible.builtin.stat:
+        path: "{{ postgres_dump }}"
+      register: postgres_dump_here
+
+    - name: Find the server with the PostgreSQL dump
+      ansible.builtin.set_fact:
+        postgres_dump_node: >-
+          {{ app_nodes.postgres | map('extract', hostvars) | selectattr('postgres_dump_here.stat.exists')
+          | map(attribute='inventory_hostname') | first | default('') }}
+      run_once: true
+
+    - name: Stop if no server has the PostgreSQL dump
+      ansible.builtin.assert:
+        that: postgres_dump_node != ''
+        fail_msg: "No PostgreSQL dump in the backup of {{ app_nodes.postgres | join(', ') }}."
+      run_once: true
+
+    - name: Get the dump from {{ postgres_dump_node }}
+      ansible.builtin.fetch:
+        src: "{{ postgres_dump }}"
+        dest: "{{ playbook_dir }}/state/postgres-restore.sql"
+        flat: true
+      delegate_to: "{{ postgres_dump_node }}"
+      run_once: true
+      when: postgres_dump_node != postgres_primary_node
+
+    - name: Copy the dump to the primary
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/state/postgres-restore.sql"
+        dest: "{{ postgres_dump }}"
+        mode: "0600"
+      when: inventory_hostname == postgres_primary_node and postgres_dump_node != postgres_primary_node
+
+    - name: Delete the dump on this machine
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/state/postgres-restore.sql"
+        state: absent
+      delegate_to: localhost
+      become: false
+      run_once: true
+
 - name: Load PostgreSQL backup
   ansible.builtin.shell: >-
     docker exec -i postgres psql -U postgres -q -f -
-    < {{ apps_dir }}/backup/stage/dumps/postgres.sql
+    < {{ postgres_dump }}
   when: restore | bool and inventory_hostname == postgres_primary_node
   changed_when: true
