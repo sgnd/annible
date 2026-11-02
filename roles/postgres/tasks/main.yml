@@ -28,8 +28,8 @@
       PGPASSWORD_ADMIN={{ postgres_password }}
       {% if postgres_patroni %}
       # Patroni's API: reading (health, which server is the primary) is open, changes need this login.
-      PATRONI_RESTAPI_USERNAME=patroni
-      PATRONI_RESTAPI_PASSWORD={{ postgres_patroni_api_password }}
+      # (Spilo starts Patroni without the container's PATRONI_* settings; it adds this to Patroni's config.)
+      SPILO_CONFIGURATION={"restapi": {"authentication": {"username": "patroni", "password": "{{ postgres_patroni_api_password }}"}}}
       {% endif %}
     mode: "0600"
   no_log: true
