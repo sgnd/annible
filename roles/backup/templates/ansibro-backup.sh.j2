@@ -56,11 +56,14 @@ fi
 # (Only on the first server: with Galera every server has the same data.)
 if docker ps -q --filter name=^mariadb$ | grep -q .; then
   # Users as CREATE USER and GRANT, not the "mysql" database itself: its tables belong to this
-  # server (and to Galera), and loading them on a new server breaks it. The image's own users
-  # (healthcheck, mariadb.sys) have new passwords on a new server, so they are left out.
+  # server (and to Galera), and loading them on a new server breaks it. Left out: the image's own
+  # users (healthcheck, mariadb.sys: they get new passwords on a new server) and the
+  # "IF current_user() ... END IF" blocks (default roles, which ansibro does not use).
   docker exec mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb-dump -uroot --all-databases \
     --ignore-database=mysql --system=users --replace --single-transaction --routines --events \
-    --add-drop-database' | grep -a -v -E "[\`']?(healthcheck|mariadb\.sys)[\`']?@" > "$stage/dumps/mariadb.sql"
+    --add-drop-database' \
+    | LC_ALL=C awk '/^\/\*M!100101 IF current_user\(\)/ { skip = 1 } !skip { print } /END IF \*\/;/ { skip = 0 }' \
+    | LC_ALL=C grep -a -v -E "[\`']?(healthcheck|mariadb\.sys)[\`']?@" > "$stage/dumps/mariadb.sql"
 fi
 {% endif %}
 
