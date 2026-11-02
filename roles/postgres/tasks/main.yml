@@ -87,7 +87,7 @@
         src: "{{ postgres_dump }}"
         dest: "{{ playbook_dir }}/state/postgres-restore.sql"
         flat: true
-      delegate_to: "{{ postgres_dump_node }}"
+      delegate_to: "{{ postgres_dump_node | default(inventory_hostname) }}"  # read before "when"
       run_once: true
       when: postgres_dump_node != postgres_primary_node
 
