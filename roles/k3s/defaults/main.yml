@@ -5,3 +5,10 @@ k3s_url: "https://{{ hostvars[swarm_leader].node_ip }}:6443"
 k3s_binary_url: "https://github.com/k3s-io/k3s/releases/download/{{ k3s.version }}/k3s{{ '' if node_arch == 'amd64' else '-' ~ node_arch }}"
 # Servers and agents join with this token. Generated once, kept in state/secrets/.
 k3s_token: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/k3s_token', chars=['ascii_letters', 'digits'], length=48) }}"
+# The pod network (flannel) must use the network of node_ip; else it takes the interface of the
+# default route (often the public one), which the firewall closes. Found from the server's facts.
+k3s_flannel_iface: >-
+  {{ 'wg0' if wireguard else ansible_interfaces | map('regex_replace', '-', '_')
+  | map('regex_replace', '^', 'ansible_') | map('extract', hostvars[inventory_hostname])
+  | selectattr('ipv4', 'defined') | selectattr('ipv4.address', 'equalto', node_ip)
+  | map(attribute='device') | first | default('') }}
