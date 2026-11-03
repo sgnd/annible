@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0
 
 **Removed: GPU servers and ARM (arm64) servers.** Ansibro now runs on Intel/AMD (amd64) servers only,
 to keep it small and fully tested. `gpu:` on a node and `arch:` in `config.yml` are gone (the installer
