@@ -9,7 +9,6 @@ What the installer does, step by step, and things good to know.
 2. **bundle** (offline only): copies the bundle to the servers
 3. **common**: hostname, packages, time sync, firewall
 4. **wireguard** (if `wireguard: true`): the encrypted network between the servers
-5. **gpu** (servers with `gpu: true`): NVIDIA driver and container toolkit
 6. **docker**: installs Docker
 7. **registry**: a private image registry on every manager, with the same images. All servers pull from it.
 8. **swarm** or **k3s**: creates the cluster and joins the servers

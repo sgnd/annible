@@ -1,32 +1,12 @@
 # Advanced
 
-Extra options: installer flags, GPU servers, Kong, Swarmpit, and the Authelia login for your own apps.
+Extra options: installer flags, Kong, Swarmpit, and the Authelia login for your own apps.
 You do not need these for a normal install.
 
 ## More installer options
 
 Extra `ansible-playbook` options go after the config file,
 for example `./install.sh config.yml -v` (more output). Check mode (`--check`) is not supported.
-
-## GPU servers
-
-Set `gpu: true` on a server with an NVIDIA GPU. The installer installs the
-NVIDIA driver that Ubuntu recommends (and restarts the server once), the NVIDIA Container Toolkit,
-and makes `nvidia` Docker's default runtime there. Swarm servers get the label `gpu=true`. A service
-that needs the GPU:
-
-```yaml
-    environment:
-      NVIDIA_VISIBLE_DEVICES: all
-    deploy:
-      placement:
-        constraints: [node.labels.gpu == true]
-```
-
-With monitoring, dcgm-exporter reports GPU use, temperature and memory (alerts `GpuTooHot`,
-`GpuErrors`, `GpuMemoryFull`). GPU servers need internet. If the installer runs on a GPU server,
-restart it by hand after the first run and run `./install.sh` again. The NVIDIA driver is not
-open source; it is only installed with `gpu: true`.
 
 ## Kong
 

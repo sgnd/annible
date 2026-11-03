@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs inside an Ubuntu container of the target arch. build-bundle.sh starts it.
+# Runs inside an Ubuntu container (amd64). build-bundle.sh starts it.
 # /src = this project (read only), /out = the bundle folder.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -61,21 +61,19 @@ echo "- image list"
 /tmp/venv/bin/python - > /out/images.txt <<'EOF'
 import yaml
 for name, image in yaml.safe_load(open("/src/versions.yml"))["images"].items():
-    if name != "dcgm-exporter":  # GPU servers need internet anyway (NVIDIA's packages)
-        print(name, image["repo"], image["tag"], image["digest"])
+    print(name, image["repo"], image["tag"], image["digest"])
 EOF
 
 echo "- k3s version"
 # One line: version, sha256 of the program, sha256 of its images (for orchestrator: k3s).
-/tmp/venv/bin/python - "$(dpkg --print-architecture)" > /out/k3s.txt <<'EOF'
-import sys, yaml
+/tmp/venv/bin/python - > /out/k3s.txt <<'EOF'
+import yaml
 k3s = yaml.safe_load(open("/src/versions.yml"))["k3s"]
-print(k3s["version"], k3s[sys.argv[1]]["binary"], k3s[sys.argv[1]]["images"])
+print(k3s["version"], k3s["binary"], k3s["images"])
 EOF
 
 cat > /out/info.yml <<EOF
 ubuntu: "$VERSION_ID"
-arch: $(dpkg --print-architecture)
 EOF
 echo "- $(tar -tf /out/debs.tar | grep -c '\.deb$') apt packages"
 

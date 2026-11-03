@@ -10,7 +10,6 @@ acme_email: admin@example.com      # for tls: letsencrypt
 # tls_cert: ./certs/fullchain.pem   # for tls: custom, a wildcard cert for *.example.com
 # tls_key: ./certs/privkey.pem      # paths are relative to this file
 timezone: Asia/Jakarta
-# arch: amd64              # Leave this out: the installer finds each server's CPU (amd64 or arm64).
 
 ssh:
   user: ubuntu             # needs passwordless sudo
@@ -84,8 +83,6 @@ wireguard: false
 #   labels: optional tags for your own swarm placement rules, e.g. node.labels.tier == app.
 #           The installer only adds labels; remove old ones by hand (sudo docker node update --label-rm <key> <node>).
 #           You can leave labels out. (Swarm servers get tier=data or tier=app by themselves.)
-#   gpu:  optional, true for a server with an NVIDIA GPU: the installer adds the driver, the
-#         NVIDIA Container Toolkit and the label gpu=true. Needs internet.
 nodes:
   - name: swarm1
     ip: 10.0.0.11

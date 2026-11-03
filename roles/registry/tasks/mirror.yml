@@ -1,6 +1,5 @@
 # Copy pinned images into the local registry as <registry>/<name>:<tag>.
-# Online: copied straight from the internet, for every CPU type in the cluster (amd64, arm64).
-# Offline: loaded from the bundle (one CPU type).
+# Online: copied straight from the internet (the amd64 build). Offline: loaded from the bundle.
 # Runs on the first manager, and fills the registry of every manager.
 # Input: registry_mirror_images (list of keys in versions.yml images).
 
@@ -33,13 +32,11 @@
       docker tag {{ image.repo }}:{{ image.tag }} {{ dst }}
       docker push -q {{ dst }}
       {% else %}
-      # One "--platform linux/<cpu>" for each CPU type in the cluster.
-      platforms="{{ registry_platforms | map('regex_replace', '^', '--platform linux/') | join(' ') }}"
       {% if src_mirror %}
       # Docker Hub allows few downloads without a login; Google's copy of it (same digest) has no limit.
-      docker buildx imagetools create $platforms --tag {{ dst }} {{ src_mirror }} 2>/dev/null ||
+      docker buildx imagetools create --platform linux/amd64 --tag {{ dst }} {{ src_mirror }} 2>/dev/null ||
       {% endif %}
-      docker buildx imagetools create $platforms --tag {{ dst }} {{ src }}
+      docker buildx imagetools create --platform linux/amd64 --tag {{ dst }} {{ src }}
       {% endif %}
     executable: /bin/bash
   vars:
@@ -56,13 +53,10 @@
     src_mirror: >-
       {{ image.repo | regex_replace('^docker\\.io/', 'mirror.gcr.io/') ~ '@' ~ image.digest
       if src.startswith('docker.io/') else '' }}
-    # Online, the image must also be there for every CPU type (a new arm64 server, for example).
-    # have = the CPU types this registry already has for the image.
-    have: "{{ (item.json | default({})).manifests | default([]) | selectattr('platform', 'defined') | map(attribute='platform.architecture') }}"
   loop: "{{ registry_mirror_check.results }}"
   loop_control:
     label: "{{ item.item.0 }} on {{ item.item.1 }}"
-  when: item.status == 404 or (not offline and registry_platforms | difference(have) | length > 0)
+  when: item.status == 404
   delegate_to: "{{ swarm_leader }}"
   changed_when: true
   # Downloads sometimes fail for a moment (DNS, network). Try again before giving up.

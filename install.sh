@@ -34,16 +34,15 @@ fi
 offline=false
 [ -f bundle/info.yml ] && offline=true
 
-# Offline: this machine must match the bundle (its packages are for one Ubuntu version and CPU).
+# Offline: this machine must match the bundle (its packages are for one Ubuntu version, on amd64).
 if $offline; then
   bundle_ubuntu=$(sed -n 's/^ubuntu: "\(.*\)"/\1/p' bundle/info.yml)
-  bundle_arch=$(sed -n 's/^arch: //p' bundle/info.yml)
   here_ubuntu=$(sed -n 's/^VERSION_ID="\(.*\)"/\1/p' /etc/os-release 2>/dev/null || true)
   here_arch=$(dpkg --print-architecture 2>/dev/null || true)
-  if [ "$here_ubuntu" != "$bundle_ubuntu" ] || [ "$here_arch" != "$bundle_arch" ]; then
-    echo "error: this bundle is for Ubuntu $bundle_ubuntu $bundle_arch, this machine is ${here_ubuntu:-not Ubuntu} ${here_arch}." >&2
+  if [ "$here_ubuntu" != "$bundle_ubuntu" ] || [ "$here_arch" != amd64 ]; then
+    echo "error: this bundle is for Ubuntu $bundle_ubuntu amd64, this machine is ${here_ubuntu:-not Ubuntu} ${here_arch}." >&2
     echo "  Run the offline install on the first manager, or build a matching bundle:" >&2
-    echo "  ./build-bundle.sh <amd64|arm64> <ubuntu version>" >&2
+    echo "  ./build-bundle.sh <ubuntu version>" >&2
     exit 1
   fi
 fi

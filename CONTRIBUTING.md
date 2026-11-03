@@ -15,7 +15,7 @@ a beginner must be able to read every file. Use simple English.
 Open an issue with the [Suggest an app](https://github.com/sgnd/ansibro/issues/new?template=suggest-an-app.yml) form. An app fits when all of these are true:
 
 - It is open source: its license is on the [OSI list](https://opensource.org/licenses) (so not BSL or SSPL).
-- It has an image for both Intel/AMD (amd64) and ARM (arm64), with a fixed version (not `latest`).
+- It has an image for Intel/AMD (amd64), with a fixed version (not `latest`).
 - It works offline: everything it needs is in its image.
 - Its category has fewer than two apps. Each category has two choices at most.
 
@@ -26,7 +26,7 @@ Open an issue with the [Bug report](https://github.com/sgnd/ansibro/issues/new?t
 ## Add an app
 
 1. Add it to [`catalog.yml`](catalog.yml) with its license and how to reach it.
-2. Add its image to [`versions.yml`](versions.yml): tag and multi-arch digest
+2. Add its image to [`versions.yml`](versions.yml): tag and the digest of its image index
    (`docker buildx imagetools inspect <image>:<tag>`).
 3. Copy a similar role: `roles/postgres/` for a server app, `roles/portainer/` for a swarm app.
    Do not use `ports:` in server apps. Published ports skip the firewall. Use `network_mode: host`.

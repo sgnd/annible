@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+**Removed: GPU servers and ARM (arm64) servers.** Ansibro now runs on Intel/AMD (amd64) servers only,
+to keep it small and fully tested. `gpu:` on a node and `arch:` in `config.yml` are gone (the installer
+says so if they are still there), and so are the NVIDIA driver and toolkit, dcgm-exporter and the GPU
+alerts. The offline bundle is one per Ubuntu version: `./build-bundle.sh [24.04|26.04]` makes
+`dist/ansibro-<ubuntu>.tar.gz`. An ARM server stops the install with a clear message.
+
 Annible (the old name) is now called Ansibro: the repo is github.com/sgnd/ansibro, app files are in
 `/opt/ansibro`, and the commands are `ansibro-backup` and `ansibro-metrics`.
 

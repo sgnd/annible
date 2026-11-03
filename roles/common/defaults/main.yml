@@ -46,7 +46,7 @@ common_app_ports:
 # All ports this server opens to the other cluster servers:
 #   5000 registry (managers), the Swarm or k3s ports, 8082 Traefik metrics (for monitoring),
 #   12379-12380 etcd for Patroni (managers), 9100 9280 9598 9187 9104 9121 monitoring agents
-#   (node exporter, cAdvisor, Vector, PostgreSQL/MariaDB/Redis exporters), 9400 GPU exporter,
+#   (node exporter, cAdvisor, Vector, PostgreSQL/MariaDB/Redis exporters),
 #   45876 Beszel agent, and the ports of the apps on this server (common_app_ports).
 #   The agent ports are the same as in roles/observability/defaults/main.yml.
 common_cluster_tcp_ports: >-
@@ -55,7 +55,6 @@ common_cluster_tcp_ports: >-
   + ([8082] if monitoring_app and 'traefik' in apps and orchestrator == 'swarm' and inventory_hostname in traefik_nodes else [])
   + ([12379, 12380] if postgres_patroni and inventory_hostname in groups['managers'] else [])
   + ([9100, 9280, 9598, 9187, 9104, 9121] if monitoring_app else [])
-  + ([9400] if monitoring_app and node_gpu else [])
   + ([45876] if 'beszel' in apps else [])
   + (node_apps | map('extract', common_app_ports) | flatten))
   | unique | sort }}

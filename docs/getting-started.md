@@ -171,7 +171,7 @@ You are done. Next:
 | **firewall** | Rules about which network ports are open. Ansibro opens only what is needed and blocks the rest. |
 | **port** | A number that tells which app on a server a connection is for. Web pages use 80 (HTTP) and 443 (HTTPS). |
 | **WireGuard** | An encrypted network between your servers. Turn it on when servers talk over the internet. |
-| **amd64**, **arm64** | The two kinds of CPU. Intel and AMD are amd64. ARM servers (like AWS Graviton) are arm64. |
+| **amd64** | The kind of CPU Ansibro needs: Intel or AMD. ARM servers (like AWS Graviton) do not work. |
 | **offline bundle** | One big file with everything Ansibro needs, for servers that have no internet. |
 | **`state/` folder** | The folder where Ansibro keeps the passwords it made. Back it up. |
 | **Portainer** | A web page to see and manage your containers. |

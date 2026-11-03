@@ -10,7 +10,7 @@ The installer changes real servers. **Ask the user before you run `./install.sh`
 ## Before you start
 
 - `config.yml` exists and is valid. If not, use the `ansibro-setup` skill first.
-- Servers run Ubuntu 24.04 or 26.04, all with the same CPU type, with SSH key login and passwordless sudo.
+- Servers run Ubuntu 24.04 or 26.04 on Intel/AMD (amd64), with SSH key login and passwordless sudo.
 - The machine that runs the installer has Python 3.12 or newer and can reach every server's `ip` over SSH.
 - Always run it from the same machine, because the `state/` folder holds all passwords.
 
@@ -25,14 +25,14 @@ You can run it again any time. It only changes what is different in `config.yml`
 
 ## Offline (no internet on the servers)
 
-1. On a machine with internet and Docker (a Mac works too), build the bundle for the **servers'** CPU and Ubuntu version:
+1. On a machine with internet and Docker (a Mac works too), build the bundle for the **servers'** Ubuntu version:
 
    ```bash
-   ./build-bundle.sh amd64          # Intel/AMD, Ubuntu 24.04
-   ./build-bundle.sh arm64 26.04    # ARM, Ubuntu 26.04
+   ./build-bundle.sh          # Ubuntu 24.04
+   ./build-bundle.sh 26.04    # Ubuntu 26.04
    ```
 
-   This makes `dist/ansibro-<ubuntu>-<arch>.tar.gz` (about 4 GB).
+   This makes `dist/ansibro-<ubuntu>.tar.gz` (about 4 GB).
 2. Copy it **and the SSH private key** to the **first manager** (plus any `tls_cert`, `tls_key` or
    `acme_ca_cert` files: the bundle leaves out keys and certificates). The key must be allowed on
    every server, the first manager itself too. Unpack, add `config.yml` with `tls: selfsigned`
@@ -54,7 +54,7 @@ The installer sees the `bundle/` folder and uses it instead of the internet.
 | Problem | Try |
 |---------|-----|
 | `config error: ...` | Fix `config.yml` as the message says. |
-| Wrong CPU or Ubuntu version | Online, amd64 and arm64 servers may mix (leave `arch` out). Offline: the bundle has one CPU type and Ubuntu version; build one that matches. |
+| Wrong CPU or Ubuntu version | Servers must be Intel/AMD (amd64); ARM is not supported. Offline: the bundle has one Ubuntu version; build one that matches. |
 | Locked out of SSH | Check `ssh.allow_from`. Use the provider's console to run `sudo ufw disable`. |
 | No HTTPS certificate | DNS must point to the first manager, and port 80 must be open. Then `sudo docker service update --force traefik_traefik`. Let's Encrypt has rate limits. |
 | Swarm app not starting | `sudo docker service ls`, `sudo docker service logs <stack>_<service>` on a manager. |

@@ -1,6 +1,6 @@
-config.yml
-config.*.yml
-!config.example.yml
+/config.yml
+/config.*.yml
+!/config.example.yml
 *.pem
 *.key
 /certs/

@@ -1,34 +1,30 @@
 #!/usr/bin/env bash
 # Build an offline bundle: everything the servers need, so they need no internet.
 #
-# Usage: ./build-bundle.sh <arch> [ubuntu version]
-#   ./build-bundle.sh amd64          # Intel/AMD servers, Ubuntu 24.04
-#   ./build-bundle.sh arm64 26.04    # ARM servers, Ubuntu 26.04
+# Usage: ./build-bundle.sh [ubuntu version]
+#   ./build-bundle.sh          # Ubuntu 24.04
+#   ./build-bundle.sh 26.04    # Ubuntu 26.04
 #
 # Run it on any machine with Docker and internet (also a Mac). It makes
-# dist/ansibro-<ubuntu>-<arch>.tar.gz: a copy of this project plus a bundle/ folder:
+# dist/ansibro-<ubuntu>.tar.gz: a copy of this project plus a bundle/ folder:
 #   bundle/debs.tar       apt packages (Docker, chrony, ufw, ...)
 #   bundle/python/        Ansible and its Python packages
 #   bundle/collections/   Ansible collections
 #   bundle/images/        Docker images from versions.yml (list in bundle/images.txt)
-#   bundle/info.yml       Ubuntu version and arch of the bundle
+#   bundle/info.yml       Ubuntu version of the bundle
 # Your project folder is not changed: the work happens in dist/.
 set -euo pipefail
 
-arch="${1:-}"
-ubuntu="${2:-24.04}"
-if [ "$arch" != amd64 ] && [ "$arch" != arm64 ]; then
-  echo "usage: $0 <amd64|arm64> [24.04|26.04]" >&2
-  exit 1
-fi
+ubuntu="${1:-24.04}"
+arch=amd64  # Ansibro runs on Intel/AMD servers only
 if [ "$ubuntu" != 24.04 ] && [ "$ubuntu" != 26.04 ]; then
   echo "error: Ubuntu $ubuntu is not supported, use 24.04 or 26.04" >&2
   exit 1
 fi
 
 cd "$(dirname "$0")"
-file="dist/ansibro-$ubuntu-$arch.tar.gz"
-root="dist/build-$ubuntu-$arch"   # one work folder per bundle, so two builds can run at once
+file="dist/ansibro-$ubuntu.tar.gz"
+root="dist/build-$ubuntu"   # one work folder per bundle, so two builds can run at once
 work="$root/ansibro"              # the folder that goes into the tar file
 bundle="$work/bundle"
 
@@ -47,7 +43,7 @@ mkdir -p "$bundle/images"
 export COPYFILE_DISABLE=1
 git archive HEAD | tar -C "$work" -xf -
 
-echo "== apt packages, Python packages and collections (in an Ubuntu $ubuntu $arch container)"
+echo "== apt packages, Python packages and collections (in an Ubuntu $ubuntu container)"
 # OWNER: the container gives the files back to you (on Linux it would leave them owned by root).
 docker run --rm --platform "linux/$arch" -e OWNER="$(id -u):$(id -g)" \
   -v "$PWD:/src:ro" -v "$PWD/$bundle:/out" \
@@ -76,11 +72,10 @@ read -r k3s_version k3s_binary_sha k3s_images_sha < "$bundle/k3s.txt"
 rm "$bundle/k3s.txt"
 mkdir -p "$bundle/k3s"
 k3s_url="https://github.com/k3s-io/k3s/releases/download/${k3s_version/+/%2B}"
-k3s_name=$([ "$arch" = amd64 ] && echo k3s || echo "k3s-$arch")
-curl -fsSL --retry 3 -o "$bundle/k3s/k3s-$arch" "$k3s_url/$k3s_name"
-curl -fsSL --retry 3 -o "$bundle/k3s/k3s-airgap-images-$arch.tar.zst" "$k3s_url/k3s-airgap-images-$arch.tar.zst"
+curl -fsSL --retry 3 -o "$bundle/k3s/k3s" "$k3s_url/k3s"
+curl -fsSL --retry 3 -o "$bundle/k3s/k3s-airgap-images-amd64.tar.zst" "$k3s_url/k3s-airgap-images-amd64.tar.zst"
 # Stop if a download is not exactly the pinned file.
-(cd "$bundle/k3s" && printf '%s  %s\n%s  %s\n' "$k3s_binary_sha" "k3s-$arch" "$k3s_images_sha" "k3s-airgap-images-$arch.tar.zst" \
+(cd "$bundle/k3s" && printf '%s  %s\n%s  %s\n' "$k3s_binary_sha" k3s "$k3s_images_sha" k3s-airgap-images-amd64.tar.zst \
   | { sha256sum -c - 2>/dev/null || shasum -a 256 -c -; })
 
 echo "== Pack"

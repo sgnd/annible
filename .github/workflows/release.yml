@@ -12,7 +12,7 @@ permissions:
   contents: write  # to make the release and upload the bundles
 
 jobs:
-  # Make the release first, so the four bundle jobs only add files to it.
+  # Make the release first, so the bundle jobs only add files to it.
   release:
     name: Release
     runs-on: ubuntu-latest
@@ -29,28 +29,24 @@ jobs:
             gh release create "$GITHUB_REF_NAME" --prerelease="$pre" --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md. Offline bundles: docs/offline.md."
 
   bundle:
-    name: Bundle ${{ matrix.ubuntu }} ${{ matrix.arch }}
+    name: Bundle ${{ matrix.ubuntu }}
     needs: release
     if: always() && needs.release.result != 'failure'
     strategy:
       fail-fast: false  # one bundle failing does not stop the others
       matrix:
-        include:
-          - { arch: amd64, ubuntu: "24.04", runner: ubuntu-24.04 }
-          - { arch: amd64, ubuntu: "26.04", runner: ubuntu-24.04 }
-          - { arch: arm64, ubuntu: "24.04", runner: ubuntu-24.04-arm }
-          - { arch: arm64, ubuntu: "26.04", runner: ubuntu-24.04-arm }
-    runs-on: ${{ matrix.runner }}
+        ubuntu: ["24.04", "26.04"]
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Make disk space (a bundle needs about 10 GB while it is built)
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
       - name: Build the bundle
-        run: ./build-bundle.sh ${{ matrix.arch }} ${{ matrix.ubuntu }}
+        run: ./build-bundle.sh ${{ matrix.ubuntu }}
       - name: Split it into parts of 1.9 GB
         run: |
           cd dist
-          file=ansibro-${{ matrix.ubuntu }}-${{ matrix.arch }}.tar.gz
+          file=ansibro-${{ matrix.ubuntu }}.tar.gz
           sha256sum "$file" > "$file.sha256"
           split -b 1900m -d "$file" "$file.part"
           rm "$file"

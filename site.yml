@@ -17,19 +17,14 @@
         that: ansible_distribution_version == bundle.ubuntu
         fail_msg: >-
           The bundle is for Ubuntu {{ bundle.ubuntu }}, this node runs {{ ansible_distribution_version }}.
-          Build one with: ./build-bundle.sh {{ node_arch }} {{ ansible_distribution_version }}
+          Build one with: ./build-bundle.sh {{ ansible_distribution_version }}
       when: offline
 
-    # Servers may mix amd64 and arm64 (online). An offline bundle has one CPU type.
-    - name: Check CPU architecture
+    - name: Check CPU type
       ansible.builtin.assert:
-        that:
-          - node_arch in ['amd64', 'arm64']
-          - arch is not defined or node_arch == arch
-          - not offline or node_arch == bundle.arch
+        that: ansible_architecture == 'x86_64'
         fail_msg: >-
-          {{ inventory_hostname }} is {{ node_arch }}. Ansibro runs on amd64 and arm64.
-          Check arch in config.yml (if set) and the offline bundle's CPU type (if offline).
+          {{ inventory_hostname }} has a {{ ansible_architecture }} CPU. Ansibro runs on Intel/AMD (amd64) servers only.
 
     # Before anything changes: does config.yml still match the swarm? (No Docker yet = a new server.)
     - name: Read swarm state
@@ -135,8 +130,6 @@
     - common
     - role: wireguard
       when: wireguard
-    - role: gpu
-      when: node_gpu
     - docker
 
 - name: Registry
