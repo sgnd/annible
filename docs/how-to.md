@@ -143,7 +143,8 @@ remove its members by itself, so the installer stops when the managers change. T
 1. On every manager that runs etcd now, stop it and delete its data (it holds only Patroni's state):
    `cd /opt/ansibro/etcd && sudo docker compose down && sudo rm -rf data managers`
 2. Run `./install.sh`. etcd starts again, empty, on the new list of managers, and Patroni writes its
-   state into it again. PostgreSQL takes no writes for about a minute while etcd is down.
+   state into it again. PostgreSQL takes no writes for about a minute while etcd is down, and the
+   primary may move to another database server (apps that use database-proxy follow it).
 
 ## Upgrade an app
 

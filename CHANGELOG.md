@@ -102,8 +102,9 @@ Fixes
   Sentinel, Garage, Keycloak, prometheus) with backup, then all servers rebuilt and `-e restore=true`;
   k3s 3 servers + 3 data servers (MariaDB Galera, Authelia, victoria); offline from the bundle with
   3 managers and no internet. `tests/check.py` passes and a second run changes nothing. Also k3s with
-  `tls: letsencrypt` on a real domain (3 servers + 1 data server, Keycloak, Portainer). Not tested:
-  the stop when managers change.
+  `tls: letsencrypt` on a real domain (3 servers + 1 data server, Keycloak, Portainer). And with
+  `wireguard: true`: Swarm with Patroni grown from 1 to 3 managers (the installer stops, the steps in
+  docs/how-to.md work, Patroni stays healthy), and k3s with MariaDB Galera and Authelia.
   - Offline with more than one manager: every manager gets the registry image from the bundle.
   - PostgreSQL with Patroni: etcd compacts its old values (it filled up after some weeks), etcd's
     data is no longer in the backup, a restore loads the dump on the new primary (it may be another
