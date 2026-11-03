@@ -1,4 +1,5 @@
-# Monitoring: shared by the two choices, prometheus and victoria (monitoring_app in group_vars).
+# Monitoring with victoria (monitoring_app in group_vars): VictoriaMetrics, VictoriaLogs, vmalert,
+# Alertmanager and Grafana.
 # The server part runs where the app is set in config.yml, the agent part on every server.
 observability_dir: "{{ apps_dir }}/{{ monitoring_app }}"
 observability_agent_dir: "{{ apps_dir }}/monitoring-agent"
@@ -7,8 +8,8 @@ observability_agent_dir: "{{ apps_dir }}/monitoring-agent"
 observability_keep_days: "{{ (monitoring | default({})).keep_days | default(30) }}"
 
 # Ports on the monitoring server. Everything listens on the server's ip only.
-observability_metrics_port: "{{ 9090 if monitoring_app == 'prometheus' else 8428 }}"
-observability_logs_port: "{{ 3100 if monitoring_app == 'prometheus' else 9428 }}"
+observability_metrics_port: 8428
+observability_logs_port: 9428
 observability_vmalert_port: 8880
 observability_alertmanager_port: 9093
 observability_grafana_port: 3000
@@ -38,12 +39,10 @@ observability_app_ports:
   uptimekuma: 3001
   beszel: 8090
   openbao: 8200
-  prometheus: 9090
   victoria: 8428
 
 # The images each part needs.
 observability_server_images:
-  prometheus: [prometheus, loki, alertmanager, grafana]
   victoria: [victoriametrics, victorialogs, vmalert, alertmanager, grafana]
 
 # Generated once and saved in state/secrets/ on the installer machine.

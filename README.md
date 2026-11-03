@@ -95,19 +95,19 @@ A server app gets the name of the server it runs on (for example `postgres: serv
 it runs there with [Docker Compose](docs/getting-started.md#words).
 Click a name to open its official website.
 
-| Category | App | Runs on | Port | Web page |
-|----------|-----|---------|------|----------|
-| gateway | [traefik](https://traefik.io/traefik/) | swarm | 80, 443 | `traefik.<domain>` |
-| api-gateway | [kong](https://konghq.com/products/kong-gateway) | swarm | | `kong.<domain>`, `kong-manager.<domain>` |
-| management | [portainer](https://www.portainer.io) / [swarmpit](https://swarmpit.io) | swarm | | `portainer.<domain>` / `swarmpit.<domain>` |
-| auth (login) | [keycloak](https://www.keycloak.org) / [authelia](https://www.authelia.com) | swarm | | `keycloak.<domain>` / `authelia.<domain>` |
-| database | [postgres](https://www.postgresql.org) / [mariadb](https://mariadb.org) | server | 5432 / 3306 | |
-| cache | [redis](https://redis.io) / [valkey](https://valkey.io) | server | 6379 | |
-| storage (S3) | [rustfs](https://rustfs.com) / [garage](https://garagehq.deuxfleurs.fr) | server | 9000 / 3900 | `rustfs.<domain>/rustfs/console/` |
-| queue | [rabbitmq](https://www.rabbitmq.com) / [nats](https://nats.io) | server | 5672 / 4222 | `rabbitmq.<domain>` / `nats.<domain>` |
-| monitoring | [uptimekuma](https://uptime.kuma.pet) / [beszel](https://beszel.dev) | server | | `uptimekuma.<domain>` / `beszel.<domain>` |
-| secrets | [openbao](https://openbao.org) | server | 8200 | `openbao.<domain>` |
-| observability (metrics, logs, alerts) | [prometheus](https://prometheus.io) / [victoria](https://victoriametrics.com) | server | | `grafana.<domain>` and more, see [How to](docs/how-to.md#monitoring-and-alerts) |
+| Category | What it does | App | Runs on | Port | Web page |
+|----------|--------------|-----|---------|------|----------|
+| gateway | HTTPS entry for all web pages | [traefik](https://traefik.io/traefik/) | swarm | 80, 443 | `traefik.<domain>` |
+| api-gateway | API keys, limits and routes for your APIs | [kong](https://konghq.com/products/kong-gateway) | swarm | | `kong.<domain>`, `kong-manager.<domain>` |
+| management | manage containers in a web page | [portainer](https://www.portainer.io) / [swarmpit](https://swarmpit.io) | swarm | | `portainer.<domain>` / `swarmpit.<domain>` |
+| auth | login with a second factor | [keycloak](https://www.keycloak.org) / [authelia](https://www.authelia.com) | swarm | | `keycloak.<domain>` / `authelia.<domain>` |
+| database | SQL database | [postgres](https://www.postgresql.org) / [mariadb](https://mariadb.org) | server | 5432 / 3306 | |
+| cache | key-value cache | [redis](https://redis.io) / [valkey](https://valkey.io) | server | 6379 | |
+| storage | S3 file storage | [rustfs](https://rustfs.com) / [garage](https://garagehq.deuxfleurs.fr) | server | 9000 / 3900 | `rustfs.<domain>/rustfs/console/` |
+| queue | messages between apps | [rabbitmq](https://www.rabbitmq.com) / [nats](https://nats.io) | server | 5672 / 4222 | `rabbitmq.<domain>` / `nats.<domain>` |
+| uptime | checks from outside that your sites answer, status page | [uptimekuma](https://uptime.kuma.pet) | server | | `uptimekuma.<domain>` |
+| monitoring | servers, containers and alerts. victoria: full (also logs, Grafana, `monitoring:` in config.yml); beszel: light | [victoria](https://victoriametrics.com) / [beszel](https://beszel.dev) | server | | `grafana.<domain>` and more, see [How to](docs/how-to.md#monitoring-and-alerts) / `beszel.<domain>` |
+| secrets | passwords and keys for your apps | [openbao](https://openbao.org) | server | 8200 | `openbao.<domain>` |
 
 Logins, what each app needs, and notes: [docs/apps.md](docs/apps.md).
 

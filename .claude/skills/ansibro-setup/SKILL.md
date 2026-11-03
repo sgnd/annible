@@ -61,7 +61,7 @@ If a `bundle/` folder is here, the check treats it as an offline install.
   (for example 10.99.0.11); open UDP 51820 between the hosts in the cloud firewall.
 - Suggest `backup:` with storage outside the cluster (S3 or rest-server). The restic password is in
   `state/secrets/restic`: keep `state/` safe outside the cluster. Restore on new servers: `./install.sh -e restore=true`.
-- Suggest monitoring: `victoria` (lighter) or `prometheus` on a server with 2 GB free memory, plus `monitoring:`
-  with at least one of telegram, email or webhook. Put `uptimekuma` on another server and, after the first
+- Suggest monitoring: `victoria` on a server with 2 GB free memory, plus `monitoring:` with at least one of
+  telegram, email or webhook. Or `beszel` for small setups: light, no logs, alerts set in its web page. Put `uptimekuma` on another server and, after the first
   install, add the "HTTP(s) - Keyword" monitor the install prints, so someone watches the monitoring server.
 - Next step: run the installer (skill `ansibro-install`).

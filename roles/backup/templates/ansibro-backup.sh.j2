@@ -91,7 +91,7 @@ for dir in {{ apps_dir }}/*/; do
     etcd) ;;                                # Patroni's state: made again from the new database
     postgres | mariadb) ;;                  # saved as a dump above
     rustfs) paths+=("$dir") ;;              # big: saved while it runs
-    prometheus | victoria) copy_app "$app" data ;;  # metrics and logs history: not saved
+    victoria) copy_app "$app" data ;;                # metrics and logs history: not saved
     monitoring-agent) copy_app "$app" vector-data ;;  # logs waiting to be sent: not saved
     garage) copy_app garage data            # settings and metadata paused, data while it runs
             paths+=("{{ apps_dir }}/garage/data") ;;

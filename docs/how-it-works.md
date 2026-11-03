@@ -13,7 +13,7 @@ What the installer does, step by step, and things good to know.
 7. **registry**: a private image registry on every manager, with the same images. All servers pull from it.
 8. **swarm** or **k3s**: creates the cluster and joins the servers
 9. **server apps**: `roles/<app>/`, Docker Compose in `/opt/ansibro/<app>/`
-10. **agents** on every server: beszel (if picked), monitoring (with prometheus or victoria)
+10. **agents** on every server, for the monitoring app: victoria or beszel
 11. **swarm apps**: `roles/<app>/`, swarm stacks in `/opt/ansibro/<app>/` (k3s: its built-in Traefik)
 12. **removed apps** stop, then **backup** (if `backup:` is set)
 

@@ -127,15 +127,7 @@ images:
     repo: docker.io/henrygd/beszel-agent
     tag: 0.21.1
     digest: sha256:cb6868012964d7a68debaa2c84bb72285e5f08531e81f506bd4c493bf052e41c
-  # Monitoring (observability: prometheus or victoria). Agents and exporters run on every server.
-  prometheus:
-    repo: docker.io/prom/prometheus
-    tag: v3.15.1
-    digest: sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
-  loki:
-    repo: docker.io/grafana/loki
-    tag: 3.7.9
-    digest: sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
+  # Monitoring (victoria). Agents and exporters run on every server.
   victoriametrics:
     repo: docker.io/victoriametrics/victoria-metrics
     tag: v1.155.0

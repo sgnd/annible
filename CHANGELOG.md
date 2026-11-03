@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+Clearer app categories, and one monitoring stack less.
+- **Removed: `prometheus`.** `victoria` does the same (metrics, logs, alerts, Grafana) with less
+  memory and disk. Use `victoria` in `apps` instead.
+- The category `monitoring` is now `victoria` (full) or `beszel` (light: servers and containers,
+  alerts set in its web page, no logs). `monitoring:` in `config.yml` is where victoria sends alerts.
+- `uptimekuma` has its own category, `uptime` (it checks from outside that your sites answer), so it
+  can run next to either monitoring app.
+- The Apps table in the README has a "What it does" column, and uses the exact category names.
+
 ## 1.1.0
 
 **Removed: GPU servers and ARM (arm64) servers.** Ansibro now runs on Intel/AMD (amd64) servers only,

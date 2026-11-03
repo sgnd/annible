@@ -41,7 +41,6 @@ common_app_ports:
   uptimekuma: [3001]
   beszel: [8090]
   openbao: [8200, 8201]
-  prometheus: [9090, 3100, 9093, 3000]      # metrics, logs, alerts, Grafana
   victoria: [8428, 9428, 8880, 9093, 3000]  # metrics, logs, rules, alerts, Grafana
 # All ports this server opens to the other cluster servers:
 #   5000 registry (managers), the Swarm or k3s ports, 8082 Traefik metrics (for monitoring),

@@ -473,7 +473,7 @@ def check_beszel():
 
 def check_monitoring(app):
     ip = ip_of(app)
-    metrics = f"http://{ip}:{9090 if app == 'prometheus' else 8428}"
+    metrics = f"http://{ip}:8428"
     code, _ = curl(f"http://{ip}:3000/api/user", user="admin:" + secret("grafana_admin"))
     check("grafana admin login", code == "200", code)
     check("grafana page", https("grafana", path="/login")[0] == "200")
@@ -492,8 +492,7 @@ def check_monitoring(app):
     check(f"every server app answers ({len(apps)})", apps and all(v == "1" for v in apps.values()), str(apps))
 
     # The alert rules are loaded and Watchdog fires: alerts reach Alertmanager.
-    rules_url = metrics + "/api/v1/rules" if app == "prometheus" else f"http://{ip}:8880/api/v1/rules"
-    _, body = curl(rules_url)
+    _, body = curl(f"http://{ip}:8880/api/v1/rules")
     rules = sum(len(g["rules"]) for g in json.loads(body)["data"]["groups"])
     check(f"alert rules loaded ({rules})", rules >= 30, str(rules))
     _, body = curl(f"http://{ip}:9093/api/v2/alerts")
@@ -503,12 +502,8 @@ def check_monitoring(app):
     check("no other alerts firing", not real, ", ".join(sorted(real)))
 
     # Logs arrive from every server.
-    if app == "prometheus":
-        _, body = curl(f"http://{ip}:3100/loki/api/v1/label/node/values")
-        nodes = set(json.loads(body).get("data", []))
-    else:
-        _, body = curl(f"http://{ip}:9428/select/logsql/field_values?query=_time:15m&field=node")
-        nodes = {v["value"] for v in json.loads(body).get("values", [])}
+    _, body = curl(f"http://{ip}:9428/select/logsql/field_values?query=_time:15m&field=node")
+    nodes = {v["value"] for v in json.loads(body).get("values", [])}
     for host in HOSTS:
         check(f"logs arrive from {host}", host in nodes, str(sorted(nodes)))
 
@@ -520,7 +515,7 @@ CHECKS = {
     "redis": lambda: check_cache("redis"), "valkey": lambda: check_cache("valkey"),
     "rustfs": check_rustfs, "garage": check_garage, "rabbitmq": check_rabbitmq, "nats": check_nats,
     "uptimekuma": check_uptimekuma, "beszel": check_beszel,
-    "prometheus": lambda: check_monitoring("prometheus"), "victoria": lambda: check_monitoring("victoria"),
+    "victoria": lambda: check_monitoring("victoria"),
 }
 
 if __name__ == "__main__":

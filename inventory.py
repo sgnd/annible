@@ -32,7 +32,7 @@ LABEL = re.compile(r"^[A-Za-z0-9._-]+$")
 SSH_KEYS = {"user", "key", "port", "allow_from"}
 BACKUP_KEYS = {"repository", "s3_access_key", "s3_secret_key", "time", "keep_daily", "keep_weekly", "keep_monthly"}
 MONITORING_KEYS = {"telegram", "email", "webhook", "heartbeat_url", "keep_days"}
-MONITORING_APPS = ("prometheus", "victoria")
+MONITORING_APPS = ("victoria",)
 URL = re.compile(r"^https?://\S+$")
 TIME = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
 # Swarm's own networks use this range. Docker's default (10.0.0.0/8) often clashes with servers' IPs.
@@ -125,7 +125,7 @@ def check_backup(backup):
 
 
 def check_monitoring(monitoring):
-    """monitoring: where alerts go. Only used with the prometheus or victoria app."""
+    """monitoring: where alerts go. Only used with the victoria app."""
     if monitoring is None:
         return
     if not isinstance(monitoring, dict):
@@ -326,7 +326,8 @@ def build_apps(apps, catalog, hostvars, monitoring=None):
     if monitoring_app and not monitoring:
         fail(f"{monitoring_app} needs monitoring: in config.yml, to know where to send alerts (telegram, email or webhook)")
     if monitoring and not monitoring_app:
-        fail("monitoring: is set, but no monitoring app is installed. Add prometheus or victoria to apps")
+        fail("monitoring: is set, but victoria is not installed. monitoring: tells victoria where to send alerts "
+             "(beszel has its own alert settings in its web page). Add victoria to apps, or remove monitoring:")
     if monitoring_app and apps.get("uptimekuma") == apps[monitoring_app]:
         fail(f"uptimekuma watches the monitoring server, so put it on another server than {monitoring_app}")
 

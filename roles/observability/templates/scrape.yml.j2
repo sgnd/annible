@@ -1,17 +1,6 @@
 # What to collect, every 30 seconds. Each target has a "node" label: the server it runs on.
-# The same file works for Prometheus and VictoriaMetrics.
 global:
   scrape_interval: 30s
-{% if monitoring_app == 'prometheus' %}
-  evaluation_interval: 30s
-
-rule_files: [/etc/prometheus/alerts.yml]
-
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets: ["{{ node_ip }}:{{ observability_alertmanager_port }}"]
-{% endif %}
 
 scrape_configs:
   # On every server: the server itself (node-exporter), its containers (cAdvisor), the log agent (Vector).
