@@ -20,10 +20,11 @@
   when: inventory_hostname == swarm_leader
   diff: false  # may have keys
 
+# Only the passwords: state/summary.md is made again by every install (and its date changes each time).
 - name: Copy state/ for the backup
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/state/"
-    dest: "{{ backup_dir }}/installer/state/"
+    src: "{{ playbook_dir }}/state/secrets/"
+    dest: "{{ backup_dir }}/installer/state/secrets/"
     mode: "0600"
     directory_mode: "0700"
   when: inventory_hostname == swarm_leader

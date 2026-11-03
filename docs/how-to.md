@@ -38,7 +38,7 @@ and run `./install.sh`. Every server then backs up each night with [restic](http
 - databases (PostgreSQL, MariaDB) as a dump (one file with all the data), while they run
 - every other folder in `/opt/ansibro/`: the app is paused for a moment while its files are copied
 - RustFS and Garage data as it is, while it runs
-- on the first manager: the swarm (your stacks, secrets, configs, networks), `config.yml` and `state/`
+- on the first manager: the swarm (your stacks, secrets, configs, networks), `config.yml` and the passwords in `state/secrets/`
 
 Not saved: the image registry (the installer fills it again; push your own images again)
 and Docker volumes. Keep your own stacks' files in `/opt/ansibro/<stack name>/` so they are saved too:
@@ -135,6 +135,16 @@ Add it to `config.yml`, after the first manager, and run `./install.sh`.
 From worker to manager, or back. The installer does not do this; it stops and
 shows the command: `sudo docker node promote <name>` or `sudo docker node demote <name>` on a manager.
 
+## Add or remove a manager with PostgreSQL on more servers
+
+With PostgreSQL on 2 or more servers (Patroni), etcd runs on every manager. etcd cannot add or
+remove its members by itself, so the installer stops when the managers change. Then:
+
+1. On every manager that runs etcd now, stop it and delete its data (it holds only Patroni's state):
+   `cd /opt/ansibro/etcd && sudo docker compose down && sudo rm -rf data managers`
+2. Run `./install.sh`. etcd starts again, empty, on the new list of managers, and Patroni writes its
+   state into it again. PostgreSQL takes no writes for about a minute while etcd is down.
+
 ## Upgrade an app
 
 Change its tag (the version name) and digest (a fingerprint of that exact image)
@@ -157,12 +167,12 @@ A new Docker version is installed one server at a time, so the swarm keeps runni
   failover needs that manager.
 - Alerts: `PostgresNoPrimary`, `PostgresReplicaBehind`.
 
-**MariaDB**: on 3 servers, `mariadb: [m1, m2, m3]`, it is a [Galera](https://mariadb.com/kb/en/galera-cluster/) cluster.
+**MariaDB**: on 3 servers, `mariadb: [m1, m2, m3]`, it is a [Galera](https://mariadb.com/docs/galera-cluster) cluster.
 - What it does: every server has all the data, and stays up when one server is down.
 - How apps connect: through `database-proxy` (port 3306). It uses the first server, and the
-  others when the first is down.
+  others when the first is down or out of sync (each server answers a check on port 9200).
 - If all 3 servers stop at the same time, start the cluster again by hand: see
-  [Galera: restarting the cluster](https://mariadb.com/kb/en/getting-started-with-mariadb-galera-cluster/#restarting-the-cluster).
+  [Galera: recovering a primary component](https://mariadb.com/docs/galera-cluster/high-availability/recovering-a-primary-component).
 - Alert: `MariadbClusterSmall`.
 
 **Redis or Valkey**: on 3 servers, `valkey: [c1, c2, c3]`.

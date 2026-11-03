@@ -89,12 +89,14 @@
 # When the installer runs on a server, it talks to the others over SSH. The firewall lets their
 # replies in only while it remembers the connection, and it forgets when it starts or Docker starts.
 # Then the install hangs. So always let SSH replies from the other servers in.
+# Replies come back to a short-lived local port (32768-60999 on Linux), so only those are opened.
 - name: Allow SSH replies from other cluster nodes
   community.general.ufw:
     rule: allow
     proto: tcp
     from_ip: "{{ item }}"
     from_port: "{{ ansible_port | string }}"
+    port: "32768:60999"
   loop: "{{ common_cluster_hosts }}"
 
 # Containers on this server can reach apps that use the host network.
@@ -105,8 +107,32 @@
     interface: "{{ item }}"
   loop: "{{ common_docker_interfaces }}"
 
+# Ports that Docker publishes skip the rules above (Docker sends them on before ufw sees them).
+# Traefik's metrics port 8082 is one: only the other cluster servers may use it.
+# Docker checks the DOCKER-USER chain first, so the limit goes there.
+- name: Limit Traefik's metrics port to the cluster servers
+  ansible.builtin.blockinfile:
+    path: /etc/ufw/after.rules
+    marker: "# {mark} ANSIBRO TRAEFIK METRICS"
+    block: |
+      *filter
+      :DOCKER-USER - [0:0]
+      {% for ip in common_cluster_ips %}
+      -A DOCKER-USER -p tcp -m conntrack --ctorigdstport 8082 --ctdir ORIGINAL -s {{ ip }} -j RETURN
+      {% endfor %}
+      -A DOCKER-USER -p tcp -m conntrack --ctorigdstport 8082 --ctdir ORIGINAL -j DROP
+      -A DOCKER-USER -j RETURN
+      COMMIT
+    state: "{{ 'present' if 8082 in common_cluster_tcp_ports else 'absent' }}"
+  register: common_docker_user
+
 - name: Enable firewall
   community.general.ufw:
     state: enabled
     direction: incoming
     policy: deny
+
+- name: Load the changed Docker port limit
+  ansible.builtin.command: ufw reload
+  when: common_docker_user.changed  # noqa: no-handler
+  changed_when: true

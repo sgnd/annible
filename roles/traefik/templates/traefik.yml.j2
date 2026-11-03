@@ -21,7 +21,7 @@ entryPoints:
 {% endif %}
 
 {% if monitoring_app %}
-  # Only for the monitoring server (the firewall lets only the cluster servers in).
+  # Only for the monitoring server (a DOCKER-USER rule from roles/common lets only the cluster servers in).
   metrics:
     address: ":8082"
 

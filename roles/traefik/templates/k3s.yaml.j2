@@ -20,14 +20,40 @@ spec:
 {% if acme_server is defined %}
       - --certificatesresolvers.letsencrypt.acme.caserver={{ acme_server }}
 {% endif %}
+{% if acme_ca_cert is defined %}
+      - --certificatesresolvers.letsencrypt.acme.cacertificates=/acme-ca/ca.crt
+    # The ACME server's CA certificate (acme_ca_cert), from the secret below.
+    volumes:
+      - name: acme-ca
+        mountPath: /acme-ca
+        type: secret
+{% endif %}
     # Keeps the certificates when Traefik restarts.
     persistence:
       enabled: true
+    # One Traefik, on the first manager: Let's Encrypt's check must reach the Traefik that asked.
+    # Point DNS to the first manager.
+    nodeSelector:
+      kubernetes.io/hostname: {{ swarm_leader }}
+{% else %}
+    # A Traefik on every cluster server, so each one answers on 80 and 443. Point DNS to all of them.
+    deployment:
+      kind: DaemonSet
 {% endif %}
-    # Keeps the real client IP.
+    # Keeps the real client IP. Only a server that runs Traefik answers.
     service:
       spec:
         externalTrafficPolicy: Local
+{% if tls == 'letsencrypt' and acme_ca_cert is defined %}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: acme-ca
+  namespace: kube-system
+data:
+  ca.crt: {{ lookup('ansible.builtin.file', acme_ca_cert) | b64encode }}
+{% endif %}
 ---
 # Ansibro's own things (routes to server apps, admin logins) live in this namespace.
 apiVersion: v1

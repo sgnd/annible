@@ -11,6 +11,12 @@ sources:
     since_now: true
   vector_metrics:
     type: internal_metrics
+{% if orchestrator == 'k3s' and inventory_hostname in groups['swarm'] %}
+  # k3s pods are not Docker containers: k3s writes their logs to files.
+  pods:
+    type: file
+    include: [/var/log/pods/*/*/*.log]
+{% endif %}
 
 transforms:
   container_labels:
@@ -23,6 +29,21 @@ transforms:
       .app = .label."com.docker.compose.project" || .label."com.docker.stack.namespace" || .container_name || "other"
       .container = .label."com.docker.swarm.service.name" || .container_name || "other"
 {% endraw %}
+{% if orchestrator == 'k3s' and inventory_hostname in groups['swarm'] %}
+  pod_labels:
+    type: remap
+    inputs: [pods]
+    source: |
+      .node = "{{ inventory_hostname }}"
+{% raw %}
+      # The file is /var/log/pods/<namespace>_<pod>_<id>/<container>/0.log: app and container are
+      # the container's name. A line is "<time> stdout F <message>": keep the message only.
+      parts = split(string(.file) ?? "", "/")
+      .app = string(parts[5]) ?? "other"
+      .container = .app
+      .message = replace(string(.message) ?? "", r'^\S+ \S+ \S+ ', "")
+{% endraw %}
+{% endif %}
   system_labels:
     type: remap
     inputs: [system]
@@ -35,7 +56,7 @@ sinks:
   # Loki and VictoriaLogs both take logs in the Loki format.
   logs:
     type: loki
-    inputs: [container_labels, system_labels]
+    inputs: [container_labels, system_labels{{ ', pod_labels' if orchestrator == 'k3s' and inventory_hostname in groups['swarm'] }}]
 {% if monitoring_app == 'prometheus' %}
     endpoint: http://{{ monitoring_ip }}:{{ observability_logs_port }}
 {% else %}

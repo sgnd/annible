@@ -22,6 +22,13 @@ scrape_configs:
       - targets: ["{{ hostvars[host].node_ip }}:{{ port }}"]
         labels: { node: {{ host }} }
 {% endfor %}
+{% if job == 'cadvisor' and orchestrator == 'k3s' %}
+    # k3s pods: name is the container's name from Kubernetes, like a Docker container's name.
+    metric_relabel_configs:
+      - source_labels: [container_label_io_kubernetes_container_name]
+        regex: (.+)
+        target_label: name
+{% endif %}
 {% endfor %}
 
   # Database exporters, on each server where the database runs (replicas too).

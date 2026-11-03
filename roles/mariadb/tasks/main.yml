@@ -110,3 +110,54 @@
         tasks_from: compose
       vars:
         docker_compose_app: mariadb
+
+# Galera: a small check that database-proxy asks (port {{ mariadb_check_port }}), see galera-check.sh.j2.
+# systemd listens on the port and runs the script for each connection; no extra program is needed.
+- name: Set up the Galera check
+  when: mariadb_galera
+  block:
+    - name: Write the Galera check script
+      ansible.builtin.template:
+        src: galera-check.sh.j2
+        dest: /usr/local/bin/ansibro-galera-check
+        mode: "0700"
+
+    - name: Write the Galera check socket
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/ansibro-galera-check.socket
+        content: |
+          [Unit]
+          Description=Ansibro Galera check for database-proxy
+
+          [Socket]
+          ListenStream={{ node_ip }}:{{ mariadb_check_port }}
+          # The address can come later than the socket at boot (for example with WireGuard).
+          FreeBind=true
+          Accept=yes
+          MaxConnections=10
+
+          [Install]
+          WantedBy=sockets.target
+        mode: "0644"
+      register: mariadb_check_socket
+
+    - name: Write the Galera check service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/ansibro-galera-check@.service
+        content: |
+          [Unit]
+          Description=Ansibro Galera check
+
+          [Service]
+          ExecStart=/usr/local/bin/ansibro-galera-check
+          StandardInput=socket
+          StandardOutput=socket
+          StandardError=journal
+        mode: "0644"
+
+    - name: Start the Galera check
+      ansible.builtin.systemd_service:
+        name: ansibro-galera-check.socket
+        state: "{{ 'restarted' if mariadb_check_socket.changed else 'started' }}"
+        enabled: true
+        daemon_reload: true

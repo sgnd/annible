@@ -67,10 +67,13 @@
     mode: "0600"
   diff: false  # has the password
 
+# One server at a time: with 3 servers, a config change must not restart them all together.
 - name: Start Redis
   ansible.builtin.include_role:
     name: docker
     tasks_from: compose
+    apply:
+      throttle: 1
   vars:
     docker_compose_app: redis
     docker_compose_restart: "{{ redis_config.changed }}"

@@ -98,6 +98,29 @@ Updates
 - Traefik v3.7.17.
 
 Fixes
+- From the final review, tested on DigitalOcean: Swarm 3 managers + 3 data servers (Patroni, Redis
+  Sentinel, Garage, Keycloak, prometheus) with backup, then all servers rebuilt and `-e restore=true`;
+  k3s 3 servers + 3 data servers (MariaDB Galera, Authelia, victoria); offline from the bundle with
+  3 managers and no internet. `tests/check.py` passes and a second run changes nothing. Not tested:
+  k3s with `tls: letsencrypt` (needs a real domain), and the stop when managers change.
+  - Offline with more than one manager: every manager gets the registry image from the bundle.
+  - PostgreSQL with Patroni: etcd compacts its old values (it filled up after some weeks), etcd's
+    data is no longer in the backup, a restore loads the dump on the new primary (it may be another
+    server than at backup time), and the backup waits for a primary during a failover. The installer
+    stops when the managers change; docs/how-to.md shows the steps. Patroni's API needs a login for changes.
+  - MariaDB with Galera: database-proxy uses a server only when it is in sync (a check on port 9200).
+    Authelia goes through database-proxy too.
+  - Garage's key may make buckets.
+  - k3s: with `tls: letsencrypt`, Traefik runs on the first manager (point DNS there); else on every
+    cluster server. `acme_ca_cert` works on k3s. Pod logs and container metrics reach the monitoring.
+  - Traefik's metrics port 8082 is open only to the other servers (Docker skipped the firewall for it).
+    The SSH replies rule opens only the short-lived local ports.
+  - Turning off a database on more servers removes etcd, database-proxy and the Galera check.
+    Redis and Valkey restart one server at a time. Beszel's login token is not shown in logs.
+  - Found by these tests: k3s without WireGuard sent its pod network (flannel) over the public IP,
+    which the firewall closes, so pods on different servers could not reach each other; it now uses
+    the interface of `ip`. Patroni's API login is set through Spilo's own setting. A second install
+    no longer reports a change (the backup copied `state/summary.md`; now `state/secrets/` only).
 - Docker Hub allows few downloads without a login (429 Too Many Requests). Images are now copied
   from Google's copy of Docker Hub (mirror.gcr.io, same pinned digest) when they can be, each image
   is downloaded once (the other managers copy it from the first), and Docker and k3s use the mirror too.

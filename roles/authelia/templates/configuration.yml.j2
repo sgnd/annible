@@ -54,7 +54,7 @@ storage:
     address: tcp://{{ database_host }}:5432
 {% else %}
   mysql:
-    address: tcp://{{ database_ip }}:3306
+    address: tcp://{{ database_host }}:3306
 {% endif %}
     database: authelia
     username: authelia

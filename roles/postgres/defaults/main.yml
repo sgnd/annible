@@ -2,7 +2,10 @@ postgres_dir: "{{ apps_dir }}/postgres"
 
 # Generated once and saved in state/secrets/ on the installer machine.
 postgres_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/postgres', chars=['ascii_letters', 'digits'], length=24) }}"
+postgres_patroni_api_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/postgres_patroni_api', chars=['ascii_letters', 'digits'], length=24) }}"
 postgres_replication_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/postgres_replication', chars=['ascii_letters', 'digits'], length=24) }}"
 
 # Patroni keeps its shared state (who is the primary) in etcd, which runs on the managers.
 postgres_etcd_hosts: "{{ groups['managers'] | map('extract', hostvars, 'node_ip') | map('regex_replace', '$', ':12379') | join(',') }}"
+# Where a restore finds the database dump (put back from the backup by roles/backup).
+postgres_dump: "{{ apps_dir }}/backup/stage/dumps/postgres.sql"
