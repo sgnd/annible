@@ -93,4 +93,4 @@ spec:
       kind: Rule
       middlewares: [{ name: admin-ip }, { name: "{{ k3s_admin_login }}" }, { name: kong-admin-strip }]
       services: [{ name: kong, port: 8001 }]
-  tls: {}
+  tls: {{ k3s_route_tls | to_json }}

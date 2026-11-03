@@ -78,7 +78,7 @@
       {% endif %}
             services:
               - { name: {{ traefik_route_name }}, port: {{ traefik_route_port }} }
-        tls: {}
+        tls: {{ k3s_route_tls | to_json }}
     mode: "0600"
   delegate_to: "{{ swarm_leader }}"
   when: "'traefik' in apps and orchestrator == 'k3s'"
