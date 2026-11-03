@@ -2,13 +2,15 @@
 {% set monitors = [] %}
 {% if 'traefik' in apps %}
 {% for app in apps if app in uptimekuma_pages %}
-{#   Through Traefik with the page's name, so it works without DNS. 401 and 403: the page asks for a login. #}
+{#   Through Traefik with the page's name, so it works without DNS. 3xx, 401 and 403: the page asks for a
+     login (redirects are not followed: a login page on another name may have no DNS here). #}
 {%   set _ = monitors.append({
        'name': uptimekuma_pages[app].host ~ ' web page',
        'url': 'https://' ~ traefik_ip ~ uptimekuma_pages[app].path,
        'headers': {'Host': uptimekuma_pages[app].host ~ '.' ~ domain} | to_json,
        'ignoreTls': true,
        'accepted_statuscodes': ['200-399', '401', '403'],
+       'maxredirects': 0,
      }) %}
 {% endfor %}
 {% endif %}
