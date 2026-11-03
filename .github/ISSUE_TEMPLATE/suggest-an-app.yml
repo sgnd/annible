@@ -14,7 +14,7 @@ body:
     id: category
     attributes:
       label: Category
-      description: Like database, cache, queue, storage, monitoring or gateway
+      description: Like database, cache, queue, storage, uptime, monitoring or gateway (see catalog.yml)
     validations:
       required: true
   - type: textarea

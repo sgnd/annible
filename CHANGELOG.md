@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+Clearer app categories: "monitoring" now means the same everywhere.
+- `prometheus` and `victoria` are in the category `monitoring` (was `observability`), which matches
+  the `monitoring:` setting they need.
+- `uptimekuma` is in `uptime`, and `beszel` in `server-stats` (both were `monitoring`), so you can
+  install them together.
+- The Apps table in the README has a "What it does" column, and uses the exact category names.
+
 ## 1.1.0
 
 **Removed: GPU servers and ARM (arm64) servers.** Ansibro now runs on Intel/AMD (amd64) servers only,

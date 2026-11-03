@@ -104,21 +104,21 @@ nats:
   info: "nats://<ip>:4222 (user admin, password state/secrets/nats). Monitoring https://nats.<domain> (needs traefik; Traefik dashboard login)"
 
 uptimekuma:
-  category: monitoring
+  category: uptime
   runs_on: node
   requires: [traefik]
   license: MIT
   info: "https://uptimekuma.<domain> (Traefik dashboard login first, then create Uptime Kuma's admin user)"
 
 beszel:
-  category: monitoring
+  category: server-stats
   runs_on: node
   requires: [traefik]
   license: MIT
   info: "https://beszel.<domain> (user admin@<domain>, password state/secrets/beszel_admin). Agents run on every server"
 
 prometheus:
-  category: observability
+  category: monitoring
   runs_on: node
   requires: [traefik]
   license: Apache-2.0 (Prometheus, Alertmanager), AGPL-3.0 (Loki, Grafana)
@@ -126,7 +126,7 @@ prometheus:
     alerts https://alertmanager.<domain>, Prometheus https://metrics.<domain>. Logs: Grafana > Explore > Logs"
 
 victoria:
-  category: observability
+  category: monitoring
   runs_on: node
   requires: [traefik]
   license: Apache-2.0 (VictoriaMetrics, VictoriaLogs, Alertmanager), AGPL-3.0 (Grafana)

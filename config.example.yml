@@ -111,6 +111,7 @@ apps:
   redis: data1             # or valkey. On 3 servers with Sentinel (failover): redis: [data1, data2, data3]
   rustfs: data1            # or garage. 3 copies of every file: garage: [data1, data2, data3]
   rabbitmq: data1          # or nats
-  # uptimekuma: swarm2     # or beszel. With victoria or prometheus, put it on another server
+  # uptimekuma: swarm2     # checks that your sites answer. With victoria or prometheus, put it on another server
+  # beszel: data1          # CPU, memory and disk of each server, at a glance
   # openbao: data1         # secrets for your apps (passwords, API keys)
   # victoria: data1        # metrics, logs and alerts, or prometheus (needs monitoring: above)

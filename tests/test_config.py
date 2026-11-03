@@ -90,7 +90,7 @@ CASES = [
      lambda c: (c.update(wireguard=True), [n.update(host=n["ip"]) for n in c["nodes"]]), "must differ from host"),
     ("monitoring app without monitoring", lambda c: c["apps"].update(victoria="data1"), "needs monitoring: in config.yml"),
     ("monitoring without the app", lambda c: c.update(monitoring={"webhook": "https://x.example.com"}), "no monitoring app"),
-    ("two monitoring apps", lambda c: (monitored(c), c["apps"].update(prometheus="swarm2")), "both observability"),
+    ("two monitoring apps", lambda c: (monitored(c), c["apps"].update(prometheus="swarm2")), "both monitoring"),
     ("monitoring with no place for alerts", lambda c: (monitored(c), c.update(monitoring={"keep_days": 30})), "at least one place"),
     ("monitoring typo", lambda c: (monitored(c), c["monitoring"].update(slack="x")), "unknown setting monitoring.slack"),
     ("telegram chat_id as text",
@@ -132,6 +132,7 @@ GOOD = [
                                                  "s3_secret_key": "b", "time": "03:30", "keep_daily": 14})),
     ("backup to a folder", lambda c: c.update(backup={"repository": "/mnt/backup"})),
     ("victoria with a webhook", monitored),
+    ("uptimekuma and beszel together", lambda c: c["apps"].update(uptimekuma="data1", beszel="data1")),
     ("prometheus with every alert channel", lambda c: (
         c["apps"].update(prometheus="data1", uptimekuma="swarm2"),
         c.update(monitoring={

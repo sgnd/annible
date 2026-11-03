@@ -127,7 +127,7 @@ images:
     repo: docker.io/henrygd/beszel-agent
     tag: 0.21.1
     digest: sha256:cb6868012964d7a68debaa2c84bb72285e5f08531e81f506bd4c493bf052e41c
-  # Monitoring (observability: prometheus or victoria). Agents and exporters run on every server.
+  # Monitoring (prometheus or victoria). Agents and exporters run on every server.
   prometheus:
     repo: docker.io/prom/prometheus
     tag: v3.15.1
