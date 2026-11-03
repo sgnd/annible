@@ -11,6 +11,24 @@ Clearer app categories, and one monitoring stack less.
   can run next to either monitoring app.
 - The Apps table in the README has a "What it does" column, and uses the exact category names.
 
+Ready-to-use configs in `examples/`: Swarm on 1, 2, 3 and 9 servers, k3s on 4 and 9 servers, each with
+the offline change in its first lines. CI checks every one, online and offline.
+- Servers get their `tier` from their role: with workers, a swarm manager is `gateway` (Traefik only)
+  and a k3s master `control` (the cluster only); apps go to the `tier=app` workers.
+- k3s: Traefik runs on the workers, not the masters (with Let's Encrypt on the first worker).
+- Ports 80 and 443 are open only on the servers Traefik runs on.
+
+Every app is ready to use: you only log in.
+- Uptime Kuma: the installer makes the admin user (`state/secrets/uptimekuma_admin`), a monitor for
+  every app's web page, and one for the monitoring server (its Watchdog alert). No Traefik login in front.
+- Swarmpit: the installer makes the admin user (`state/secrets/swarmpit_admin`). No Traefik login in front.
+
+Tested on DigitalOcean with every config in `examples/`: swarm-1, swarm-2, swarm-3 and k3s-4 (with
+Let's Encrypt on a real domain) online; swarm-ha (9 servers) online; swarm-3 and k3s-ha (9 servers)
+offline, with no internet. `tests/check.py` passes (apart from alerts to the test's fake webhook), and a
+second run changes nothing. Found and fixed by these tests: k3s's load balancer opened 80/443 on every
+server (now only on the Traefik servers), and two problems in the new Uptime Kuma setup.
+
 ## 1.1.0
 
 **Removed: GPU servers and ARM (arm64) servers.** Ansibro now runs on Intel/AMD (amd64) servers only,

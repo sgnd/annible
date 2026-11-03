@@ -1,0 +1,63 @@
+// First setup of Uptime Kuma: the admin user and the monitors. Made by ansibro.
+// The installer runs it inside the container: "docker exec -i uptimekuma node /app/data/ansibro-setup.js".
+// It talks to Uptime Kuma like its web page does (socket.io). The user and password come in through
+// stdin (JSON), so the password is never on a command line; the monitors are in ansibro-monitors.json.
+// When an admin user exists already, it changes nothing.
+const { io } = require("/app/node_modules/socket.io-client");
+
+let input = "";
+process.stdin.on("data", (chunk) => (input += chunk));
+process.stdin.on("end", () => run(JSON.parse(input)).catch((e) => fail(e.message)));
+
+function fail(message) {
+  console.error("error: " + message);
+  process.exit(1);
+}
+
+// Send an event and wait for Uptime Kuma's answer (at most 20 seconds, then fail: the installer tries again).
+function call(socket, event, ...args) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => fail("no answer to " + event), 20000);
+    socket.emit(event, ...args, (answer) => {
+      clearTimeout(timer);
+      resolve(answer);
+    });
+  });
+}
+
+// The fields a new monitor needs, like the web page fills them in.
+const defaults = {
+  type: "http", method: "GET", interval: 60, retryInterval: 60, resendInterval: 0, maxretries: 1,
+  timeout: 48, maxredirects: 10, accepted_statuscodes: ["200-299"], ignoreTls: false, upsideDown: false,
+  expiryNotification: false, notificationIDList: {}, httpBodyEncoding: "json", body: "", headers: "",
+  authMethod: null, packetSize: 56, dns_resolve_type: "A", dns_resolve_server: "1.1.1.1",
+  kafkaProducerBrokers: [], kafkaProducerSaslOptions: { mechanism: "None" }, conditions: [],
+};
+
+async function run(settings) {
+  const socket = io("http://localhost:3001", { transports: ["websocket"], reconnection: false });
+  await new Promise((resolve) => {
+    socket.on("connect", resolve);
+    socket.on("connect_error", (e) => fail("cannot reach Uptime Kuma: " + e.message));
+  });
+  // Uptime Kuma sets up its answers a moment after a connection opens; a question sent before is lost.
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+
+  if (!(await call(socket, "needSetup"))) {
+    console.log("already set up");
+    process.exit(0);
+  }
+
+  let answer = await call(socket, "setup", settings.username, settings.password);
+  if (!answer.ok) fail("setup: " + answer.msg);
+  answer = await call(socket, "login", { username: settings.username, password: settings.password, token: "" });
+  if (!answer.ok) fail("login: " + answer.msg);
+
+  const monitors = JSON.parse(require("fs").readFileSync("/app/data/ansibro-monitors.json", "utf8"));
+  for (const monitor of monitors) {
+    answer = await call(socket, "add", { ...defaults, ...monitor });
+    if (!answer.ok) fail("monitor " + monitor.name + ": " + answer.msg);
+  }
+  console.log("created the admin user and " + monitors.length + " monitors");
+  process.exit(0);
+}

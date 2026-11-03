@@ -14,11 +14,16 @@ For developers: the list is in [`catalog.yml`](../catalog.yml).
 - kong needs postgres. keycloak needs a database. authelia needs a database and a cache.
   The installer creates their databases for them.
 
-## Swarmpit and Uptime Kuma: first visit
+## Swarmpit: ready to use
 
-Swarmpit and Uptime Kuma create their admin user on the first visit. So their pages first ask for
-the Traefik dashboard login (user `admin`, password in `state/secrets/traefik_admin`); after that you
-create the app's own admin user.
+The installer makes the admin user (`admin`, password in `state/secrets/swarmpit_admin`).
+
+## Uptime Kuma: ready to use
+
+The installer makes the admin user (`admin`, password in `state/secrets/uptimekuma_admin`) and a
+monitor for every app's web page, plus one for the monitoring server (its Watchdog alert) when
+victoria is installed. Add a notification (Settings > Notifications) to get told when one is down.
+The monitors are made once, at the first install; after that they are yours to change.
 
 ## With Keycloak, admin pages use Keycloak
 
@@ -28,7 +33,7 @@ first login. oauth2-proxy (`https://oauth.<domain>`) connects Traefik to Keycloa
 
 ## With Authelia, admin pages use Authelia
 
-When you install Authelia, the Traefik dashboard, Swarmpit, Uptime Kuma, Kong Manager, Alertmanager
+When you install Authelia, the Traefik dashboard, Kong Manager, Alertmanager
 and the other pages that ask for the Traefik login ask for the Authelia login instead (user `admin`, password in `state/secrets/authelia_admin`), with a second factor (an
 authenticator app). The first time, Authelia asks for a code that it writes to
 `/opt/ansibro/authelia/config/notification.txt` on the first manager.

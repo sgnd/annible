@@ -74,3 +74,6 @@ common_k3s_cidrs: >-
 
 # docker0: default bridge. docker_gwbridge: how swarm containers reach the host.
 common_docker_interfaces: [docker0, docker_gwbridge]
+
+# This server answers on 80 and 443: Traefik runs here (traefik_nodes in group_vars).
+common_web: "{{ 'traefik' in apps and inventory_hostname in traefik_nodes }}"

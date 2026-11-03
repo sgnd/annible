@@ -39,6 +39,10 @@ LEADER = inv["managers"]["hosts"][0]
 LEADER_IP = HOSTS[LEADER]["node_ip"]
 LEADER_HOST = HOSTS[LEADER]["node_host"]  # where SSH connects
 REGISTRY = f"{LEADER_IP}:{CFG['registry_port']}"
+# Where Traefik answers: on k3s the first tier=app server (a worker, if any), on Swarm the first manager.
+CLUSTER = inv["managers"]["hosts"] + inv["workers"]["hosts"]
+WEB_IP = next((HOSTS[h]["node_ip"] for h in CLUSTER if CFG["orchestrator"] == "k3s"
+               and HOSTS[h]["node_labels"].get("tier") == "app"), LEADER_IP)
 IMAGES = CFG["images"]
 WEB = "traefik" in APPS  # web pages only exist with traefik
 # psql comes from the PostgreSQL image in the registry: spilo with Patroni (2 or more servers).
@@ -93,7 +97,7 @@ def https(sub, path="/", **kwargs):
     """
     host = f"{sub}.{DOMAIN}"
     for _ in range(4):
-        code, body = curl(f"https://{host}{path}", resolve=f"{host}:443:{LEADER_IP}", **kwargs)
+        code, body = curl(f"https://{host}{path}", resolve=f"{host}:443:{WEB_IP}", **kwargs)
         if code not in ("404", "502", "503") or (sub == "kong" and "no Route matched" in body):
             break
         time.sleep(3)
@@ -258,7 +262,7 @@ def check_wireguard():
 
 
 def check_traefik():
-    code, _ = curl(f"http://traefik.{DOMAIN}/", resolve=f"traefik.{DOMAIN}:80:{LEADER_IP}")
+    code, _ = curl(f"http://traefik.{DOMAIN}/", resolve=f"traefik.{DOMAIN}:80:{WEB_IP}")
     check("traefik redirects HTTP to HTTPS", code in ("301", "308"), code)
     admin_login("traefik dashboard", "traefik", "/dashboard/")
 
@@ -269,7 +273,9 @@ def check_portainer():
 
 
 def check_swarmpit():
-    admin_login("swarmpit", "swarmpit")
+    check("swarmpit page", https("swarmpit")[0] == "200")
+    code, body = https("swarmpit", "/login", user="admin:" + secret("swarmpit_admin"), method="POST")
+    check("swarmpit admin login (made by the installer)", code == "200" and "token" in body, code)
 
 
 def check_kong():
@@ -452,7 +458,15 @@ def check_nats():
 
 
 def check_uptimekuma():
-    admin_login("uptime kuma", "uptimekuma", ok=("200", "302"))
+    check("uptime kuma page", https("uptimekuma")[0] in ("200", "302"))
+    # /metrics needs the admin login, and lists every monitor with its state (1 = up).
+    code, body = curl(f"http://{ip_of('uptimekuma')}:3001/metrics", user="admin:" + secret("uptimekuma_admin"))
+    check("uptime kuma admin login (made by the installer)", code == "200", code)
+    monitors = [line for line in body.splitlines() if line.startswith("monitor_status{")]
+    check(f"uptime kuma has its monitors ({len(monitors)})", len(monitors) >= 2, str(len(monitors)))
+    down = [line.split('monitor_name="')[1].split('"')[0] for line in monitors if not line.endswith(" 1")]
+    if monitors:
+        check("uptime kuma monitors are up", not down, ", ".join(down))
 
 
 def check_beszel():

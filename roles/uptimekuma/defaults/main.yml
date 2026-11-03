@@ -1,1 +1,20 @@
 uptimekuma_dir: "{{ apps_dir }}/uptimekuma"
+
+# Generated once and saved in state/secrets/ on the installer machine.
+uptimekuma_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/uptimekuma_admin', chars=['ascii_letters', 'digits'], length=24) }}"
+
+# The web page of each app (subdomain and path). The installer adds an Uptime Kuma monitor for each
+# installed one. It calls Traefik directly with the page's name, so it works without DNS too.
+uptimekuma_pages:
+  traefik: { host: traefik, path: / }
+  kong: { host: kong-manager, path: / }
+  portainer: { host: portainer, path: / }
+  swarmpit: { host: swarmpit, path: / }
+  keycloak: { host: keycloak, path: / }
+  authelia: { host: authelia, path: / }
+  rustfs: { host: rustfs, path: /rustfs/console/ }
+  rabbitmq: { host: rabbitmq, path: / }
+  nats: { host: nats, path: / }
+  beszel: { host: beszel, path: / }
+  victoria: { host: grafana, path: /login }
+  openbao: { host: openbao, path: /ui/ }

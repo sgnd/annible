@@ -1,5 +1,6 @@
 # Uptime Kuma: checks that your sites and services are up.
-# https://uptimekuma.<domain> first asks for the Traefik dashboard password, then you create Uptime Kuma's admin user.
+# The installer makes the admin user (password in state/secrets/uptimekuma_admin) and a monitor for
+# every app's web page, and for the monitoring server (its Watchdog alert). Log in at https://uptimekuma.<domain>.
 
 - name: Create Uptime Kuma folders
   ansible.builtin.file:
@@ -16,6 +17,14 @@
     tasks_from: mirror
   vars:
     registry_mirror_images: [uptimekuma]
+
+# Uptime Kuma 2 asks for its database type on the first visit. SQLite (a file in data/): no question.
+- name: Use SQLite for Uptime Kuma
+  ansible.builtin.copy:
+    dest: "{{ uptimekuma_dir }}/data/db-config.json"
+    content: '{"type": "sqlite"}'
+    mode: "0600"
+    force: false  # keep the choice of an existing install
 
 - name: Write Uptime Kuma compose file
   ansible.builtin.template:
@@ -37,5 +46,23 @@
   vars:
     traefik_route_name: uptimekuma
     traefik_route_port: 3001
-    # The Traefik password first, because Uptime Kuma creates its admin user on the first visit.
-    traefik_route_middleware: admin
+    traefik_route_middleware: admin-ip  # Uptime Kuma has its own login
+
+- name: Write the Uptime Kuma setup script and monitors
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ uptimekuma_dir }}/data/ansibro-{{ item }}"
+    mode: "0600"
+  loop: [setup.js, monitors.json]
+
+# Only the first time: when Uptime Kuma has no admin user yet. After that, you own the monitors.
+- name: Make the Uptime Kuma admin user and monitors
+  ansible.builtin.command:
+    cmd: docker exec -i uptimekuma node /app/data/ansibro-setup.js
+    stdin: "{{ {'username': 'admin', 'password': uptimekuma_password} | to_json }}"
+  register: uptimekuma_setup
+  until: uptimekuma_setup.rc == 0
+  retries: 10
+  delay: 6
+  changed_when: "'created' in uptimekuma_setup.stdout"
+  no_log: true

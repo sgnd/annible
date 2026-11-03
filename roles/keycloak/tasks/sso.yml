@@ -1,10 +1,10 @@
 # Keycloak as the login for the admin pages (when Authelia is not installed): realm "ansibro",
 # the client for oauth2-proxy, and the user "admin" who must set up an authenticator app (OTP)
-# at the first login. Uses Keycloak's admin API through Traefik on this server.
+# at the first login. Uses Keycloak's admin API through Traefik (traefik_ip).
 
 - name: Wait for Keycloak
   ansible.builtin.uri:
-    url: "https://{{ node_ip }}/realms/master"
+    url: "https://{{ traefik_ip }}/realms/master"
     headers: { Host: "{{ keycloak_host }}" }
     validate_certs: false
   register: keycloak_up
@@ -14,7 +14,7 @@
 
 - name: Log in to Keycloak's admin API
   ansible.builtin.uri:
-    url: "https://{{ node_ip }}/realms/master/protocol/openid-connect/token"
+    url: "https://{{ traefik_ip }}/realms/master/protocol/openid-connect/token"
     method: POST
     headers: { Host: "{{ keycloak_host }}" }
     validate_certs: false
@@ -29,7 +29,7 @@
 
 - name: Check the ansibro realm
   ansible.builtin.uri:
-    url: "https://{{ node_ip }}/admin/realms/ansibro"
+    url: "https://{{ traefik_ip }}/admin/realms/ansibro"
     headers: "{{ keycloak_api_headers }}"
     validate_certs: false
     status_code: [200, 404]
@@ -38,7 +38,7 @@
 
 - name: Create the ansibro realm
   ansible.builtin.uri:
-    url: "https://{{ node_ip }}/admin/realms"
+    url: "https://{{ traefik_ip }}/admin/realms"
     method: POST
     headers: "{{ keycloak_api_headers }}"
     validate_certs: false
@@ -51,7 +51,7 @@
 
 - name: Check the client for oauth2-proxy
   ansible.builtin.uri:
-    url: "https://{{ node_ip }}/admin/realms/ansibro/clients?clientId=ansibro-admin"
+    url: "https://{{ traefik_ip }}/admin/realms/ansibro/clients?clientId=ansibro-admin"
     headers: "{{ keycloak_api_headers }}"
     validate_certs: false
   register: keycloak_client
@@ -59,7 +59,7 @@
 
 - name: Create the client for oauth2-proxy
   ansible.builtin.uri:
-    url: "https://{{ node_ip }}/admin/realms/ansibro/clients"
+    url: "https://{{ traefik_ip }}/admin/realms/ansibro/clients"
     method: POST
     headers: "{{ keycloak_api_headers }}"
     validate_certs: false
@@ -80,7 +80,7 @@
 
 - name: Check the admin user
   ansible.builtin.uri:
-    url: "https://{{ node_ip }}/admin/realms/ansibro/users?username=admin&exact=true"
+    url: "https://{{ traefik_ip }}/admin/realms/ansibro/users?username=admin&exact=true"
     headers: "{{ keycloak_api_headers }}"
     validate_certs: false
   register: keycloak_user
@@ -89,7 +89,7 @@
 # CONFIGURE_TOTP: at the first login, Keycloak asks to set up an authenticator app.
 - name: Create the admin user
   ansible.builtin.uri:
-    url: "https://{{ node_ip }}/admin/realms/ansibro/users"
+    url: "https://{{ traefik_ip }}/admin/realms/ansibro/users"
     method: POST
     headers: "{{ keycloak_api_headers }}"
     validate_certs: false

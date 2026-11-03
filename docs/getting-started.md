@@ -81,6 +81,9 @@ cd ansibro
 cp config.example.yml config.yml
 ```
 
+(Shortcut: `cp examples/swarm-1-server.yml config.yml` gives a short config for one server; then
+change only the lines marked `change`. The steps below use the long example, which explains every line.)
+
 Open `config.yml` in a text editor. It is long, but every line is explained, and most
 can stay as they are. Change `domain`, `acme_email` and `ssh` as below.
 Then **replace the whole `nodes:` part and the whole `apps:` part** with the ones below.

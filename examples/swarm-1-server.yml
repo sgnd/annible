@@ -1,0 +1,31 @@
+# Docker Swarm on 1 server: the gateway, your apps and the data all on one server.
+# For: a personal project, a first test, a small app.
+# Server: 2 CPUs, 4 GB memory or more.
+#
+# Use it: cp examples/swarm-1-server.yml config.yml, change the lines marked "change", run ./install.sh.
+# Offline (no internet on the server): set tls: selfsigned, remove acme_email, and see docs/offline.md.
+# More settings (backup, firewall, alerts): config.example.yml.
+
+domain: example.com                 # change: your domain; DNS *.example.com -> the server's public IP
+tls: letsencrypt
+acme_email: admin@example.com       # change: your email, for Let's Encrypt
+timezone: UTC
+
+ssh:
+  user: ubuntu                      # change: a user with passwordless sudo
+  key: ~/.ssh/id_ed25519            # change: the private key that logs in to the server
+
+nodes:
+  - { name: server1, ip: 10.0.0.11, host: 203.0.113.11, role: manager }  # change: private ip, public host
+
+apps:
+  traefik: swarm        # gateway: HTTPS for every web page
+  portainer: swarm      # manage your containers in a web page
+  postgres: server1     # database
+  redis: server1        # cache
+  beszel: server1       # monitoring (light): CPU, memory, disk and containers, with alerts
+
+# backup:               # recommended: nightly backup to storage outside this server
+#   repository: s3:https://s3.example.com/my-bucket
+#   s3_access_key: ...
+#   s3_secret_key: ...
