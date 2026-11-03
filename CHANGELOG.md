@@ -18,6 +18,11 @@ the offline change in its first lines. CI checks every one, online and offline.
 - k3s: Traefik runs on the workers, not the masters (with Let's Encrypt on the first worker).
 - Ports 80 and 443 are open only on the servers Traefik runs on.
 
+Every app is ready to use: you only log in.
+- Uptime Kuma: the installer makes the admin user (`state/secrets/uptimekuma_admin`), a monitor for
+  every app's web page, and one for the monitoring server (its Watchdog alert). No Traefik login in front.
+- Swarmpit: the installer makes the admin user (`state/secrets/swarmpit_admin`). No Traefik login in front.
+
 ## 1.1.0
 
 **Removed: GPU servers and ARM (arm64) servers.** Ansibro now runs on Intel/AMD (amd64) servers only,

@@ -13,12 +13,11 @@ services:
       replicas: 1
       placement:
         constraints:
-          - node.role == manager
+          - node.hostname == {{ swarm_leader }}  # next to its databases; the installer makes its admin user here
       labels:
         traefik.enable: "true"
         traefik.http.routers.swarmpit.rule: Host(`{{ swarmpit_host }}`)
-        # admin: the Traefik password first, because Swarmpit creates its admin user on the first visit.
-        traefik.http.routers.swarmpit.middlewares: admin@file
+        traefik.http.routers.swarmpit.middlewares: admin-ip@file  # Swarmpit has its own login
         traefik.http.services.swarmpit.loadbalancer.server.port: "8080"
 
   db:

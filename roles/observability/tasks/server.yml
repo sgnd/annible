@@ -141,7 +141,6 @@
 - name: Show how to watch the monitoring server
   ansible.builtin.debug:
     msg: >-
-      Watch this monitoring server from another server: in Uptime Kuma add a monitor of type
-      "HTTP(s) - Keyword", URL http://{{ node_ip }}:{{ observability_alertmanager_port }}/api/v2/alerts?filter=alertname=Watchdog,
-      keyword Watchdog. Or set monitoring.heartbeat_url to a service outside the cluster (healthchecks.io).
-  when: not (monitoring | default({})).heartbeat_url | default('')
+      Nothing watches this monitoring server yet. Add uptimekuma on another server (the installer then
+      adds a monitor for it), or set monitoring.heartbeat_url to a service outside the cluster (healthchecks.io).
+  when: "'uptimekuma' not in apps and not (monitoring | default({})).heartbeat_url | default('')"

@@ -1,5 +1,5 @@
 # Swarmpit: web UI to manage the swarm. Its databases (CouchDB, InfluxDB) run on the first manager.
-# https://swarmpit.<domain> first asks for the Traefik dashboard password, then you create Swarmpit's admin user.
+# The installer makes Swarmpit's admin user (password in state/secrets/swarmpit_admin). Log in at https://swarmpit.<domain>.
 
 # CouchDB sets its own data folder to user 5984 and mode 0755 when it starts, so we do the same.
 # The swarmpit folder above it stays private (0700).
@@ -36,3 +36,20 @@
   vars:
     swarm_stack: swarmpit
     swarm_stack_changed: "{{ swarmpit_stack.changed }}"
+
+# Swarmpit makes its first admin user through its API (/initialize). The installer calls it from inside
+# the Swarmpit container, on this server. Once there is an admin user, Swarmpit answers 400: nothing changes.
+- name: Make the Swarmpit admin user
+  ansible.builtin.shell:
+    cmd: >-
+      cid=$(docker ps -q --latest --filter label=com.docker.swarm.service.name=swarmpit_app);
+      test -n "$cid" &&
+      docker exec -i "$cid" curl -s -o /dev/null -w '%{http_code}' -X POST
+      -H 'Content-Type: application/json' -d @- http://localhost:8080/initialize
+    stdin: "{{ {'username': 'admin', 'password': swarmpit_password} | to_json }}"
+  register: swarmpit_init
+  until: swarmpit_init.stdout in ['200', '201', '400']
+  retries: 30
+  delay: 10
+  changed_when: swarmpit_init.stdout in ['200', '201']
+  no_log: true

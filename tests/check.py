@@ -273,7 +273,9 @@ def check_portainer():
 
 
 def check_swarmpit():
-    admin_login("swarmpit", "swarmpit")
+    check("swarmpit page", https("swarmpit")[0] == "200")
+    code, body = https("swarmpit", "/login", user="admin:" + secret("swarmpit_admin"), method="POST")
+    check("swarmpit admin login (made by the installer)", code == "200" and "token" in body, code)
 
 
 def check_kong():
@@ -456,7 +458,15 @@ def check_nats():
 
 
 def check_uptimekuma():
-    admin_login("uptime kuma", "uptimekuma", ok=("200", "302"))
+    check("uptime kuma page", https("uptimekuma")[0] in ("200", "302"))
+    # /metrics needs the admin login, and lists every monitor with its state (1 = up).
+    code, body = curl(f"http://{ip_of('uptimekuma')}:3001/metrics", user="admin:" + secret("uptimekuma_admin"))
+    check("uptime kuma admin login (made by the installer)", code == "200", code)
+    monitors = [line for line in body.splitlines() if line.startswith("monitor_status{")]
+    check(f"uptime kuma has its monitors ({len(monitors)})", len(monitors) >= 2, str(len(monitors)))
+    down = [line.split('monitor_name="')[1].split('"')[0] for line in monitors if not line.endswith(" 1")]
+    if monitors:
+        check("uptime kuma monitors are up", not down, ", ".join(down))
 
 
 def check_beszel():

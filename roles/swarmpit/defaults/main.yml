@@ -1,2 +1,5 @@
 swarmpit_dir: "{{ apps_dir }}/swarmpit"
 swarmpit_host: "swarmpit.{{ domain }}"
+
+# Generated once and saved in state/secrets/ on the installer machine.
+swarmpit_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/swarmpit_admin', chars=['ascii_letters', 'digits'], length=24) }}"

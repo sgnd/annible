@@ -104,10 +104,10 @@ If the monitoring server stops, it cannot send an alert. So there is a
 test alert, `Watchdog`, that is always on. Something on another server checks that it is still there.
 If it is gone, the monitoring is broken:
 
-- Uptime Kuma (put `uptimekuma` on another server): add a monitor of type "HTTP(s) - Keyword",
-  URL `http://<monitoring server ip>:9093/api/v2/alerts?filter=alertname=Watchdog`, keyword `Watchdog`.
-  The install prints this URL. When the monitoring server, Alertmanager or the alert rules stop,
-  the keyword is gone and Uptime Kuma tells you. The monitoring server sends an alert when Uptime Kuma's
+- Uptime Kuma (put `uptimekuma` on another server): the installer adds the monitor
+  "Monitoring server (its Watchdog alert)" for you. When the monitoring server, Alertmanager or the
+  alert rules stop, the Watchdog alert is gone and Uptime Kuma tells you (add a notification in its
+  Settings, for example Telegram). The monitoring server sends an alert when Uptime Kuma's
   server is down, so the two watch each other.
 - Or a heartbeat service outside the cluster, like [healthchecks.io](https://healthchecks.io): put its URL
   in `monitoring.heartbeat_url`. Alertmanager sends it a POST about every 2 minutes; set its period to 5 minutes.
