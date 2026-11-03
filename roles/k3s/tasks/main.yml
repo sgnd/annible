@@ -116,11 +116,13 @@
 
 # Swarm adds labels from config.yml; here k3s does it from its config (node-label), but only when
 # a server joins. Set them on servers that are already in the cluster too.
+# Also: k3s's load balancer (ServiceLB) opens ports 80 and 443 on every server, past the firewall.
+# When some servers have enablelb=true, it runs only there: the servers Traefik runs on.
 - name: Set node labels from config.yml
   ansible.builtin.command: >-
     k3s kubectl label node {{ inventory_hostname }} --overwrite
     {% for key, value in node_labels.items() %}{{ key }}={{ value }} {% endfor %}
+    svccontroller.k3s.cattle.io/enablelb={{ 'true' if 'traefik' in apps and inventory_hostname in traefik_nodes else 'false' }}
   register: k3s_labels
   changed_when: "'not labeled' not in k3s_labels.stdout"
   delegate_to: "{{ swarm_leader }}"
-  when: node_labels | length > 0
