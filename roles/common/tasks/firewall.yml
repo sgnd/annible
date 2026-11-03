@@ -11,7 +11,7 @@
     content: |
       # Managed by ansibro. Change config.yml instead of this file.
       ssh {{ ansible_port }} from {{ common_ssh_allow_from | join(', ') }}
-      web 80, 443: {{ inventory_hostname in groups['swarm'] }}
+      web 80, 443: {{ common_web }}
       cluster nodes: {{ common_cluster_ips | join(', ') }}
       cluster tcp: {{ common_cluster_tcp_ports | join(', ') }}
       cluster udp: {{ common_cluster_udp_ports | join(', ') }}
@@ -45,13 +45,14 @@
     from_ip: "{{ item.from | default('any') }}"
   loop: "{{ firewall_allow | default([]) }}"
 
-- name: Allow HTTP and HTTPS on swarm nodes
+# Only where Traefik runs (traefik_nodes in group_vars): the other servers need no web ports.
+- name: Allow HTTP and HTTPS where Traefik runs
   community.general.ufw:
     rule: allow
     port: "{{ item }}"
     proto: tcp
   loop: ["80", "443"]
-  when: inventory_hostname in groups['swarm']
+  when: common_web
 
 # Other cluster servers may use only the ports this server needs to offer: swarm, registry,
 # the apps on it and the monitoring agents (see common_cluster_tcp_ports). Up to 15 ports per rule.

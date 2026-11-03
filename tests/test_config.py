@@ -10,6 +10,8 @@ No servers are needed.
 """
 
 import copy
+import glob
+import json
 import os
 import subprocess
 import sys
@@ -154,14 +156,17 @@ GOOD = [
 ]
 
 
-def run(cfg):
-    """Write cfg to a file, run inventory.py on it. Returns (exit code, error text)."""
+def run(cfg, output=None):
+    """Write cfg to a file, run inventory.py on it. Returns (exit code, error text).
+    With output=[], the inventory (JSON) is added to that list."""
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "config.yml")
         with open(path, "w") as f:
             yaml.safe_dump(cfg, f)
         p = subprocess.run([sys.executable, os.path.join(HERE, "inventory.py"), "--list"],
                            capture_output=True, text=True, cwd=HERE, env={**os.environ, "ANSIBRO_CONFIG": path})
+    if output is not None and p.returncode == 0:
+        output.append(json.loads(p.stdout))
     return p.returncode, p.stderr.strip()
 
 
@@ -185,5 +190,33 @@ for name, change in GOOD:
     failed += code != 0
     print(f"{'PASS' if code == 0 else 'FAIL'}  {name} is accepted" + (f"  ({err})" if code else ""))
 
-print(f"\n{len(CASES) + len(GOOD) + 1 - failed} passed, {failed} failed")
+# The ready-to-use configs in examples/: accepted online and offline (tls: selfsigned),
+# and every server gets the tier its comment promises.
+TIERS = {
+    "swarm-1-server.yml": {"server1": "data"},  # one server: it keeps the data, and apps may run anywhere
+    "swarm-2-servers.yml": {"manager1": "app"},
+    "swarm-3-servers.yml": {"manager1": "gateway", "worker1": "app"},
+    "swarm-ha.yml": {"manager1": "gateway", "manager3": "gateway", "worker1": "app", "worker3": "app"},
+    "k3s-4-servers.yml": {"master1": "control", "worker1": "app", "worker2": "app"},
+    "k3s-ha.yml": {"master1": "control", "master3": "control", "worker1": "app", "worker3": "app"},
+}
+examples = sorted(glob.glob(os.path.join(HERE, "examples", "*.yml")))
+for path in examples:
+    name = os.path.basename(path)
+    for mode in ("online", "offline"):
+        cfg = yaml.safe_load(open(path))
+        if mode == "offline":
+            cfg["tls"] = "selfsigned"
+            cfg.pop("acme_email", None)
+        inventory = []
+        code, err = run(cfg, inventory)
+        tiers = {host: hv["node_labels"].get("tier") for host, hv in inventory[0]["_meta"]["hostvars"].items()} if inventory else {}
+        wrong = {host: tiers.get(host) for host, tier in TIERS.get(name, {}).items() if tiers.get(host) != tier}
+        ok = code == 0 and name in TIERS and not wrong
+        failed += not ok
+        print(f"{'PASS' if ok else 'FAIL'}  examples/{name} ({mode}) is accepted, tiers as described"
+              + ("" if ok else f"  ({err or wrong or 'no tiers listed in TIERS'})"))
+
+total = len(CASES) + len(GOOD) + 1 + 2 * len(examples)
+print(f"\n{total - failed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

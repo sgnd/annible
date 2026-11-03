@@ -1,0 +1,42 @@
+# k3s (a small Kubernetes) on 4 servers.
+#   master1          k3s server: only runs the cluster (labelled tier=control)
+#   worker1-2        k3s agents: Traefik (the gateway) and your apps (labelled tier=app)
+#   data1            not in the cluster: databases, cache, monitoring
+# For: a team that wants Kubernetes, without high availability yet.
+# Servers: 2 CPUs, 4 GB memory or more each.
+#
+# Gateway: with Let's Encrypt, Traefik runs on worker1 only (Let's Encrypt must reach the server
+# that asked): point DNS to worker1. With tls: selfsigned or custom, it runs on both workers.
+#
+# Use it: cp examples/k3s-4-servers.yml config.yml, change the lines marked "change", run ./install.sh.
+# Offline (no internet on the servers): set tls: selfsigned, remove acme_email, and see docs/offline.md.
+# More settings (backup, firewall, alerts): config.example.yml.
+
+domain: example.com                 # change: your domain; DNS *.example.com -> worker1's public IP
+tls: letsencrypt
+acme_email: admin@example.com       # change: your email, for Let's Encrypt
+timezone: UTC
+orchestrator: k3s
+
+ssh:
+  user: ubuntu                      # change: a user with passwordless sudo
+  key: ~/.ssh/id_ed25519            # change: the private key that logs in to the servers
+
+nodes:                              # change: private ip and public host of each server
+  - { name: master1, ip: 10.0.0.11, host: 203.0.113.11, role: manager }
+  - { name: worker1, ip: 10.0.0.31, host: 203.0.113.31, role: worker }
+  - { name: worker2, ip: 10.0.0.32, host: 203.0.113.32, role: worker }
+  - { name: data1, ip: 10.0.0.21, host: 203.0.113.21, role: standalone }
+
+apps:
+  traefik: cluster      # gateway: HTTPS for every web page (k3s's own Traefik)
+  portainer: cluster    # manage the cluster in a web page
+  keycloak: cluster     # login (also for the admin pages, with a second factor)
+  postgres: data1       # database
+  redis: data1          # cache
+  beszel: data1         # monitoring (light): CPU, memory, disk and containers, with alerts
+
+# backup:               # recommended: nightly backup to storage outside these servers
+#   repository: s3:https://s3.example.com/my-bucket
+#   s3_access_key: ...
+#   s3_secret_key: ...

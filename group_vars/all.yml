@@ -12,10 +12,16 @@ registry_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/regist
 # Traefik runs on every manager, so the apps stay reachable when one manager is down. Point DNS
 # to all of them. Let's Encrypt (and acme_server) checks a domain by calling it, and the call can
 # reach another manager, so with them Traefik runs only on the first manager.
-# On k3s it is the same with Let's Encrypt (first manager only); else Traefik runs on every cluster server.
+# On k3s Traefik runs on the tier=app servers (the workers, if there are any): every one of them,
+# or with Let's Encrypt the first one only. No tier=app server (one server with a database): all of them.
+traefik_k3s_nodes: >-
+  {{ groups['swarm'] | map('extract', hostvars) | selectattr('node_labels.tier', 'equalto', 'app')
+  | map(attribute='inventory_hostname') | list or groups['swarm'] }}
 traefik_nodes: >-
-  {{ [swarm_leader] if tls == 'letsencrypt'
-  else groups['swarm'] if orchestrator == 'k3s' else groups['managers'] }}
+  {{ (traefik_k3s_nodes[:1] if tls == 'letsencrypt' else traefik_k3s_nodes) if orchestrator == 'k3s'
+  else [swarm_leader] if tls == 'letsencrypt' else groups['managers'] }}
+# The address where the installer reaches Traefik (for example Keycloak's admin API).
+traefik_ip: "{{ hostvars[traefik_nodes[0]].node_ip }}"
 
 # The login on admin pages: Authelia, or Keycloak (through oauth2-proxy), or else the Traefik
 # dashboard password. Authelia and Keycloak ask for a second factor (an authenticator app).

@@ -11,6 +11,13 @@ Clearer app categories, and one monitoring stack less.
   can run next to either monitoring app.
 - The Apps table in the README has a "What it does" column, and uses the exact category names.
 
+Ready-to-use configs in `examples/`: Swarm on 1, 2, 3 and 9 servers, k3s on 4 and 9 servers, each with
+the offline change in its first lines. CI checks every one, online and offline.
+- Servers get their `tier` from their role: with workers, a swarm manager is `gateway` (Traefik only)
+  and a k3s master `control` (the cluster only); apps go to the `tier=app` workers.
+- k3s: Traefik runs on the workers, not the masters (with Let's Encrypt on the first worker).
+- Ports 80 and 443 are open only on the servers Traefik runs on.
+
 ## 1.1.0
 
 **Removed: GPU servers and ARM (arm64) servers.** Ansibro now runs on Intel/AMD (amd64) servers only,

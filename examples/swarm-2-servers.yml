@@ -1,0 +1,35 @@
+# Docker Swarm on 2 servers: one runs the gateway and your apps, one keeps the data.
+#   manager1  swarm manager: Traefik and your apps
+#   data1     not in the swarm: databases, cache, storage (it keeps all the data)
+# For: a small production app; the data server can be bigger and backed up on its own.
+# Servers: 2 CPUs, 4 GB memory or more each.
+#
+# Use it: cp examples/swarm-2-servers.yml config.yml, change the lines marked "change", run ./install.sh.
+# Offline (no internet on the servers): set tls: selfsigned, remove acme_email, and see docs/offline.md.
+# More settings (backup, firewall, alerts): config.example.yml.
+
+domain: example.com                 # change: your domain; DNS *.example.com -> manager1's public IP
+tls: letsencrypt
+acme_email: admin@example.com       # change: your email, for Let's Encrypt
+timezone: UTC
+
+ssh:
+  user: ubuntu                      # change: a user with passwordless sudo
+  key: ~/.ssh/id_ed25519            # change: the private key that logs in to the servers
+
+nodes:                              # change: private ip and public host of each server
+  - { name: manager1, ip: 10.0.0.11, host: 203.0.113.11, role: manager }
+  - { name: data1, ip: 10.0.0.21, host: 203.0.113.21, role: standalone }
+
+apps:
+  traefik: swarm        # gateway: HTTPS for every web page
+  portainer: swarm      # manage your containers in a web page
+  postgres: data1       # database
+  redis: data1          # cache
+  rustfs: data1         # S3 file storage
+  beszel: data1         # monitoring (light): CPU, memory, disk and containers, with alerts
+
+# backup:               # recommended: nightly backup to storage outside these servers
+#   repository: s3:https://s3.example.com/my-bucket
+#   s3_access_key: ...
+#   s3_secret_key: ...

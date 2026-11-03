@@ -54,12 +54,28 @@ First time? Follow [Getting started](docs/getting-started.md) instead. It shows 
 ```bash
 git clone https://github.com/sgnd/ansibro.git
 cd ansibro
-cp config.example.yml config.yml   # edit: servers, ssh key, domain, apps
+cp examples/swarm-1-server.yml config.yml   # or another ready-to-use config, see below
 ./install.sh
 ```
 
-Point DNS for `*.<domain>` to the public IP of the first manager **before** you run it, so
-Let's Encrypt can check the domain. Did you set DNS later? With Docker Swarm, log in to the first manager
+**Ready-to-use configs** in [`examples/`](examples/). Copy the one that fits, change the lines marked
+`change` (servers, SSH key, domain), and run `./install.sh`. Each one also works offline (see its first lines).
+
+| Config | Servers | Layout |
+|--------|---------|--------|
+| [`swarm-1-server.yml`](examples/swarm-1-server.yml) | 1 | everything on one server |
+| [`swarm-2-servers.yml`](examples/swarm-2-servers.yml) | 2 | manager (gateway + apps), data server |
+| [`swarm-3-servers.yml`](examples/swarm-3-servers.yml) | 3 | manager (gateway), worker (apps), data server |
+| [`swarm-ha.yml`](examples/swarm-ha.yml) | 9 | 3 managers (gateway), 3 workers (apps), 3 data servers; any one can stop |
+| [`k3s-4-servers.yml`](examples/k3s-4-servers.yml) | 4 | k3s: master, 2 workers (gateway + apps), data server |
+| [`k3s-ha.yml`](examples/k3s-ha.yml) | 9 | k3s: 3 masters, 3 workers (gateway + apps), 3 data servers; any one can stop |
+
+Data servers keep the databases, cache, storage and monitoring, outside the cluster.
+[`config.example.yml`](config.example.yml) explains every setting.
+
+Point DNS for `*.<domain>` to the public IP of the server Traefik runs on **before** you run it, so
+Let's Encrypt can check the domain: the first manager with Docker Swarm, the first worker with k3s
+(each config in `examples/` says which). Did you set DNS later? With Docker Swarm, log in to the first manager
 (`ssh <user>@<its IP>`) and run `sudo docker service update --force traefik_traefik`.
 It asks Let's Encrypt for the certificates again.
 

@@ -351,10 +351,20 @@ def build(cfg, base_dir):
         for name, target in apps.items():
             if target == "swarm" and name not in K3S_CLUSTER_APPS:
                 fail(f"{name} manages Docker Swarm, so it does not run on k3s (use portainer)")
-    # tier=data: a swarm server that runs server apps (databases, ...); tier=app: the others.
-    # Swarm apps without data prefer tier=app servers. A tier in config.yml labels wins.
+    # The tier of each cluster server (a tier in config.yml labels wins). Apps run on tier=app servers.
+    #   data:     runs server apps (databases, ...)
+    #   app:      runs the apps. Workers, or the managers when there are no workers.
+    #   gateway:  a swarm manager when there are workers: Traefik runs there, the apps on the workers.
+    #   control:  a k3s manager when there are workers: only runs the cluster; Traefik and apps run on the workers.
+    manager_tier = "control" if orchestrator == "k3s" else "gateway"
     for name in groups["managers"] + groups["workers"]:
-        hostvars[name]["node_labels"].setdefault("tier", "data" if hostvars[name]["node_apps"] else "app")
+        if hostvars[name]["node_apps"]:
+            tier = "data"
+        elif hostvars[name]["node_role"] == "manager" and groups["workers"]:
+            tier = manager_tier
+        else:
+            tier = "app"
+        hostvars[name]["node_labels"].setdefault("tier", tier)
 
     def from_config_dir(path):
         return os.path.join(base_dir, os.path.expanduser(path))

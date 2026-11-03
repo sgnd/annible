@@ -39,6 +39,10 @@ LEADER = inv["managers"]["hosts"][0]
 LEADER_IP = HOSTS[LEADER]["node_ip"]
 LEADER_HOST = HOSTS[LEADER]["node_host"]  # where SSH connects
 REGISTRY = f"{LEADER_IP}:{CFG['registry_port']}"
+# Where Traefik answers: on k3s the first tier=app server (a worker, if any), on Swarm the first manager.
+CLUSTER = inv["managers"]["hosts"] + inv["workers"]["hosts"]
+WEB_IP = next((HOSTS[h]["node_ip"] for h in CLUSTER if CFG["orchestrator"] == "k3s"
+               and HOSTS[h]["node_labels"].get("tier") == "app"), LEADER_IP)
 IMAGES = CFG["images"]
 WEB = "traefik" in APPS  # web pages only exist with traefik
 # psql comes from the PostgreSQL image in the registry: spilo with Patroni (2 or more servers).
@@ -93,7 +97,7 @@ def https(sub, path="/", **kwargs):
     """
     host = f"{sub}.{DOMAIN}"
     for _ in range(4):
-        code, body = curl(f"https://{host}{path}", resolve=f"{host}:443:{LEADER_IP}", **kwargs)
+        code, body = curl(f"https://{host}{path}", resolve=f"{host}:443:{WEB_IP}", **kwargs)
         if code not in ("404", "502", "503") or (sub == "kong" and "no Route matched" in body):
             break
         time.sleep(3)
@@ -258,7 +262,7 @@ def check_wireguard():
 
 
 def check_traefik():
-    code, _ = curl(f"http://traefik.{DOMAIN}/", resolve=f"traefik.{DOMAIN}:80:{LEADER_IP}")
+    code, _ = curl(f"http://traefik.{DOMAIN}/", resolve=f"traefik.{DOMAIN}:80:{WEB_IP}")
     check("traefik redirects HTTP to HTTPS", code in ("301", "308"), code)
     admin_login("traefik dashboard", "traefik", "/dashboard/")
 

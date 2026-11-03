@@ -31,14 +31,19 @@ spec:
     # Keeps the certificates when Traefik restarts.
     persistence:
       enabled: true
-    # One Traefik, on the first manager: Let's Encrypt's check must reach the Traefik that asked.
-    # Point DNS to the first manager.
+    # One Traefik, on {{ traefik_nodes[0] }}: Let's Encrypt's check must reach the Traefik that asked.
+    # Point DNS to that server.
     nodeSelector:
-      kubernetes.io/hostname: {{ swarm_leader }}
+      kubernetes.io/hostname: {{ traefik_nodes[0] }}
 {% else %}
-    # A Traefik on every cluster server, so each one answers on 80 and 443. Point DNS to all of them.
+    # A Traefik on each of {{ traefik_nodes | join(', ') }}, so each one answers on 80 and 443.
+    # Point DNS to all of them.
     deployment:
       kind: DaemonSet
+{% if traefik_nodes | length < groups['swarm'] | length %}
+    nodeSelector:
+      tier: app
+{% endif %}
 {% endif %}
     # Keeps the real client IP. Only a server that runs Traefik answers.
     service:

@@ -55,13 +55,18 @@ server's pages (metrics, logs, Alertmanager), etcd for Patroni, and Patroni's AP
 - **With 3 managers, one can go down.** The swarm keeps working, and every manager has the registry
   with all images. Workers and standalone servers pull from the first manager's registry: while it is
   down, they can still run the images they have, but not pull new ones.
-- **Where Traefik runs.** With `tls: letsencrypt`, Traefik runs only on the first manager: point DNS there.
-  (Let's Encrypt checks a domain by calling it, and the call could reach another manager.)
-  With `tls: selfsigned` or `tls: custom` (for example a wildcard certificate), Traefik runs on every
-  manager: point DNS to all of them.
-- **Tiers.** Swarm servers that run server apps get the label `tier=data`, the others `tier=app`.
-  Kong and Keycloak run on `tier=app` servers when there are any. Use `node.labels.tier == app`
-  in your own stacks too. Set `labels: { tier: ... }` on a node to choose yourself.
+- **Where Traefik runs.** Swarm: on the managers. k3s: on the workers (the `tier=app` servers), so the
+  masters only run the cluster; with no workers, on the masters. With `tls: letsencrypt` it runs on the
+  first of them only: point DNS there (Let's Encrypt checks a domain by calling it, and the call must
+  reach the Traefik that asked). With `tls: selfsigned` or `tls: custom` (for example a wildcard
+  certificate) it runs on all of them: point DNS to all of them. Only those servers open ports 80 and 443.
+- **Tiers.** Each cluster server gets a label `tier`:
+  `data` (it runs server apps like a database), `app` (workers, or the managers when there are no
+  workers), `gateway` (a swarm manager when there are workers: Traefik only) or `control` (a k3s master
+  when there are workers: the cluster only). Kong and Keycloak run on `tier=app` servers. Use
+  `node.labels.tier == app` (Swarm) or `nodeSelector: { tier: app }` (k3s) in your own apps too.
+  Set `labels: { tier: ... }` on a node to choose yourself. Portainer, Authelia and Swarmpit keep
+  their data on the first manager, so they run there.
 - **The registry needs a login.** Every server logs in (password in `state/secrets/registry`),
   so a container cannot push a fake image into it.
 - **Swarm networks use `10.200.0.0/16`, k3s uses `10.42.0.0/16` and `10.43.0.0/16`.** Your servers' IPs must be outside them.

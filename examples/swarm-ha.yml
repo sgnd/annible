@@ -1,0 +1,56 @@
+# Docker Swarm, highly available: any one server can stop and everything keeps working.
+#   manager1-3  swarm managers: Traefik (the gateway). Portainer and Authelia keep their data on manager1.
+#   worker1-3   swarm workers: your apps (labelled tier=app; add more workers when you need them)
+#   data1-3     not in the swarm: PostgreSQL with automatic failover (Patroni), Redis with Sentinel,
+#               Garage with 3 copies of every file, and monitoring
+# For: production that must stay up.
+# Servers: 2 CPUs, 4 GB memory or more each; data1 6 GB (monitoring needs 2 GB more).
+#
+# Gateway: with Let's Encrypt, Traefik runs on manager1 only (Let's Encrypt must reach the server
+# that asked). For a gateway on all 3 managers, use your own wildcard certificate: tls: custom
+# with tls_cert and tls_key, and point DNS to all 3 managers.
+#
+# Use it: cp examples/swarm-ha.yml config.yml, change the lines marked "change", run ./install.sh.
+# Offline (no internet on the servers): set tls: selfsigned (or custom), remove acme_email, and see docs/offline.md.
+# More settings (backup, firewall, alerts): config.example.yml.
+
+domain: example.com                 # change: your domain; DNS *.example.com -> manager1's public IP
+tls: letsencrypt
+acme_email: admin@example.com       # change: your email, for Let's Encrypt
+timezone: UTC
+
+ssh:
+  user: ubuntu                      # change: a user with passwordless sudo
+  key: ~/.ssh/id_ed25519            # change: the private key that logs in to the servers
+
+nodes:                              # change: private ip and public host of each server
+  - { name: manager1, ip: 10.0.0.11, host: 203.0.113.11, role: manager }
+  - { name: manager2, ip: 10.0.0.12, host: 203.0.113.12, role: manager }
+  - { name: manager3, ip: 10.0.0.13, host: 203.0.113.13, role: manager }
+  - { name: worker1, ip: 10.0.0.31, host: 203.0.113.31, role: worker }
+  - { name: worker2, ip: 10.0.0.32, host: 203.0.113.32, role: worker }
+  - { name: worker3, ip: 10.0.0.33, host: 203.0.113.33, role: worker }
+  - { name: data1, ip: 10.0.0.21, host: 203.0.113.21, role: standalone }
+  - { name: data2, ip: 10.0.0.22, host: 203.0.113.22, role: standalone }
+  - { name: data3, ip: 10.0.0.23, host: 203.0.113.23, role: standalone }
+
+apps:
+  traefik: swarm                    # gateway: HTTPS for every web page
+  portainer: swarm                  # manage your containers in a web page
+  authelia: swarm                   # login with a second factor in front of every admin page
+  postgres: [data1, data2, data3]   # database, with automatic failover
+  redis: [data1, data2, data3]      # cache, with automatic failover (Sentinel)
+  garage: [data1, data2, data3]     # S3 file storage, 3 copies of every file
+  victoria: data1                   # monitoring (full): metrics, logs, alerts and Grafana
+  uptimekuma: data2                 # checks your sites from outside, and watches the monitoring server
+
+monitoring:                                       # where victoria sends alerts
+  webhook: https://hooks.slack.com/services/...   # change: Slack, Discord, or see config.example.yml
+                                                  # for Telegram and email
+
+backup:                                           # nightly backup of every server
+  repository: s3:https://s3.example.com/my-bucket # change: storage outside these servers
+  s3_access_key: change-me                        # change
+  s3_secret_key: change-me                        # change
+
+# wireguard: true       # encrypt the traffic between the servers (when they have no private network)

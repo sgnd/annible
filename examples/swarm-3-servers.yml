@@ -1,0 +1,43 @@
+# Docker Swarm on 3 servers: gateway, apps and data each on their own server.
+#   manager1  swarm manager: Traefik (the gateway). Portainer and Authelia keep their data here too.
+#   worker1   swarm worker: your apps (the installer labels it tier=app; give your stacks
+#             the placement rule node.labels.tier == app)
+#   data1     not in the swarm: databases, cache, storage, monitoring
+# For: a team with several apps; a busy app does not slow down the gateway or the databases.
+# Servers: 2 CPUs, 4 GB memory or more each; data1 6 GB (monitoring needs 2 GB more).
+#
+# Use it: cp examples/swarm-3-servers.yml config.yml, change the lines marked "change", run ./install.sh.
+# Offline (no internet on the servers): set tls: selfsigned, remove acme_email, and see docs/offline.md.
+# More settings (backup, firewall, alerts): config.example.yml.
+
+domain: example.com                 # change: your domain; DNS *.example.com -> manager1's public IP
+tls: letsencrypt
+acme_email: admin@example.com       # change: your email, for Let's Encrypt
+timezone: UTC
+
+ssh:
+  user: ubuntu                      # change: a user with passwordless sudo
+  key: ~/.ssh/id_ed25519            # change: the private key that logs in to the servers
+
+nodes:                              # change: private ip and public host of each server
+  - { name: manager1, ip: 10.0.0.11, host: 203.0.113.11, role: manager }
+  - { name: worker1, ip: 10.0.0.12, host: 203.0.113.12, role: worker }
+  - { name: data1, ip: 10.0.0.21, host: 203.0.113.21, role: standalone }
+
+apps:
+  traefik: swarm        # gateway: HTTPS for every web page
+  portainer: swarm      # manage your containers in a web page
+  authelia: swarm       # login with a second factor in front of every admin page
+  postgres: data1       # database
+  redis: data1          # cache
+  rustfs: data1         # S3 file storage
+  victoria: data1       # monitoring (full): metrics, logs, alerts and Grafana
+
+monitoring:                                       # where victoria sends alerts
+  webhook: https://hooks.slack.com/services/...   # change: Slack, Discord, or see config.example.yml
+                                                  # for Telegram and email
+
+# backup:               # recommended: nightly backup to storage outside these servers
+#   repository: s3:https://s3.example.com/my-bucket
+#   s3_access_key: ...
+#   s3_secret_key: ...

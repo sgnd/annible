@@ -1,6 +1,8 @@
 # Examples of config.yml
 
-Small examples for common setups. [`config.example.yml`](../config.example.yml) explains every setting.
+Small examples for common setups. Complete, ready-to-use configs for 1, 2, 3 and 9 servers (Swarm)
+and 4 and 9 servers (k3s) are in [`examples/`](../examples/), see the [README](../README.md#quick-start).
+[`config.example.yml`](../config.example.yml) explains every setting.
 
 **One server.** Everything on one machine. `ip` is the private IP, `host` the public IP where the
 installer connects (no private IP? Use the public IP for both):
