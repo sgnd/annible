@@ -1,34 +1,5 @@
 # Host network: the firewall decides who can connect. Every app listens on {{ node_ip }} only.
 services:
-{% if monitoring_app == 'prometheus' %}
-  # Collects the metrics of every server and checks the alert rules.
-  prometheus:
-    image: {{ registry_addr }}/prometheus:{{ images.prometheus.tag }}
-    container_name: prometheus
-    restart: always
-    network_mode: host
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time={{ observability_keep_days }}d
-      - --web.listen-address={{ node_ip }}:{{ observability_metrics_port }}
-      - --web.external-url=https://metrics.{{ domain }}
-    volumes:
-      - ./config/scrape.yml:/etc/prometheus/prometheus.yml:ro
-      - ./config/alerts.yml:/etc/prometheus/alerts.yml:ro
-      - ./data/metrics:/prometheus
-
-  # Keeps the logs that the agents send.
-  loki:
-    image: {{ registry_addr }}/loki:{{ images.loki.tag }}
-    container_name: loki
-    restart: always
-    network_mode: host
-    command: [-config.file=/etc/loki/loki.yml]
-    volumes:
-      - ./config/loki.yml:/etc/loki/loki.yml:ro
-      - ./data/logs:/loki
-{% else %}
   # Collects the metrics of every server.
   victoriametrics:
     image: {{ registry_addr }}/victoriametrics:{{ images.victoriametrics.tag }}
@@ -75,7 +46,6 @@ services:
       - -external.url=https://grafana.{{ domain }}
     volumes:
       - ./config/alerts.yml:/etc/vmalert/alerts.yml:ro
-{% endif %}
 
   # Sends the alerts to Telegram, email or a webhook, and the heartbeat to Uptime Kuma.
   alertmanager:

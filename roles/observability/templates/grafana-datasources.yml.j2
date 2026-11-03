@@ -8,13 +8,6 @@ datasources:
     url: http://{{ node_ip }}:{{ observability_metrics_port }}
     isDefault: true
     editable: false
-{% if monitoring_app == 'prometheus' %}
-  - name: Logs
-    uid: logs
-    type: loki
-    url: http://{{ node_ip }}:{{ observability_logs_port }}
-    editable: false
-{% endif %}
   - name: Alerts
     uid: alerts
     type: alertmanager

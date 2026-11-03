@@ -69,6 +69,7 @@ remove_nodes: false
 # ./install.sh -e restore=true puts the newest backup back on new servers (see roles/backup).
 restore: false
 
-# The monitoring app (prometheus or victoria), and the server it runs on. Empty if not installed.
-monitoring_app: "{{ 'prometheus' if 'prometheus' in apps else 'victoria' if 'victoria' in apps else '' }}"
+# The monitoring app with alerts to Telegram, email or a webhook (victoria), and its server. Empty if not installed.
+# (beszel, the light choice, has its own agents and alert settings.)
+monitoring_app: "{{ 'victoria' if 'victoria' in apps else '' }}"
 monitoring_ip: "{{ hostvars[apps[monitoring_app]].node_ip if monitoring_app else '' }}"

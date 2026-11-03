@@ -1,5 +1,0 @@
-# Prometheus + Loki + Alertmanager + Grafana. The shared parts are in roles/observability.
-- name: Deploy monitoring
-  ansible.builtin.include_role:
-    name: observability
-    tasks_from: server

@@ -1,4 +1,4 @@
-# Alert rules. The same file works for Prometheus and vmalert.
+# Alert rules, checked by vmalert.
 # severity: critical = something is down now, warning = look at it soon.
 # The ansibro_* metrics come from /usr/local/bin/ansibro-metrics on every server (every minute).
 
@@ -27,7 +27,7 @@ groups:
           summary: "Alertmanager could not send alerts to {{ $labels.integration }}. Check monitoring: in config.yml."
 
       - alert: AlertRulesFailing
-        expr: increase(prometheus_rule_evaluation_failures_total[10m]) > 0 or increase(vmalert_execution_errors_total[10m]) > 0
+        expr: increase(vmalert_execution_errors_total[10m]) > 0
         labels: { severity: warning }
         annotations:
           summary: Some alert rules cannot be checked, so their alerts would not fire.

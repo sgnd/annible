@@ -89,8 +89,9 @@ CASES = [
     ("wireguard with host same as ip",
      lambda c: (c.update(wireguard=True), [n.update(host=n["ip"]) for n in c["nodes"]]), "must differ from host"),
     ("monitoring app without monitoring", lambda c: c["apps"].update(victoria="data1"), "needs monitoring: in config.yml"),
-    ("monitoring without the app", lambda c: c.update(monitoring={"webhook": "https://x.example.com"}), "no monitoring app"),
-    ("two monitoring apps", lambda c: (monitored(c), c["apps"].update(prometheus="swarm2")), "both monitoring"),
+    ("monitoring without the app", lambda c: c.update(monitoring={"webhook": "https://x.example.com"}), "victoria is not installed"),
+    ("two monitoring apps", lambda c: (monitored(c), c["apps"].update(beszel="swarm2")), "both monitoring"),
+    ("monitoring: with beszel only", lambda c: (c["apps"].update(beszel="data1"), c.update(monitoring={"webhook": "https://x.example.com"})), "victoria is not installed"),
     ("monitoring with no place for alerts", lambda c: (monitored(c), c.update(monitoring={"keep_days": 30})), "at least one place"),
     ("monitoring typo", lambda c: (monitored(c), c["monitoring"].update(slack="x")), "unknown setting monitoring.slack"),
     ("telegram chat_id as text",
@@ -133,8 +134,9 @@ GOOD = [
     ("backup to a folder", lambda c: c.update(backup={"repository": "/mnt/backup"})),
     ("victoria with a webhook", monitored),
     ("uptimekuma and beszel together", lambda c: c["apps"].update(uptimekuma="data1", beszel="data1")),
-    ("prometheus with every alert channel", lambda c: (
-        c["apps"].update(prometheus="data1", uptimekuma="swarm2"),
+    ("beszel without monitoring:", lambda c: c["apps"].update(beszel="data1")),
+    ("victoria with every alert channel", lambda c: (
+        c["apps"].update(victoria="data1", uptimekuma="swarm2"),
         c.update(monitoring={
             "telegram": {"bot_token": "123:ABC", "chat_id": -1001234},
             "email": {"to": "ops@example.com", "from": "alerts@example.com", "smarthost": "smtp.example.com:587",

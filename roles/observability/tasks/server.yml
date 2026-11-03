@@ -1,5 +1,5 @@
 # Monitoring server: keeps metrics and logs, checks the alert rules, sends alerts, shows Grafana.
-# Used by the prometheus and victoria roles. The agents on every server are in agent.yml.
+# Used by the victoria role. The agents on every server are in agent.yml.
 #
 #   {{ observability_dir }}/config/  settings (made by the installer)
 #   {{ observability_dir }}/data/    metrics and logs (big, not in the backup)
@@ -21,9 +21,9 @@
     - { path: config/grafana/datasources, owner: root, mode: "0755" }
     - { path: config/grafana/dashboards, owner: root, mode: "0755" }
     - { path: data, owner: root }
-    # Prometheus and Alertmanager run as user 65534 (nobody), Loki as 10001, Grafana as 472.
-    - { path: data/metrics, owner: "{{ '65534' if monitoring_app == 'prometheus' else 'root' }}" }
-    - { path: data/logs, owner: "{{ '10001' if monitoring_app == 'prometheus' else 'root' }}" }
+    # Alertmanager runs as user 65534 (nobody), Grafana as 472.
+    - { path: data/metrics, owner: root }
+    - { path: data/logs, owner: root }
     - { path: alertmanager, owner: "65534" }
     - { path: grafana, owner: "472" }
   loop_control:
@@ -42,14 +42,6 @@
     dest: "{{ observability_dir }}/config/alerts.yml"
     mode: "0644"
   register: observability_alerts
-
-- name: Write Loki config
-  ansible.builtin.template:
-    src: loki.yml.j2
-    dest: "{{ observability_dir }}/config/loki.yml"
-    mode: "0644"
-  register: observability_loki
-  when: monitoring_app == 'prometheus'
 
 # Has the Telegram token and email password: only Alertmanager (user 65534) may read it.
 - name: Write where alerts go
@@ -106,7 +98,7 @@
   vars:
     docker_compose_app: "{{ monitoring_app }}"
     docker_compose_restart: >-
-      {{ observability_scrape.changed or observability_alerts.changed or observability_loki.changed
+      {{ observability_scrape.changed or observability_alerts.changed
          or observability_alertmanager.changed or observability_datasources.changed }}
 
 - name: Add Grafana to Traefik
@@ -136,7 +128,6 @@
     traefik_route_port: "{{ observability_metrics_port }}"
     traefik_route_middleware: admin
 
-# Loki has no web page; with Prometheus, you read logs in Grafana (Explore).
 - name: Add the logs page to Traefik
   ansible.builtin.include_role:
     name: traefik
@@ -145,7 +136,6 @@
     traefik_route_name: logs
     traefik_route_port: "{{ observability_logs_port }}"
     traefik_route_middleware: admin
-  when: monitoring_app == 'victoria'
 
 # If this server stops, it cannot send an alert. Something on another server must watch it.
 - name: Show how to watch the monitoring server

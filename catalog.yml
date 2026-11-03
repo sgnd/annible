@@ -111,19 +111,11 @@ uptimekuma:
   info: "https://uptimekuma.<domain> (Traefik dashboard login first, then create Uptime Kuma's admin user)"
 
 beszel:
-  category: server-stats
+  category: monitoring
   runs_on: node
   requires: [traefik]
   license: MIT
   info: "https://beszel.<domain> (user admin@<domain>, password state/secrets/beszel_admin). Agents run on every server"
-
-prometheus:
-  category: monitoring
-  runs_on: node
-  requires: [traefik]
-  license: Apache-2.0 (Prometheus, Alertmanager), AGPL-3.0 (Loki, Grafana)
-  info: "Grafana https://grafana.<domain> (user admin, password state/secrets/grafana_admin). With the Traefik login:
-    alerts https://alertmanager.<domain>, Prometheus https://metrics.<domain>. Logs: Grafana > Explore > Logs"
 
 victoria:
   category: monitoring

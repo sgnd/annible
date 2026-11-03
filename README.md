@@ -105,9 +105,8 @@ Click a name to open its official website.
 | cache | key-value cache | [redis](https://redis.io) / [valkey](https://valkey.io) | server | 6379 | |
 | storage | S3 file storage | [rustfs](https://rustfs.com) / [garage](https://garagehq.deuxfleurs.fr) | server | 9000 / 3900 | `rustfs.<domain>/rustfs/console/` |
 | queue | messages between apps | [rabbitmq](https://www.rabbitmq.com) / [nats](https://nats.io) | server | 5672 / 4222 | `rabbitmq.<domain>` / `nats.<domain>` |
-| uptime | checks that your sites answer, status page | [uptimekuma](https://uptime.kuma.pet) | server | | `uptimekuma.<domain>` |
-| server-stats | CPU, memory and disk of each server, at a glance | [beszel](https://beszel.dev) | server | | `beszel.<domain>` |
-| monitoring | metrics, logs and alerts (`monitoring:` in config.yml) | [prometheus](https://prometheus.io) / [victoria](https://victoriametrics.com) | server | | `grafana.<domain>` and more, see [How to](docs/how-to.md#monitoring-and-alerts) |
+| uptime | checks from outside that your sites answer, status page | [uptimekuma](https://uptime.kuma.pet) | server | | `uptimekuma.<domain>` |
+| monitoring | servers, containers and alerts. victoria: full (also logs, Grafana, `monitoring:` in config.yml); beszel: light | [victoria](https://victoriametrics.com) / [beszel](https://beszel.dev) | server | | `grafana.<domain>` and more, see [How to](docs/how-to.md#monitoring-and-alerts) / `beszel.<domain>` |
 | secrets | passwords and keys for your apps | [openbao](https://openbao.org) | server | 8200 | `openbao.<domain>` |
 
 Logins, what each app needs, and notes: [docs/apps.md](docs/apps.md).

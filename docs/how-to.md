@@ -76,10 +76,13 @@ restic -r <repository> restore latest \
 
 ## Monitoring and alerts
 
-Add `prometheus` or `victoria` to `apps` (on a server with at least 2 GB
+Add `victoria` to `apps` (on a server with at least 2 GB
 of free memory), and `monitoring:` with where alerts go: Telegram, email or a webhook (for Slack or Discord,
-paste their webhook URL: Ansibro knows their format). See [`config.example.yml`](../config.example.yml). Both choices do the same;
-victoria uses less memory and disk.
+paste their webhook URL: Ansibro knows their format). See [`config.example.yml`](../config.example.yml).
+
+For a small setup, `beszel` is the light choice instead: CPU, memory, disk and containers of every
+server, with alerts you set in its web page. It has no logs and does not use `monitoring:`.
+The rest of this section is about victoria.
 
 On every server, agents collect the server (CPU, memory, disk, clock), its containers, the logs of
 every container and of the system, and the stats of PostgreSQL, MariaDB, Redis and Valkey. Each minute,
@@ -93,8 +96,7 @@ last backup and WireGuard. Alerts are sent for:
 - the monitoring itself: an agent or exporter that does not answer, alerts that cannot be sent
 
 The rules are in [`roles/observability/files/alerts.yml`](../roles/observability/files/alerts.yml).
-Grafana has an "Ansibro overview" dashboard. Logs: Grafana > Explore (prometheus), or
-`https://logs.<domain>/select/vmui` (victoria).
+Grafana has an "Ansibro overview" dashboard. Logs: `https://logs.<domain>/select/vmui`.
 
 ## Who watches the monitoring?
 

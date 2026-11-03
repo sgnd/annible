@@ -53,15 +53,11 @@ transforms:
       .container = ._SYSTEMD_UNIT || .SYSLOG_IDENTIFIER || "kernel"
 
 sinks:
-  # Loki and VictoriaLogs both take logs in the Loki format.
+  # VictoriaLogs takes logs in the Loki format.
   logs:
     type: loki
     inputs: [container_labels, system_labels{{ ', pod_labels' if orchestrator == 'k3s' and inventory_hostname in groups['swarm'] }}]
-{% if monitoring_app == 'prometheus' %}
-    endpoint: http://{{ monitoring_ip }}:{{ observability_logs_port }}
-{% else %}
     endpoint: http://{{ monitoring_ip }}:{{ observability_logs_port }}/insert
-{% endif %}
     encoding:
       codec: text
     labels:
