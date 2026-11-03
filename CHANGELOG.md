@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0
 
 Clearer app categories, and one monitoring stack less.
 - **Removed: `prometheus`.** `victoria` does the same (metrics, logs, alerts, Grafana) with less
