@@ -101,8 +101,9 @@ Fixes
 - From the final review, tested on DigitalOcean: Swarm 3 managers + 3 data servers (Patroni, Redis
   Sentinel, Garage, Keycloak, prometheus) with backup, then all servers rebuilt and `-e restore=true`;
   k3s 3 servers + 3 data servers (MariaDB Galera, Authelia, victoria); offline from the bundle with
-  3 managers and no internet. `tests/check.py` passes and a second run changes nothing. Not tested:
-  k3s with `tls: letsencrypt` (needs a real domain), and the stop when managers change.
+  3 managers and no internet. `tests/check.py` passes and a second run changes nothing. Also k3s with
+  `tls: letsencrypt` on a real domain (3 servers + 1 data server, Keycloak, Portainer). Not tested:
+  the stop when managers change.
   - Offline with more than one manager: every manager gets the registry image from the bundle.
   - PostgreSQL with Patroni: etcd compacts its old values (it filled up after some weeks), etcd's
     data is no longer in the backup, a restore loads the dump on the new primary (it may be another
@@ -121,6 +122,8 @@ Fixes
     which the firewall closes, so pods on different servers could not reach each other; it now uses
     the interface of `ip`. Patroni's API login is set through Spilo's own setting. A second install
     no longer reports a change (the backup copied `state/summary.md`; now `state/secrets/` only).
+  - k3s with `tls: letsencrypt`: only the Traefik dashboard got a Let's Encrypt certificate. Each
+    route's own `tls: {}` hid the Let's Encrypt setting; the routes now name it.
 - Docker Hub allows few downloads without a login (429 Too Many Requests). Images are now copied
   from Google's copy of Docker Hub (mirror.gcr.io, same pinned digest) when they can be, each image
   is downloaded once (the other managers copy it from the first), and Docker and k3s use the mirror too.
