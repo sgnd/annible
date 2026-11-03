@@ -16,3 +16,15 @@
     dest: /var/lib/rancher/k3s/server/manifests/ansibro-traefik.yaml
     mode: "0600"
   diff: false  # has the password hash
+
+# k3s installs Traefik by itself, a little later (offline it first loads its images, which takes
+# minutes). Wait for it, so the web pages work when the install ends.
+- name: Wait until Traefik runs on k3s
+  ansible.builtin.command: >-
+    k3s kubectl -n kube-system wait --for=condition=Ready pod
+    -l app.kubernetes.io/name=traefik --timeout=10s
+  register: traefik_k3s_ready
+  until: traefik_k3s_ready.rc == 0
+  retries: 90
+  delay: 10
+  changed_when: false
