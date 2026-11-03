@@ -40,4 +40,4 @@ spec:
     - match: Host(`{{ authelia_host }}`)
       kind: Rule
       services: [{ name: authelia, port: 9091 }]
-  tls: {}
+  tls: {{ k3s_route_tls | to_json }}

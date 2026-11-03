@@ -60,7 +60,7 @@ spec:
     - match: Host(`{{ keycloak_host }}`)
       kind: Rule
       services: [{ name: keycloak, port: 8080 }]
-  tls: {}
+  tls: {{ k3s_route_tls | to_json }}
 {% if admin_sso == 'keycloak' %}
 ---
 # The Keycloak login in front of the admin pages (Traefik middleware "oauth").
@@ -108,5 +108,5 @@ spec:
     - match: Host(`{{ keycloak_oauth_host }}`)
       kind: Rule
       services: [{ name: oauth2-proxy, port: 4180 }]
-  tls: {}
+  tls: {{ k3s_route_tls | to_json }}
 {% endif %}

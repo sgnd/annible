@@ -54,4 +54,4 @@ spec:
       kind: Rule
       middlewares: [{ name: admin-ip }]
       services: [{ name: portainer, port: 9000 }]
-  tls: {}
+  tls: {{ k3s_route_tls | to_json }}
