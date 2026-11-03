@@ -14,9 +14,15 @@ function fail(message) {
   process.exit(1);
 }
 
-// Send an event and wait for Uptime Kuma's answer.
+// Send an event and wait for Uptime Kuma's answer (at most 20 seconds, then fail: the installer tries again).
 function call(socket, event, ...args) {
-  return new Promise((resolve) => socket.emit(event, ...args, resolve));
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => fail("no answer to " + event), 20000);
+    socket.emit(event, ...args, (answer) => {
+      clearTimeout(timer);
+      resolve(answer);
+    });
+  });
 }
 
 // The fields a new monitor needs, like the web page fills them in.
@@ -34,6 +40,8 @@ async function run(settings) {
     socket.on("connect", resolve);
     socket.on("connect_error", (e) => fail("cannot reach Uptime Kuma: " + e.message));
   });
+  // Uptime Kuma sets up its answers a moment after a connection opens; a question sent before is lost.
+  await new Promise((resolve) => setTimeout(resolve, 3000));
 
   if (!(await call(socket, "needSetup"))) {
     console.log("already set up");
