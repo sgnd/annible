@@ -31,7 +31,7 @@ body:
       options:
         - label: It is open source, with an OSI-approved license (not BSL or SSPL)
           required: true
-        - label: It has an image for both amd64 and arm64
+        - label: It has an image for Intel/AMD (amd64)
           required: true
         - label: It works offline (everything it needs is in its image)
           required: true

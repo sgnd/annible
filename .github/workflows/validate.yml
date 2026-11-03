@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: shellcheck install.sh build-bundle.sh scripts/*.sh
 
-  # 3. Every image and package in versions.yml still exists, for amd64 and arm64.
+  # 3. Every image and package in versions.yml still exists (amd64).
   versions:
     name: Pinned versions
     runs-on: ubuntu-latest

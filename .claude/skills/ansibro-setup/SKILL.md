@@ -18,9 +18,7 @@ Ask only what you cannot guess. Keep it short.
    - `worker` runs cluster apps (swarm worker or k3s agent).
    - `standalone` is not in the cluster. Good for databases and storage.
    - One server only? Make it a `manager` and put every app on it.
-   - `gpu: true` for a server with an NVIDIA GPU (needs internet).
-3. **CPU** of the servers (not the laptop): `amd64` or `arm64`. The installer finds it; they may mix
-   with internet. The offline bundle needs one CPU type. **Ubuntu** must be 24.04 or 26.04.
+3. **Servers** must be Intel/AMD (amd64), not ARM, with **Ubuntu** 24.04 or 26.04.
 4. **Domain** for the web pages, for example `example.com`.
 5. **Internet on the servers?**
    - Yes: `tls: letsencrypt` and set `acme_email`. DNS must point to the first manager **before** the install.

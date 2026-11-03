@@ -2,10 +2,6 @@
 {% if inventory_hostname not in groups['swarm'] %}
   "live-restore": true,
 {% endif %}
-{% if node_gpu %}
-  "default-runtime": "nvidia",
-  "runtimes": { "nvidia": { "path": "nvidia-container-runtime", "args": [] } },
-{% endif %}
 {# Docker Hub allows few downloads without a login: try Google's copy of it first. #}
 {% if not offline %}
   "registry-mirrors": ["https://mirror.gcr.io"],

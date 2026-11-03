@@ -8,7 +8,7 @@ description: Add a new app to the Ansibro catalog (a new role, catalog entry and
 ## Rules (check these first)
 
 - **Open source only.** The license must be OSI-approved. If it is not (for example BSL or SSPL), stop and tell the user.
-- **Pinned version.** Tag + multi-arch digest (amd64 and arm64). Never `latest`.
+- **Pinned version.** Tag + the digest of its image index, with an amd64 build. Never `latest`.
 - **Works offline.** Images come from `versions.yml`, so the bundle and the local registry pick them up. Don't download anything else at install time.
 - **Apps with data** (databases, caches, storage, queues, monitoring) use `runs_on: node` and Docker Compose.
   A swarm app that must keep data is pinned to the first manager (see `roles/portainer/`).
@@ -29,13 +29,13 @@ description: Add a new app to the Ansibro catalog (a new role, catalog entry and
      info: "<ip>:1234 (password state/secrets/myapp)"
    ```
 
-2. **versions.yml**: add the image under `images:`. Get the digest of the multi-arch index:
+2. **versions.yml**: add the image under `images:`. Get the digest of its image index:
 
    ```bash
    docker buildx imagetools inspect docker.io/org/myapp:1.2.3
    ```
 
-   Use the top `Digest:` (the index), not one of the per-platform digests. Check that both `linux/amd64` and `linux/arm64` are listed.
+   Use the top `Digest:` (the index), not one of the per-platform digests. Check that `linux/amd64` is listed.
 
 3. **roles/myapp/**: copy the closest role and rename things.
    - Server app: copy `roles/valkey/` (simple) or `roles/postgres/` (has a database).

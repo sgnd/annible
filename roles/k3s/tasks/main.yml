@@ -15,7 +15,7 @@
   ansible.builtin.get_url:
     url: "{{ k3s_binary_url }}"
     dest: /usr/local/bin/k3s
-    checksum: "sha256:{{ k3s[node_arch].binary }}"
+    checksum: "sha256:{{ k3s.binary }}"
     mode: "0755"
   when: not offline
   notify: Restart k3s
@@ -23,7 +23,7 @@
 # From the bundle on the machine that runs the installer.
 - name: Copy the k3s program from the bundle
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/bundle/k3s/k3s-{{ node_arch }}"
+    src: "{{ playbook_dir }}/bundle/k3s/k3s"
     dest: /usr/local/bin/k3s
     mode: "0755"
   when: offline
@@ -32,7 +32,7 @@
 # Offline: k3s loads its own images (CoreDNS, Traefik, ...) from this folder when it starts.
 - name: Copy the k3s images from the bundle
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/bundle/k3s/k3s-airgap-images-{{ node_arch }}.tar.zst"
+    src: "{{ playbook_dir }}/bundle/k3s/k3s-airgap-images-amd64.tar.zst"
     dest: /var/lib/rancher/k3s/agent/images/
     mode: "0644"
   when: offline

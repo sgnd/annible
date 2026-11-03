@@ -54,16 +54,6 @@ scrape_configs:
         labels: { node: {{ host }} }
 {% endfor %}
 {% endif %}
-{% if groups['all'] | map('extract', hostvars, 'node_gpu') | select | list %}
-
-  # NVIDIA GPUs (dcgm-exporter), on servers with gpu: true.
-  - job_name: gpu
-    static_configs:
-{% for host in groups['all'] if hostvars[host].node_gpu %}
-      - targets: ["{{ hostvars[host].node_ip }}:{{ observability_dcgm_exporter_port }}"]
-        labels: { node: {{ host }} }
-{% endfor %}
-{% endif %}
 {% if 'traefik' in apps and orchestrator == 'swarm' %}
 
   # Traefik: requests, backends that are down, and when the certificates end.

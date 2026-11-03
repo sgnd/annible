@@ -28,15 +28,6 @@ body:
     validations:
       required: true
   - type: dropdown
-    id: arch
-    attributes:
-      label: CPU type
-      options:
-        - amd64
-        - arm64
-    validations:
-      required: true
-  - type: dropdown
     id: cluster
     attributes:
       label: Cluster

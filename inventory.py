@@ -15,7 +15,7 @@ import yaml
 HERE = os.path.dirname(os.path.abspath(__file__))
 GROUPS = {"manager": "managers", "worker": "workers", "standalone": "standalone"}
 CONFIG_KEYS = {
-    "domain", "acme_email", "acme_server", "acme_ca_cert", "tls", "tls_cert", "tls_key", "timezone", "arch",
+    "domain", "acme_email", "acme_server", "acme_ca_cert", "tls", "tls_cert", "tls_key", "timezone",
     "ssh", "admin_allow_from", "firewall_allow", "wireguard", "backup", "monitoring", "nodes", "apps",
     "orchestrator",
 }
@@ -39,7 +39,7 @@ TIME = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
 SWARM_ADDRESS_POOL = "10.200.0.0/16"
 REGISTRY_PORT = 5000  # the local image registry, on every manager
 KONG_SUBNET = "10.200.255.0/24"  # Kong's own network, inside the pool
-NODE_KEYS = {"name", "ip", "host", "role", "labels", "gpu"}
+NODE_KEYS = {"name", "ip", "host", "role", "labels"}
 WIREGUARD_PORT = 51820  # UDP port of the WireGuard network between the servers
 
 
@@ -163,6 +163,8 @@ def check_monitoring(monitoring):
 
 
 def check_settings(cfg, bundle):
+    if "arch" in cfg:
+        fail("arch was removed: Ansibro runs on Intel/AMD (amd64) servers only. Delete arch from config.yml")
     unknown = set(cfg) - CONFIG_KEYS
     if unknown:
         fail(f"unknown setting {', '.join(sorted(unknown))} (typo?)")
@@ -185,8 +187,6 @@ def check_settings(cfg, bundle):
              "or set acme_server to an ACME server in your network")
     if cfg.get("acme_ca_cert") and not cfg.get("acme_server"):
         fail("acme_ca_cert is only used with acme_server")
-    if cfg.get("arch") is not None and cfg["arch"] not in ("amd64", "arm64"):
-        fail("arch must be amd64 or arm64 (or leave it out: the installer finds each server's CPU type)")
     check_ip_list("ssh.allow_from", (cfg.get("ssh") or {}).get("allow_from"))
     check_ip_list("admin_allow_from", cfg.get("admin_allow_from"))
     check_firewall_allow(cfg.get("firewall_allow"))
@@ -196,8 +196,6 @@ def check_settings(cfg, bundle):
         fail("wireguard must be true or false")
     if cfg.get("orchestrator", "swarm") not in ORCHESTRATORS:
         fail("orchestrator must be swarm or k3s")
-    if bundle and cfg.get("arch") and cfg["arch"] != bundle["arch"]:
-        fail(f"the bundle is for {bundle['arch']}, but config.yml arch is {cfg['arch']}")
 
 
 def build_nodes(nodes, wireguard):
@@ -210,6 +208,8 @@ def build_nodes(nodes, wireguard):
     hostvars = {}
     for node in nodes:
         name, ip, role = node.get("name"), node.get("ip"), node.get("role")
+        if "gpu" in node:
+            fail(f"node {name}: gpu was removed (Ansibro no longer sets up GPU servers). Delete gpu from config.yml")
         unknown = set(node) - NODE_KEYS
         if unknown:
             fail(f"node {name}: unknown setting {', '.join(sorted(unknown))} (typo?)")
@@ -228,8 +228,6 @@ def build_nodes(nodes, wireguard):
         for key, value in labels.items():
             if not LABEL.match(str(key)) or not LABEL.match(str(value)):
                 fail(f"{name}: label {key}: {value} may only use letters, numbers, . _ and -")
-        if node.get("gpu", False) not in (True, False):
-            fail(f"{name}: gpu must be true or false")
         if name in hostvars:
             fail(f"duplicate node name {name}")
         try:
@@ -263,11 +261,7 @@ def build_nodes(nodes, wireguard):
             "node_role": role,
             "node_labels": {str(k): str(v) for k, v in (node.get("labels") or {}).items()},
             "node_apps": [],
-            "node_gpu": node.get("gpu", False),
         }
-        # Swarm services that need a GPU use the placement rule node.labels.gpu == true.
-        if node.get("gpu") and role != "standalone":
-            hostvars[name]["node_labels"].setdefault("gpu", "true")
 
     if not groups["managers"]:
         fail("at least one manager is required")
@@ -350,8 +344,6 @@ def build(cfg, base_dir):
     check_settings(cfg, bundle)
     groups, hostvars = build_nodes(cfg.get("nodes"), cfg.get("wireguard", False))
     catalog = load_yaml(os.path.join(HERE, "catalog.yml"))
-    if bundle and any(h["node_gpu"] for h in hostvars.values()):
-        fail("gpu: true needs internet (the NVIDIA driver and toolkit are not in the offline bundle)")
     apps, app_nodes = build_apps(cfg.get("apps"), catalog, hostvars, cfg.get("monitoring"))
     orchestrator = cfg.get("orchestrator", "swarm")
     if orchestrator == "k3s":

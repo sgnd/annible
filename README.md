@@ -28,13 +28,11 @@ from renting a server to opening your first app. Words you do not know are expla
 - A firewall, HTTPS, and a password for every app, made for you.
 - Optional: backups each night, monitoring with alerts, an encrypted network between servers.
 - Only open-source apps. Every version is pinned in [`versions.yml`](versions.yml), nothing uses `latest`.
-- Intel/AMD (amd64) and ARM (arm64) servers, also mixed in one cluster.
 - Works without internet, with an offline bundle.
 
 ## Requirements
 
-- **Servers** with Ubuntu 24.04 or 26.04. They can be Intel/AMD (amd64) or ARM (arm64);
-  the installer finds out which. Online, you can mix both types. An offline bundle works for one type only.
+- **Servers** with Ubuntu 24.04 or 26.04, with an Intel or AMD CPU (amd64). ARM servers are not supported.
 - **At least 2 CPUs and 4 GB of memory** on each server (a server for monitoring needs 2 GB more).
 - **SSH login with a key**, and a user that can use `sudo` without a password.
 - **A computer to run the installer**, with Python 3.12 or newer: your laptop (macOS or Linux),
@@ -124,7 +122,7 @@ Logins, what each app needs, and notes: [docs/apps.md](docs/apps.md).
 | [Check and fix](docs/troubleshooting.md) | check that everything works, or fix a problem |
 | [Offline install](docs/offline.md) | install on servers without internet |
 | [Docker Swarm or k3s](docs/k3s.md) | use k3s (Kubernetes) instead of Docker Swarm |
-| [Advanced](docs/advanced.md) | GPU servers, Kong, Authelia in front of your own apps |
+| [Advanced](docs/advanced.md) | Kong, Swarmpit, Authelia in front of your own apps |
 | [How it works](docs/how-it-works.md) | know what the installer does, and the firewall rules |
 
 ## Contributing
