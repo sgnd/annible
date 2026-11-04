@@ -39,10 +39,15 @@
   when: orchestrator == 'swarm'
   changed_when: true
 
-# k3s: the address to reach a removed server (label ansibro-host, set by roles/k3s). Read it before
-# the server is deleted.
+# k3s: the address to reach a removed server: its label ansibro-host (set by roles/k3s), or else its
+# cluster address (InternalIP). Read it before the server is deleted.
 - name: Find the address of removed k3s servers
-  ansible.builtin.command: k3s kubectl get node {{ item }} -o jsonpath={.metadata.labels.ansibro-host}
+  ansible.builtin.shell: |
+    set -o pipefail
+    k3s kubectl get node {{ item }} -o jsonpath='{.metadata.labels.ansibro-host}' | grep . \
+      || k3s kubectl get node {{ item }} -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}'
+  args:
+    executable: /bin/bash
   loop: "{{ cleanup_old_nodes }}"
   register: cleanup_k3s_hosts
   failed_when: false
@@ -63,6 +68,7 @@
 # (so the server can join again later, also with another role).
 - name: Stop k3s on removed servers
   ansible.builtin.shell: |
+    set -o pipefail
     for unit in k3s k3s-agent; do
       systemctl disable --now "$unit" 2>/dev/null || true
       rm -f "/etc/systemd/system/$unit.service"
@@ -70,9 +76,18 @@
     systemctl daemon-reload
     # [a]: so pkill does not match this shell itself (its command line has the text too).
     pkill -f '/var/lib/rancher/k3s/dat[a]/' || true
+    # Its pod network too (like k3s-killall.sh): when the server joins again it gets a new pod
+    # range, and old interfaces would leave its pods without a route. The ufw rules stay.
+    for link in cni0 flannel.1 flannel-v6.1 flannel-wg kube-ipvs0; do
+      ip link delete "$link" 2>/dev/null || true
+    done
+    rm -rf /var/lib/cni/ /run/flannel/  # old pod addresses, and the old pod range for new pods
+    iptables-save | grep -v KUBE- | grep -v CNI- | grep -iv flannel | iptables-restore
+    ip6tables-save | grep -v KUBE- | grep -v CNI- | grep -iv flannel | ip6tables-restore
+  args:
+    executable: /bin/bash
   delegate_to: "{{ item.stdout }}"
-  vars:
-    ansible_host: "{{ item.stdout }}"
+  vars:  # (delegate_to gives the address; these vars cannot use item)
     ansible_user: "{{ hostvars[inventory_hostname].ansible_user }}"
     ansible_port: "{{ hostvars[inventory_hostname].ansible_port }}"
     ansible_ssh_private_key_file: "{{ hostvars[inventory_hostname].ansible_ssh_private_key_file }}"
@@ -82,3 +97,15 @@
   when: orchestrator == 'k3s' and item.stdout | default('') != ''
   ignore_unreachable: true
   changed_when: true
+  register: cleanup_k3s_stop
+
+# A server that did not answer still runs k3s, and would join the cluster again by itself.
+- name: Say which removed servers still run k3s
+  ansible.builtin.debug:
+    msg: >-
+      {{ item.item.item }} did not answer, so k3s still runs there. Stop it there by hand, or it joins
+      again: sudo systemctl disable --now k3s k3s-agent
+  loop: "{{ cleanup_k3s_stop.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.item | default('') }}"
+  when: orchestrator == 'k3s' and (item.unreachable | default(false) or (item.item.stdout | default('')) == '')
