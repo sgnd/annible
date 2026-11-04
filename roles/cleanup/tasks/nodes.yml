@@ -81,7 +81,7 @@
     for link in cni0 flannel.1 flannel-v6.1 flannel-wg kube-ipvs0; do
       ip link delete "$link" 2>/dev/null || true
     done
-    rm -rf /var/lib/cni/
+    rm -rf /var/lib/cni/ /run/flannel/  # old pod addresses, and the old pod range for new pods
     iptables-save | grep -v KUBE- | grep -v CNI- | grep -iv flannel | iptables-restore
     ip6tables-save | grep -v KUBE- | grep -v CNI- | grep -iv flannel | ip6tables-restore
   args:
