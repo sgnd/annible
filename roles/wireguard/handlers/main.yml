@@ -6,6 +6,7 @@
 # (A new MTU needs a restart by hand: sudo systemctl restart wg-quick@wg0, one server at a time.)
 - name: Restart wireguard
   ansible.builtin.shell: |
+    set -o pipefail
     if ip link show wg0 >/dev/null 2>&1; then
       key=$(cat /etc/wireguard/private.key)
       export key
