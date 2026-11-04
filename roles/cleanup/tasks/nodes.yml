@@ -56,21 +56,11 @@
   when: orchestrator == 'k3s'
   changed_when: true
 
-# Deleting the node does not stop k3s on that server: it would join again. So stop it there,
-# with the same SSH settings as the other servers. A server that does not answer is skipped.
-- name: Add removed k3s servers, to stop k3s on them
-  ansible.builtin.add_host:
-    name: "{{ item.item }}"
-    ansible_host: "{{ item.stdout }}"
-    groups: cleanup_removed
-  loop: "{{ cleanup_k3s_hosts.results | default([]) }}"
-  loop_control:
-    label: "{{ item.item }}"
-  when: item.stdout | default('') != ''
-  changed_when: false
-
-# Stops k3s and its containers, and removes its services (so the server can join again later,
-# also with another role).
+# Deleting the node does not stop k3s on that server: it would join again. So stop it there.
+# It is reached at its address with the same SSH settings as the other servers. (Not with add_host:
+# that would keep the removed server in the inventory, and the next plays would set it up again.)
+# A server that does not answer is skipped. Stops k3s and its containers, and removes its services
+# (so the server can join again later, also with another role).
 - name: Stop k3s on removed servers
   ansible.builtin.shell: |
     for unit in k3s k3s-agent; do
@@ -80,7 +70,15 @@
     systemctl daemon-reload
     # [a]: so pkill does not match this shell itself (its command line has the text too).
     pkill -f '/var/lib/rancher/k3s/dat[a]/' || true
-  delegate_to: "{{ item }}"
-  loop: "{{ groups['cleanup_removed'] | default([]) }}"
+  delegate_to: "{{ item.stdout }}"
+  vars:
+    ansible_host: "{{ item.stdout }}"
+    ansible_user: "{{ hostvars[inventory_hostname].ansible_user }}"
+    ansible_port: "{{ hostvars[inventory_hostname].ansible_port }}"
+    ansible_ssh_private_key_file: "{{ hostvars[inventory_hostname].ansible_ssh_private_key_file }}"
+  loop: "{{ cleanup_k3s_hosts.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: orchestrator == 'k3s' and item.stdout | default('') != ''
   ignore_unreachable: true
   changed_when: true
