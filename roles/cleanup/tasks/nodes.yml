@@ -78,7 +78,8 @@
       rm -f "/etc/systemd/system/$unit.service"
     done
     systemctl daemon-reload
-    pkill -f /var/lib/rancher/k3s/data/ || true
+    # [a]: so pkill does not match this shell itself (its command line has the text too).
+    pkill -f '/var/lib/rancher/k3s/dat[a]/' || true
   delegate_to: "{{ item }}"
   loop: "{{ groups['cleanup_removed'] | default([]) }}"
   ignore_unreachable: true
