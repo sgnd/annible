@@ -80,8 +80,7 @@
     iptables-save | grep -v KUBE- | grep -v CNI- | grep -iv flannel | iptables-restore
     ip6tables-save | grep -v KUBE- | grep -v CNI- | grep -iv flannel | ip6tables-restore
   delegate_to: "{{ item.stdout }}"
-  vars:
-    ansible_host: "{{ item.stdout }}"
+  vars:  # (delegate_to gives the address; these vars cannot use item)
     ansible_user: "{{ hostvars[inventory_hostname].ansible_user }}"
     ansible_port: "{{ hostvars[inventory_hostname].ansible_port }}"
     ansible_ssh_private_key_file: "{{ hostvars[inventory_hostname].ansible_ssh_private_key_file }}"
