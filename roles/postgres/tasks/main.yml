@@ -142,7 +142,9 @@
 
 # The dump was made with --clean: it first drops what it creates. Roles that are already here
 # (postgres; with Patroni also Spilo's own) cannot be dropped, so their DROP ROLE and CREATE ROLE
-# lines are left out (their ALTER ROLE lines stay). Any other error stops the restore.
+# lines are left out (their ALTER ROLE lines stay). It also drops and makes again the databases
+# postgres and template1, which Patroni is connected to: WITH (FORCE) closes those connections first.
+# Any other error stops the restore.
 - name: Load PostgreSQL backup
   ansible.builtin.shell:
     cmd: |
@@ -150,6 +152,7 @@
       docker exec postgres psql -U postgres -tAc "SELECT quote_ident(rolname) FROM pg_roles" > {{ postgres_dump }}.roles
       awk 'NR == FNR { skip["CREATE ROLE " $0 ";"]; skip["DROP ROLE IF EXISTS " $0 ";"]; next } !($0 in skip)' \
         {{ postgres_dump }}.roles {{ postgres_dump }} \
+        | sed -E 's/^(DROP DATABASE( IF EXISTS)? [^;]+);$/\1 WITH (FORCE);/' \
         | docker exec -i postgres psql -U postgres -q -v ON_ERROR_STOP=1 -f -
     executable: /bin/bash
   when: restore | bool and inventory_hostname == postgres_primary_node
