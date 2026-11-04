@@ -42,6 +42,16 @@ Other
 - CI checks that each image tag still points to its digest, checks anchors in links, and Dependabot
   watches `requirements.txt`. The release job alone may write.
 - Docs and skills: where DNS must point on k3s, steps for a new app, k3s in THIRD_PARTY.md.
+- CI: a pinned image whose tag points to a newer build (official images build a version again) is a note.
+
+Not tested yet (only the local checks ran; a DigitalOcean round is next):
+- Patroni with `SPILO_CONFIGURATION` (names, addresses, `/liveness`), failover, and restore with `ON_ERROR_STOP`
+- Galera: backup from the first server in sync, restore of its dump, and a first install run again
+- Redis/Valkey `replica.conf` after a failover
+- Swarmpit and Uptime Kuma first setup (route after the admin user, login check, monitors-done file)
+- Kong admin key, Keycloak `/admin` limit, Uptime Kuma checks with `admin_allow_from`
+- ufw `br+` and k3s pod rules, k3s NetworkPolicy for metrics, `nodeport-addresses`
+- Docker update one server at a time, `wg syncconf`, k3s role check and removing a k3s server
 
 ## 1.2.0
 
