@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+Safer servers
+- SSH accepts only keys (no passwords), also for root.
+- fail2ban blocks an IP for 10 minutes after 5 failed SSH logins. The other servers and
+  `ssh.allow_from` are never blocked.
+- Automatic security updates from Ubuntu (unattended-upgrades). Docker stays at its pinned version,
+  and the server never restarts by itself.
+- `tests/check.py` checks these on every server.
+
 Fixes from a full review of the project.
 
 Data and backups
@@ -46,6 +54,7 @@ Other
 - CI: a pinned image whose tag points to a newer build (official images build a version again) is a note.
 
 Not tested yet (only the local checks ran; a DigitalOcean round is next):
+- SSH hardening, fail2ban and security updates (fresh install and a re-run, online and offline)
 - Patroni with `SPILO_CONFIGURATION` (names, addresses, `/liveness`), failover, and restore with `ON_ERROR_STOP`
 - Galera: backup from the first server in sync, restore of its dump, and a first install run again
 - Redis/Valkey `replica.conf` after a failover

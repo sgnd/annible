@@ -1,0 +1,56 @@
+# Safer servers: SSH only with a key, fail2ban for SSH, and automatic security updates.
+
+# sshd uses the first value it reads, and reads sshd_config.d/ in name order.
+# 00- comes before cloud files like 50-cloud-init.conf, which may turn passwords on.
+- name: SSH login with a key only
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/00-ansibro.conf
+    content: |
+      # Managed by ansibro.
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitEmptyPasswords no
+      # root may log in with a key only (some providers give you root).
+      PermitRootLogin prohibit-password
+      X11Forwarding no
+    mode: "0644"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload SSH
+
+# Bans an IP for 10 minutes after 5 failed SSH logins in 10 minutes.
+# Never bans the cluster servers or ssh.allow_from.
+- name: Configure fail2ban for SSH
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.d/ansibro.conf
+    content: |
+      # Managed by ansibro.
+      [DEFAULT]
+      ignoreip = 127.0.0.1/8 ::1 {{ common_fail2ban_ignore | join(' ') }}
+      bantime = 10m
+      findtime = 10m
+      maxretry = 5
+
+      [sshd]
+      enabled = true
+      port = {{ ansible_port }}
+      backend = systemd
+    mode: "0644"
+  notify: Restart fail2ban
+
+- name: Start fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true
+
+# Only Ubuntu's security updates (the default list in 50unattended-upgrades).
+# Docker comes from Docker's own repo, so it stays at the version in versions.yml.
+# The server never restarts by itself.
+- name: Turn on automatic security updates
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      // Managed by ansibro.
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+    mode: "0644"

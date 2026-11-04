@@ -262,6 +262,17 @@ def check_wireguard():
         check(f"wireguard link to {node}", age < 180, f"last handshake {age}s ago" if key else "no peer")
 
 
+def check_hardening():
+    """On every server: SSH takes no passwords, fail2ban guards SSH, security updates are on."""
+    for node in HOSTS:
+        _, sshd = on_node(node, ["sudo", "sshd", "-T"])
+        check(f"{node}: SSH without passwords", "passwordauthentication no" in sshd.splitlines())
+        _, jail = on_node(node, ["sudo", "fail2ban-client", "status", "sshd"])
+        check(f"{node}: fail2ban guards SSH", "Currently banned" in jail, jail[:200])
+        _, auto = on_node(node, ["apt-config", "dump", "APT::Periodic::Unattended-Upgrade"])
+        check(f"{node}: security updates on", '"1"' in auto, auto)
+
+
 def check_traefik():
     code, _ = curl(f"http://traefik.{DOMAIN}/", resolve=f"traefik.{DOMAIN}:80:{WEB_IP}")
     check("traefik redirects HTTP to HTTPS", code in ("301", "308"), code)
@@ -536,6 +547,7 @@ CHECKS = {
 if __name__ == "__main__":
     print(f"Checking {', '.join(APPS)} on {DOMAIN} (from {'the first manager' if ON_LEADER else 'here, over SSH'})\n")
     todo = [("k3s", check_k3s) if CFG.get("orchestrator") == "k3s" else ("swarm", check_swarm)]
+    todo.append(("hardening", check_hardening))
     if CFG.get("wireguard"):
         todo.append(("wireguard", check_wireguard))
     if CFG.get("backup"):

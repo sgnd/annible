@@ -2,3 +2,14 @@
   ansible.builtin.service:
     name: systemd-journald
     state: restarted
+
+# A reload keeps open SSH sessions, like the installer's own, open.
+- name: Reload SSH
+  ansible.builtin.systemd_service:
+    name: ssh
+    state: reloaded
+
+- name: Restart fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: restarted

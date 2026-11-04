@@ -7,7 +7,7 @@ What the installer does, step by step, and things good to know.
 
 1. **removed servers** leave the cluster (only with `-e remove_nodes=true`)
 2. **bundle** (offline only): copies the bundle to the servers
-3. **common**: hostname, packages, time sync, firewall
+3. **common**: hostname, packages, time sync, SSH hardening, firewall
 4. **wireguard** (if `wireguard: true`): the encrypted network between the servers
 5. **docker**: installs Docker
 6. **registry**: a private image registry on every manager, with the same images. All servers pull from it.
@@ -38,6 +38,18 @@ requests from the servers arrive from there). k3s NodePorts answer only on a ser
 The installer owns the firewall. The first run, and every run where the rules change, resets it:
 rules you added by hand are removed (put them in `firewall_allow`). During that reset the firewall
 is off for a few seconds.
+
+## SSH and updates
+
+On every server the installer also:
+
+- turns off SSH login with a password. Only an SSH key works, also for `root`
+  (in `/etc/ssh/sshd_config.d/00-ansibro.conf`).
+- starts **fail2ban**: an IP with 5 failed SSH logins in 10 minutes is blocked for 10 minutes.
+  The other servers and `ssh.allow_from` are never blocked.
+- turns on automatic **security updates** from Ubuntu (unattended-upgrades). Docker is not updated
+  this way: it stays at the version in `versions.yml`. The server never restarts by itself; when
+  `/var/run/reboot-required` exists, restart it when it suits you.
 
 **Warning:** a port you open yourself with `docker run -p`, or with `ports:` in your own swarm stack,
 is open to everyone: the firewall cannot block it (that is how Docker works). Use Traefik for web apps.

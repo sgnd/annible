@@ -26,6 +26,7 @@ from renting a server to opening your first app. Words you do not know are expla
 - A Docker Swarm cluster (the default), or k3s (a small Kubernetes).
 - 1 server or many. You pick the apps and the server each app runs on.
 - A firewall, HTTPS, and a password for every app, made for you.
+- Safer servers: SSH with a key only, fail2ban, and automatic security updates.
 - Optional: backups each night, monitoring with alerts, an encrypted network between servers.
 - Only open-source apps. Every version is pinned in [`versions.yml`](versions.yml), nothing uses `latest`.
 - Works without internet, with an offline bundle.
