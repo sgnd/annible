@@ -11,6 +11,7 @@
 #   bundle/python/        Ansible and its Python packages
 #   bundle/collections/   Ansible collections
 #   bundle/images/        Docker images from versions.yml (list in bundle/images.txt)
+#   bundle/k3s/           the k3s program and its images (for orchestrator: k3s)
 #   bundle/info.yml       Ubuntu version of the bundle
 # Your project folder is not changed: the work happens in dist/.
 set -euo pipefail
@@ -23,6 +24,12 @@ if [ "$ubuntu" != 24.04 ] && [ "$ubuntu" != 26.04 ]; then
 fi
 
 cd "$(dirname "$0")"
+# The Ubuntu image to build in, pinned by digest in versions.yml (ubuntu_images).
+ubuntu_digest=$(awk -v key="\"$ubuntu\":" '/^ubuntu_images:/ {on=1; next} on && /^[^ #]/ {on=0} on && $1 == key {print $2}' versions.yml)
+if [ -z "$ubuntu_digest" ]; then
+  echo "error: versions.yml has no digest for Ubuntu $ubuntu (ubuntu_images)" >&2
+  exit 1
+fi
 file="dist/ansibro-$ubuntu.tar.gz"
 root="dist/build-$ubuntu"   # one work folder per bundle, so two builds can run at once
 work="$root/ansibro"              # the folder that goes into the tar file
@@ -47,7 +54,7 @@ echo "== apt packages, Python packages and collections (in an Ubuntu $ubuntu con
 # OWNER: the container gives the files back to you (on Linux it would leave them owned by root).
 docker run --rm --platform "linux/$arch" -e OWNER="$(id -u):$(id -g)" \
   -v "$PWD:/src:ro" -v "$PWD/$bundle:/out" \
-  "ubuntu:$ubuntu" bash /src/scripts/bundle-inside.sh
+  "ubuntu:$ubuntu@$ubuntu_digest" bash /src/scripts/bundle-inside.sh
 
 echo "== Docker images"
 # bundle-inside.sh wrote one line per image: name repo tag digest

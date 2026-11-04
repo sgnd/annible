@@ -9,29 +9,30 @@ What the installer does, step by step, and things good to know.
 2. **bundle** (offline only): copies the bundle to the servers
 3. **common**: hostname, packages, time sync, firewall
 4. **wireguard** (if `wireguard: true`): the encrypted network between the servers
-6. **docker**: installs Docker
-7. **registry**: a private image registry on every manager, with the same images. All servers pull from it.
-8. **swarm** or **k3s**: creates the cluster and joins the servers
-9. **server apps**: `roles/<app>/`, Docker Compose in `/opt/ansibro/<app>/`
-10. **agents** on every server, for the monitoring app: victoria or beszel
-11. **swarm apps**: `roles/<app>/`, swarm stacks in `/opt/ansibro/<app>/` (k3s: its built-in Traefik)
-12. **removed apps** stop, then **backup** (if `backup:` is set)
+5. **docker**: installs Docker
+6. **registry**: a private image registry on every manager, with the same images. All servers pull from it.
+7. **swarm** or **k3s**: creates the cluster and joins the servers
+8. **server apps**: `roles/<app>/`, Docker Compose in `/opt/ansibro/<app>/`
+9. **agents** on every server, for the monitoring app: victoria or beszel
+10. **swarm apps**: `roles/<app>/`, swarm stacks in `/opt/ansibro/<app>/` (k3s: its built-in Traefik)
+11. **removed apps** stop, then **backup** (if `backup:` is set)
 
 ## Firewall
 
 | Open | To |
 |------|----|
-| SSH | `ssh.allow_from`, or anyone |
-| 80, 443 | anyone, on swarm servers |
+| SSH | `ssh.allow_from` (or anyone), and always the other servers' `host` (the installer may run on the first manager) |
+| 80, 443 | anyone, only on the servers Traefik runs on (see **Where Traefik runs** below) |
 | the ports a server needs: swarm, registry, its apps, monitoring agents | other servers in `config.yml` (from their `ip`) |
 | UDP 51820 | other servers' `host`, with `wireguard: true` |
-| everything | containers on the same server (Docker's own internal networks) |
+| everything | containers on Docker networks of the same server, also your own Docker Compose networks (with k3s also its pods, `10.42.0.0/16`, on `cni0` and `flannel.1`) |
 | your own ports | `firewall_allow` in `config.yml` (for example a VPN) |
 
 Everything else is blocked. Server apps use the host network, so the firewall controls them.
 Even between your servers only those ports are open (the list is `common_app_ports` in
 `roles/common/defaults/main.yml`). An app of your own on a server's host network needs a `firewall_allow` rule.
-Admin web pages can be limited to some IPs with `admin_allow_from`.
+Admin web pages can be limited to some IPs with `admin_allow_from` (the servers themselves are always
+let in too: Uptime Kuma checks the pages from there). k3s NodePorts answer only on a server's `ip`.
 
 The installer owns the firewall. The first run, and every run where the rules change, resets it:
 rules you added by hand are removed (put them in `firewall_allow`). During that reset the firewall
@@ -39,7 +40,8 @@ is off for a few seconds.
 
 **Warning:** a port you open yourself with `docker run -p`, or with `ports:` in your own swarm stack,
 is open to everyone: the firewall cannot block it (that is how Docker works). Use Traefik for web apps.
-(Traefik's own metrics port 8082 is limited to the other servers with a rule in Docker's `DOCKER-USER` chain.)
+(Traefik's own metrics port 8082 is limited to the other servers: on Swarm with a rule in Docker's
+`DOCKER-USER` chain, on k3s with a NetworkPolicy.)
 
 **Between your servers.** A container on one server reaches another server with its server's IP,
 so it can use the same ports as that server. Most of them need a password. These do not, so they

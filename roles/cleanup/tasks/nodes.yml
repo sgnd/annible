@@ -39,9 +39,47 @@
   when: orchestrator == 'swarm'
   changed_when: true
 
+# k3s: the address to reach a removed server (label ansibro-host, set by roles/k3s). Read it before
+# the server is deleted.
+- name: Find the address of removed k3s servers
+  ansible.builtin.command: k3s kubectl get node {{ item }} -o jsonpath={.metadata.labels.ansibro-host}
+  loop: "{{ cleanup_old_nodes }}"
+  register: cleanup_k3s_hosts
+  failed_when: false
+  changed_when: false
+  when: orchestrator == 'k3s'
+
 # k3s moves their pods to other servers. A removed k3s server also leaves etcd this way.
 - name: Remove servers from k3s
   ansible.builtin.command: k3s kubectl delete node {{ item }}
   loop: "{{ cleanup_old_nodes }}"
   when: orchestrator == 'k3s'
+  changed_when: true
+
+# Deleting the node does not stop k3s on that server: it would join again. So stop it there,
+# with the same SSH settings as the other servers. A server that does not answer is skipped.
+- name: Add removed k3s servers, to stop k3s on them
+  ansible.builtin.add_host:
+    name: "{{ item.item }}"
+    ansible_host: "{{ item.stdout }}"
+    groups: cleanup_removed
+  loop: "{{ cleanup_k3s_hosts.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.stdout | default('') != ''
+  changed_when: false
+
+# Stops k3s and its containers, and removes its services (so the server can join again later,
+# also with another role).
+- name: Stop k3s on removed servers
+  ansible.builtin.shell: |
+    for unit in k3s k3s-agent; do
+      systemctl disable --now "$unit" 2>/dev/null || true
+      rm -f "/etc/systemd/system/$unit.service"
+    done
+    systemctl daemon-reload
+    pkill -f /var/lib/rancher/k3s/data/ || true
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['cleanup_removed'] | default([]) }}"
+  ignore_unreachable: true
   changed_when: true

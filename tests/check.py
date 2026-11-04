@@ -37,7 +37,6 @@ APPS = CFG["apps"]
 DOMAIN = CFG["domain"]
 LEADER = inv["managers"]["hosts"][0]
 LEADER_IP = HOSTS[LEADER]["node_ip"]
-LEADER_HOST = HOSTS[LEADER]["node_host"]  # where SSH connects
 REGISTRY = f"{LEADER_IP}:{CFG['registry_port']}"
 # Where Traefik answers: on k3s the first tier=app server (a worker, if any), on Swarm the first manager.
 CLUSTER = inv["managers"]["hosts"] + inv["workers"]["hosts"]
@@ -62,14 +61,20 @@ def ip_of(app):
     return HOSTS[APPS[app]]["node_ip"]
 
 
-def on_leader(cmd, stdin=None):
-    """Run a command on the first manager. Returns (exit code, output)."""
-    if not ON_LEADER:
+def on_node(node, cmd, stdin=None):
+    """Run a command on a server: here if this is that server, else over SSH from here.
+    Returns (exit code, output)."""
+    if socket.gethostname() != node:
         cmd = ["ssh", "-i", CFG["ansible_ssh_private_key_file"], "-p", str(CFG["ansible_port"]),
                "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new",
-               f"{CFG['ansible_user']}@{LEADER_HOST}", shlex.join(cmd)]
+               f"{CFG['ansible_user']}@{HOSTS[node]['node_host']}", shlex.join(cmd)]
     p = subprocess.run(cmd, input=stdin, capture_output=True, text=True, timeout=180)
     return p.returncode, (p.stdout + p.stderr).strip()
+
+
+def on_leader(cmd, stdin=None):
+    """Run a command on the first manager. Returns (exit code, output)."""
+    return on_node(LEADER, cmd, stdin)
 
 
 def curl(url, user=None, data=None, headers=(), resolve=None, method=None):
@@ -234,11 +239,7 @@ def check_backup():
     # A folder repository (/mnt/...) is on each server; S3 and rest-server hold all of them.
     folder = str(CFG["backup"]["repository"]).startswith("/")
     for node in HOSTS if folder else [LEADER]:
-        cmd = ["sudo", "ansibro-backup", "snapshots", "--json"]
-        if node != LEADER:
-            cmd = ["ssh", "-i", CFG["ansible_ssh_private_key_file"], "-p", str(CFG["ansible_port"]), "-o", "BatchMode=yes",
-                   "-o", "StrictHostKeyChecking=accept-new", f"{CFG['ansible_user']}@{HOSTS[node]['node_host']}", *cmd]
-        code, out = on_leader(cmd)
+        code, out = on_node(node, ["sudo", "ansibro-backup", "snapshots", "--json"])
         hosts = {s["hostname"] for s in json.loads(out)} if code == 0 else set()
         for host in [node] if folder else HOSTS:
             check(f"backup of {host} in the repository", host in hosts, out[-200:] if code else "no backup")
@@ -286,14 +287,14 @@ def check_kong():
     if result:
         check("kong admin API works", "version" in result[1])
     # From where other apps are, the admin API must not be reachable.
-    curl = ["curl", "-s", "-m", "5", "-o", "/dev/null", "-w", "%{http_code}"]
+    curl_cmd = ["curl", "-s", "-m", "5", "-o", "/dev/null", "-w", "%{http_code}"]
     if CFG.get("orchestrator") == "k3s":
         _, out = on_leader(["sudo", "k3s", "kubectl", "run", "ansibro-check-kong", "-n", "default", "--rm", "-i",
                             "--restart=Never", f"--image=registry.ansibro:{CFG['registry_port']}/kong:{IMAGES['kong']['tag']}",
-                            "--command", "--", *curl, "http://kong.ansibro.svc.cluster.local:8001/"])
+                            "--command", "--", *curl_cmd, "http://kong.ansibro.svc.cluster.local:8001/"])
     else:
         _, out = on_leader(["sudo", "docker", "run", "--rm", "--network", "public", f"{REGISTRY}/kong:{IMAGES['kong']['tag']}",
-                            *curl, "http://kong_kong:8001/"])
+                            *curl_cmd, "http://kong_kong:8001/"])
     check("kong admin API is not reachable from other apps", "200" not in out, out[-80:])
 
 
@@ -534,23 +535,24 @@ CHECKS = {
 
 if __name__ == "__main__":
     print(f"Checking {', '.join(APPS)} on {DOMAIN} (from {'the first manager' if ON_LEADER else 'here, over SSH'})\n")
-    check_k3s() if CFG.get("orchestrator") == "k3s" else check_swarm()
+    todo = [("k3s", check_k3s) if CFG.get("orchestrator") == "k3s" else ("swarm", check_swarm)]
     if CFG.get("wireguard"):
-        check_wireguard()
+        todo.append(("wireguard", check_wireguard))
     if CFG.get("backup"):
-        check_backup()
+        todo.append(("backup", check_backup))
     if len(CFG["app_nodes"].get("postgres", [])) > 1:
-        check_postgres_replicas()
+        todo.append(("postgres replicas", check_postgres_replicas))
     if len(CFG["app_nodes"].get("mariadb", [])) > 1:
-        check_galera()
+        todo.append(("galera", check_galera))
     for cache in ("redis", "valkey"):
         if len(CFG["app_nodes"].get(cache, [])) > 1:
-            check_cache_replicas(cache)
-    for app in APPS:
+            todo.append((f"{cache} replicas", lambda cache=cache: check_cache_replicas(cache)))
+    todo += [(app, CHECKS[app]) for app in APPS]
+    for name, run in todo:
         try:
-            CHECKS[app]()
+            run()
         except Exception as e:  # a crash in one check must not hide the others
-            check(f"{app} check ran", False, repr(e))
+            check(f"{name} check ran", False, repr(e))
     failed = [name for name, ok in results if not ok]
     print(f"\n{len(results) - len(failed)} passed, {len(failed)} failed")
     sys.exit(1 if failed else 0)

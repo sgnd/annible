@@ -41,7 +41,8 @@ from renting a server to opening your first app. Words you do not know are expla
 - **Internet** on the servers and on that computer (it downloads Ansible from PyPI and Ansible Galaxy),
   or an [offline bundle](docs/offline.md).
 - **A domain**, for HTTPS with Let's Encrypt (`tls: letsencrypt`): DNS for `*.<domain>` must already point
-  to the public IP of the first manager.
+  to the public IP of the server Traefik runs on: the first manager (Docker Swarm), or the first worker
+  (k3s; the first manager if there are no workers). See [where Traefik runs](docs/how-it-works.md#good-to-know).
 
 Two things used everywhere in these docs:
 - Text in `<...>`, like `<domain>`, means: put your own value here (for example `example.com`).
@@ -76,7 +77,8 @@ Data servers keep the databases, cache, storage and monitoring, outside the clus
 Point DNS for `*.<domain>` to the public IP of the server Traefik runs on **before** you run it, so
 Let's Encrypt can check the domain: the first manager with Docker Swarm, the first worker with k3s
 (each config in `examples/` says which). Did you set DNS later? With Docker Swarm, log in to the first manager
-(`ssh <user>@<its IP>`) and run `sudo docker service update --force traefik_traefik`.
+(`ssh <user>@<its IP>`) and run `sudo docker service update --force traefik_traefik`. With k3s, run
+`sudo k3s kubectl -n kube-system rollout restart deployment traefik` on the first manager.
 It asks Let's Encrypt for the certificates again.
 
 At the end it prints how to reach each app, and saves it with all passwords in `state/summary.md`.

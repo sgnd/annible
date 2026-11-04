@@ -11,7 +11,7 @@ The installer changes real servers. **Ask the user before you run `./install.sh`
 
 - `config.yml` exists and is valid. If not, use the `ansibro-setup` skill first.
 - Servers run Ubuntu 24.04 or 26.04 on Intel/AMD (amd64), with SSH key login and passwordless sudo.
-- The machine that runs the installer has Python 3.12 or newer and can reach every server's `ip` over SSH.
+- The machine that runs the installer has Python 3.12 or newer and can reach every server over SSH (at its `host`, or its `ip` if `host` is not set).
 - Always run it from the same machine, because the `state/` folder holds all passwords.
 
 ## Online (servers have internet)
@@ -45,9 +45,14 @@ The installer sees the `bundle/` folder and uses it instead of the internet.
 - Run `.venv/bin/python tests/check.py` where you ran `./install.sh`. Every check must PASS.
 - Read `state/summary.md`. It lists every app's address and passwords. Don't paste the passwords into chat.
 - Tell the user to **back up `state/`**. If it is lost, the next run makes new passwords that don't match the running databases.
-- DNS for `*.<domain>` must point to the public IP of the first manager. With Let's Encrypt it must be
-  set before the install; if it came later, run `sudo docker service update --force traefik_traefik` on the first manager.
-- Swarmpit and Uptime Kuma first ask for the Traefik dashboard login (user admin), then for a new admin user of their own.
+- DNS for `*.<domain>` must point to the public IP of the servers Traefik runs on. The end of the install
+  and `state/summary.md` (section DNS) name them. Swarm: the first manager with Let's Encrypt, else every manager.
+  k3s: the workers (with Let's Encrypt the first one only); no workers: the managers.
+  With Let's Encrypt, set DNS before the install. If it came later: Swarm, run
+  `sudo docker service update --force traefik_traefik` on the first manager; k3s, run
+  `sudo k3s kubectl -n kube-system rollout restart deployment traefik` on the first manager.
+- Swarmpit and Uptime Kuma: the installer makes the admin user. The passwords are in
+  `state/secrets/swarmpit_admin` and `state/secrets/uptimekuma_admin` (and in `state/summary.md`).
 
 ## When it fails
 
@@ -56,7 +61,7 @@ The installer sees the `bundle/` folder and uses it instead of the internet.
 | `config error: ...` | Fix `config.yml` as the message says. |
 | Wrong CPU or Ubuntu version | Servers must be Intel/AMD (amd64); ARM is not supported. Offline: the bundle has one Ubuntu version; build one that matches. |
 | Locked out of SSH | Check `ssh.allow_from`. Use the provider's console to run `sudo ufw disable`. |
-| No HTTPS certificate | DNS must point to the first manager, and port 80 must be open. Then `sudo docker service update --force traefik_traefik`. Let's Encrypt has rate limits. |
+| No HTTPS certificate | DNS must point to the server Traefik runs on (see `state/summary.md`), and port 80 must be open. Then restart Traefik (see After the install). Let's Encrypt has rate limits. |
 | Swarm app not starting | `sudo docker service ls`, `sudo docker service logs <stack>_<service>` on a manager. |
 | Server app not starting | `sudo docker ps`, `sudo docker logs <app>` on that server. |
 | `toomanyrequests` | Docker Hub limit. Wait, or run `sudo docker login` on the first manager. |

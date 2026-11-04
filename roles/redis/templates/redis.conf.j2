@@ -6,7 +6,6 @@ dir /data
 # Copies log in to the primary with the same password.
 masterauth {{ redis_password }}
 replica-announce-ip {{ node_ip }}
-{% if node_ip != redis_primary_ip %}
-replicaof {{ redis_primary_ip }} 6379
-{% endif %}
+# Which server to copy from (tasks/main.yml writes it).
+include /etc/redis-replica.conf
 {% endif %}

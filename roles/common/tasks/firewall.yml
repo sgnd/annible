@@ -10,12 +10,12 @@
     dest: /etc/ufw/ansibro-rules.txt
     content: |
       # Managed by ansibro. Change config.yml instead of this file.
-      ssh {{ ansible_port }} from {{ common_ssh_allow_from | join(', ') }}
+      ssh {{ ansible_port }} from {{ common_ssh_from | join(', ') }}
       web 80, 443: {{ common_web }}
       cluster nodes: {{ common_cluster_ips | join(', ') }}
       cluster tcp: {{ common_cluster_tcp_ports | join(', ') }}
       cluster udp: {{ common_cluster_udp_ports | join(', ') }}
-      k3s pods and services: {{ common_k3s_cidrs | join(', ') }}
+      k3s pods on: {{ common_k3s_interfaces | join(', ') }}
       wireguard from: {{ common_wireguard_hosts | join(', ') }}
       ssh replies from: {{ common_cluster_hosts | join(', ') }}
       docker interfaces: {{ common_docker_interfaces | join(', ') }}
@@ -29,13 +29,15 @@
   when: common_firewall_rules.changed  # noqa: no-handler
   changed_when: true
 
+# From ssh.allow_from (or anyone), and always from the other cluster servers: the installer
+# may run on the first manager (an offline install does), and connects from there to the others.
 - name: Allow SSH
   community.general.ufw:
     rule: allow
     port: "{{ ansible_port | string }}"
     proto: tcp
     from_ip: "{{ item }}"
-  loop: "{{ common_ssh_allow_from }}"
+  loop: "{{ common_ssh_from }}"
 
 - name: Allow your own rules (firewall_allow)
   community.general.ufw:
@@ -73,11 +75,15 @@
   loop: "{{ common_cluster_ips }}"
   when: common_cluster_udp_ports | length > 0
 
-- name: Allow k3s pods and services
+# k3s: pods on this server (cni0) and pods of other servers (flannel.1, the pod network) may use
+# this server's ports, for example DNS or a server app. Only from the pod range, only on those interfaces.
+- name: Allow k3s pods
   community.general.ufw:
     rule: allow
-    from_ip: "{{ item }}"
-  loop: "{{ common_k3s_cidrs }}"
+    direction: in
+    interface: "{{ item }}"
+    from_ip: 10.42.0.0/16
+  loop: "{{ common_k3s_interfaces }}"
 
 - name: Allow WireGuard from other cluster nodes
   community.general.ufw:
@@ -89,7 +95,8 @@
 
 # When the installer runs on a server, it talks to the others over SSH. The firewall lets their
 # replies in only while it remembers the connection, and it forgets when it starts or Docker starts.
-# Then the install hangs. So always let SSH replies from the other servers in.
+# Then the install hangs. So always let SSH replies from the other servers in. (The "Allow SSH" rule
+# above is for new connections to this server; these are replies to connections from this server.)
 # Replies come back to a short-lived local port (32768-60999 on Linux), so only those are opened.
 - name: Allow SSH replies from other cluster nodes
   community.general.ufw:
@@ -100,7 +107,8 @@
     port: "32768:60999"
   loop: "{{ common_cluster_hosts }}"
 
-# Containers on this server can reach apps that use the host network.
+# Containers on this server can reach apps that use the host network
+# (also containers on your own Docker Compose networks: br-<id>).
 - name: Allow traffic from local Docker networks
   community.general.ufw:
     rule: allow
@@ -110,6 +118,7 @@
 
 # Ports that Docker publishes skip the rules above (Docker sends them on before ufw sees them).
 # Traefik's metrics port 8082 is one: only the other cluster servers may use it.
+# (On k3s a NetworkPolicy in roles/traefik does this limit instead.)
 # Docker checks the DOCKER-USER chain first, so the limit goes there.
 - name: Limit Traefik's metrics port to the cluster servers
   ansible.builtin.blockinfile:
@@ -124,7 +133,7 @@
       -A DOCKER-USER -p tcp -m conntrack --ctorigdstport 8082 --ctdir ORIGINAL -j DROP
       -A DOCKER-USER -j RETURN
       COMMIT
-    state: "{{ 'present' if 8082 in common_cluster_tcp_ports else 'absent' }}"
+    state: "{{ 'present' if orchestrator == 'swarm' and 8082 in common_cluster_tcp_ports else 'absent' }}"
   register: common_docker_user
 
 - name: Enable firewall

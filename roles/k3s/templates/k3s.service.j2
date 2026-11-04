@@ -4,6 +4,11 @@ Description=k3s {{ 'server' if k3s_server else 'agent' }}
 Documentation=https://docs.k3s.io
 Wants=network-online.target
 After=network-online.target
+{% if wireguard %}
+# The cluster uses the WireGuard address, so start after wg0.
+Wants=wg-quick@wg0.service
+After=wg-quick@wg0.service
+{% endif %}
 
 [Service]
 Type={{ 'notify' if k3s_server else 'exec' }}

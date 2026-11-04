@@ -1,13 +1,14 @@
 # Sets postgres_primary_node: the server where PostgreSQL takes writes now.
-# One server: that one. Patroni: the one whose Patroni answers 200 on /primary.
+# One server: that one. Patroni: the leader in Patroni's list of the cluster, once its PostgreSQL runs.
+# (Its name is the node name: see SPILO_CONFIGURATION in tasks/main.yml.)
 - name: Ask Patroni which server is the primary
   ansible.builtin.uri:
-    url: "http://{{ hostvars[item].node_ip }}:8008/primary"
-    status_code: [200, 503]
-  loop: "{{ app_nodes.postgres }}"
-  register: postgres_patroni_roles
-  until: postgres_patroni_roles.status in [200, 503]
-  retries: 30
+    url: "http://{{ hostvars[app_nodes.postgres[0]].node_ip }}:8008/cluster"  # every Patroni knows the whole cluster
+  register: postgres_cluster
+  until: >-
+    (postgres_cluster.json | default({})).members | default([]) | selectattr('role', 'equalto', 'leader')
+    | selectattr('state', 'equalto', 'running') | list | length > 0
+  retries: 60
   delay: 5
   run_once: true
   when: postgres_patroni
@@ -15,6 +16,6 @@
 - name: Remember the primary
   ansible.builtin.set_fact:
     postgres_primary_node: >-
-      {{ (postgres_patroni_roles.results | selectattr('status', 'equalto', 200) | map(attribute='item') | list
-      + [apps.postgres])[0] if postgres_patroni else apps.postgres }}
+      {{ (postgres_cluster.json.members | selectattr('role', 'equalto', 'leader') | map(attribute='name') | first)
+      if postgres_patroni else apps.postgres }}
   run_once: true

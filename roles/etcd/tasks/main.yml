@@ -22,16 +22,19 @@
   register: etcd_managers
   failed_when: false
 
+# Only managers that have the file count: a new manager has none yet, and a manager that is down
+# now has no answer at all. (A new manager is still found: the others have the old list.)
 - name: Check the managers did not change
   ansible.builtin.assert:
-    that: etcd_seen | unique in [[''], [groups['managers'] | join(',')]]
+    that: etcd_seen | difference([groups['managers'] | join(',')]) | length == 0
     fail_msg: >-
       The managers changed, and etcd (for PostgreSQL with Patroni) cannot follow by itself.
       See "Add or remove a manager with PostgreSQL on more servers" in docs/how-to.md.
   vars:
     etcd_seen: >-
-      {{ groups['managers'] | map('extract', hostvars, 'etcd_managers') | map(attribute='content', default='')
-      | map('b64decode') | map('trim') | list }}
+      {{ groups['managers'] | map('extract', hostvars) | selectattr('etcd_managers', 'defined')
+      | map(attribute='etcd_managers') | selectattr('content', 'defined') | map(attribute='content')
+      | map('b64decode') | map('trim') | select | unique | list }}
   run_once: true
 
 - name: Write etcd compose file

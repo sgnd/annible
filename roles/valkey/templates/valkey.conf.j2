@@ -6,7 +6,6 @@ dir /data
 # Copies log in to the primary with the same password.
 masterauth {{ valkey_password }}
 replica-announce-ip {{ node_ip }}
-{% if node_ip != valkey_primary_ip %}
-replicaof {{ valkey_primary_ip }} 6379
-{% endif %}
+# Which server to copy from (tasks/main.yml writes it).
+include /etc/valkey-replica.conf
 {% endif %}

@@ -1,6 +1,13 @@
+# New or changed peers: when wg0 is up, load them without taking wg0 down (wg syncconf), so the
+# cluster keeps running. Only when wg0 is down, start it again.
+# (A new MTU needs a restart by hand: sudo systemctl restart wg-quick@wg0, one server at a time.)
 - name: Restart wireguard
-  ansible.builtin.service:
-    name: wg-quick@wg0
-    state: restarted
-  # One server at a time, so the swarm keeps a working majority.
-  throttle: 1
+  ansible.builtin.shell: |
+    if ip link show wg0 >/dev/null 2>&1; then
+      wg syncconf wg0 <(wg-quick strip wg0)
+    else
+      systemctl restart wg-quick@wg0
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: true

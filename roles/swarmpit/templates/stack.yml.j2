@@ -14,11 +14,14 @@ services:
       placement:
         constraints:
           - node.hostname == {{ swarm_leader }}  # next to its databases; the installer makes its admin user here
+{% if swarmpit_route %}
+      # Only once the admin user is made: before, anyone who opens the page could make it.
       labels:
         traefik.enable: "true"
         traefik.http.routers.swarmpit.rule: Host(`{{ swarmpit_host }}`)
         traefik.http.routers.swarmpit.middlewares: admin-ip@file  # Swarmpit has its own login
         traefik.http.services.swarmpit.loadbalancer.server.port: "8080"
+{% endif %}
 
   db:
     image: {{ registry_addr }}/couchdb:{{ images.couchdb.tag }}

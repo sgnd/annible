@@ -70,11 +70,13 @@
           - match: Host(`{{ traefik_route_name }}.{{ domain }}`)
             kind: Rule
             middlewares:
+      {% if traefik_route_middleware | default('admin-ip') == 'authelia@file' %}
+              - { name: authelia }  # like Swarm: the Authelia login replaces the admin-ip limit
+      {% else %}
               - { name: admin-ip }
+      {% endif %}
       {% if traefik_route_middleware | default('admin-ip') == 'admin' %}
               - { name: {{ k3s_admin_login }} }
-      {% elif traefik_route_middleware | default('admin-ip') == 'authelia@file' %}
-              - { name: authelia }
       {% endif %}
             services:
               - { name: {{ traefik_route_name }}, port: {{ traefik_route_port }} }

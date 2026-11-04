@@ -53,7 +53,17 @@ description: Add a new app to the Ansibro catalog (a new role, catalog entry and
    - Add the app to `K3S_CLUSTER_APPS` in `inventory.py`. If it only works with Docker Swarm
      (like swarmpit), leave it out: the config check then stops it on k3s.
 
-5. **Docs and tests**:
+5. **Lists of apps in other roles** (add your app to each one that fits):
+   - Server app: its ports in `common_app_ports` (`roles/common/defaults/main.yml`), so the other
+     servers may reach them (all other ports stay closed), and its main port in `observability_app_ports`
+     (`roles/observability/defaults/main.yml`), so monitoring checks that it answers.
+   - Web page: its subdomain and path in `uptimekuma_pages` (`roles/uptimekuma/defaults/main.yml`),
+     so Uptime Kuma gets a monitor for it.
+   - Admin page: add it to `authelia_admin_hosts` (`roles/authelia/defaults/main.yml`, they need two
+     factors) if it uses the `admin` login, and to the page list in the `admin_allow_from` comment in
+     `config.example.yml`.
+
+6. **Docs and tests**:
    - `README.md`: add a row to the Apps table.
    - `docs/apps.md`: add notes if the app has a special login or needs something.
    - `THIRD_PARTY.md`: add name, license and source link.
@@ -74,5 +84,7 @@ shellcheck install.sh build-bundle.sh scripts/*.sh
 scripts/validate-versions.sh               # needs yq, docker and curl
 ```
 
-Then test on a fresh VM: run `./install.sh` two times. The second run must show `changed=0`.
+Then test on new DigitalOcean droplets (tag them `ansibro-test`), never on local VMs or containers:
+run `./install.sh` two times. The second run must show `changed=0`.
 Then run `.venv/bin/python tests/check.py` where you ran `./install.sh`: every check must PASS.
+Delete every droplet (and anything else you made) after the test.

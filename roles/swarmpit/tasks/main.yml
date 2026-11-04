@@ -22,11 +22,20 @@
   vars:
     registry_mirror_images: [swarmpit, swarmpit-agent, couchdb, influxdb]
 
+# Swarmpit lets the first visitor make the admin user. So the page gets its Traefik route only after
+# the installer made the admin user (then it writes the file admin-ready).
+- name: Check if the Swarmpit admin user is made
+  ansible.builtin.stat:
+    path: "{{ swarmpit_dir }}/admin-ready"
+  register: swarmpit_ready
+
 - name: Write Swarmpit stack
   ansible.builtin.template:
     src: stack.yml.j2
     dest: "{{ swarmpit_dir }}/stack.yml"
     mode: "0600"
+  vars:
+    swarmpit_route: "{{ swarmpit_ready.stat.exists }}"
   register: swarmpit_stack
 
 - name: Deploy Swarmpit
@@ -37,19 +46,64 @@
     swarm_stack: swarmpit
     swarm_stack_changed: "{{ swarmpit_stack.changed }}"
 
-# Swarmpit makes its first admin user through its API (/initialize). The installer calls it from inside
-# the Swarmpit container, on this server. Once there is an admin user, Swarmpit answers 400: nothing changes.
-- name: Make the Swarmpit admin user
-  ansible.builtin.shell:
-    cmd: >-
-      cid=$(docker ps -q --latest --filter label=com.docker.swarm.service.name=swarmpit_app);
-      test -n "$cid" &&
-      docker exec -i "$cid" curl -s -o /dev/null -w '%{http_code}' -X POST
-      -H 'Content-Type: application/json' -d @- http://localhost:8080/initialize
-    stdin: "{{ {'username': 'admin', 'password': swarmpit_password} | to_json }}"
-  register: swarmpit_init
-  until: swarmpit_init.stdout in ['200', '201', '400']
-  retries: 30
-  delay: 10
-  changed_when: swarmpit_init.stdout in ['200', '201']
-  no_log: true
+- name: Make the Swarmpit admin user, then add its route
+  when: not swarmpit_ready.stat.exists
+  block:
+    # Swarmpit makes its first admin user through its API (/initialize). The installer calls it from
+    # inside the Swarmpit container, on this server. 400: there is an admin user already.
+    - name: Make the Swarmpit admin user
+      ansible.builtin.shell:
+        cmd: >-
+          cid=$(docker ps -q --latest --filter label=com.docker.swarm.service.name=swarmpit_app);
+          test -n "$cid" &&
+          docker exec -i "$cid" curl -s -o /dev/null -w '%{http_code}' -X POST
+          -H 'Content-Type: application/json' -d @- http://localhost:8080/initialize
+        stdin: "{{ {'username': 'admin', 'password': swarmpit_password} | to_json }}"
+      register: swarmpit_init
+      until: swarmpit_init.stdout in ['200', '201', '400']
+      retries: 30
+      delay: 10
+      changed_when: swarmpit_init.stdout in ['200', '201']
+      no_log: true
+
+    # Is the admin user ours? Log in with the saved password (curl reads it from stdin, not the command line).
+    - name: Log in to Swarmpit with the saved password
+      ansible.builtin.shell:
+        cmd: >-
+          cid=$(docker ps -q --latest --filter label=com.docker.swarm.service.name=swarmpit_app);
+          docker exec -i "$cid" curl -s -o /dev/null -w '%{http_code}' -X POST -K - http://localhost:8080/login
+        stdin: 'user = "admin:{{ swarmpit_password }}"'
+      register: swarmpit_login
+      changed_when: false
+      failed_when: false
+      no_log: true
+
+    - name: Stop if someone else made the Swarmpit admin user
+      ansible.builtin.fail:
+        msg: >-
+          Swarmpit has an admin user, but the saved password (state/secrets/swarmpit_admin) does not work
+          (answer {{ swarmpit_login.stdout }}). Someone else may have made it: check Swarmpit. To start over,
+          remove the swarmpit stack and {{ swarmpit_dir }}/couchdb on {{ inventory_hostname }}.
+      when: swarmpit_login.stdout != '200'
+
+    - name: Remember that the Swarmpit admin user is made
+      ansible.builtin.copy:
+        dest: "{{ swarmpit_dir }}/admin-ready"
+        content: "The installer made Swarmpit's admin user. Swarmpit has its Traefik route now.\n"
+        mode: "0600"
+
+    - name: Write Swarmpit stack with its route
+      ansible.builtin.template:
+        src: stack.yml.j2
+        dest: "{{ swarmpit_dir }}/stack.yml"
+        mode: "0600"
+      vars:
+        swarmpit_route: true
+
+    - name: Deploy Swarmpit with its route
+      ansible.builtin.include_role:
+        name: swarm
+        tasks_from: deploy
+      vars:
+        swarm_stack: swarmpit
+        swarm_stack_changed: true

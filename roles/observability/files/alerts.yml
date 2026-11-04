@@ -289,11 +289,15 @@ groups:
           summary: "{{ $labels.job }} on {{ $labels.node }} does not answer the exporter."
 
       - alert: CacheNoPrimary
-        expr: count(redis_instance_info) > 1 and count(redis_instance_info{role="master"}) == 0
+        # Per cache app (job: redis or valkey): more than 1 server, and none of them is the primary.
+        # ("unless" is needed: a count of nothing is empty, not 0, so "== 0" would never fire.)
+        expr: count by (job) (redis_instance_info) > 1 unless on (job) count by (job) (redis_instance_info{role="master"})
         for: 2m
         labels: { severity: critical }
         annotations:
-          summary: "No cache server is the primary: apps cannot write. Check: sudo docker exec valkey-sentinel valkey-cli -p 26379 SENTINEL masters"
+          summary: >-
+            No {{ $labels.job }} server is the primary: apps cannot write.
+            Check: sudo docker exec {{ $labels.job }}-sentinel {{ $labels.job }}-cli -p 26379 SENTINEL masters
 
       - alert: CacheMemoryFull
         expr: redis_memory_max_bytes > 0 and redis_memory_used_bytes / redis_memory_max_bytes > 0.9

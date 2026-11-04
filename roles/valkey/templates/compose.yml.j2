@@ -11,6 +11,9 @@ services:
       REDISCLI_AUTH: "{{ valkey_password }}"
     volumes:
       - ./valkey.conf:/etc/valkey.conf:ro
+{% if valkey_ha %}
+      - ./replica.conf:/etc/valkey-replica.conf:ro
+{% endif %}
       - ./data:/data
     healthcheck:
       test: ["CMD-SHELL", "valkey-cli ping | grep PONG"]

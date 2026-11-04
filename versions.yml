@@ -2,6 +2,11 @@
 # Image digests point to the image index (the list of builds); servers use its amd64 build.
 # When you change an image, change its tag too: the local registry is checked by tag.
 
+# Ubuntu images build-bundle.sh builds the offline bundle in (image index digests).
+ubuntu_images:
+  "24.04": sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
+  "26.04": sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c
+
 # apt "package=version". The * matches the Ubuntu release suffix, e.g. ~ubuntu.24.04~noble.
 docker_packages:
   - docker-ce=5:29.9.2-1*

@@ -30,10 +30,18 @@ Open an issue with the [Bug report](https://github.com/sgnd/ansibro/issues/new?t
    (`docker buildx imagetools inspect <image>:<tag>`).
 3. Copy a similar role: `roles/postgres/` for a server app, `roles/portainer/` for a swarm app.
    Do not use `ports:` in server apps. Published ports skip the firewall. Use `network_mode: host`.
-4. Add it to the Apps table in the [README](README.md#apps), to [`THIRD_PARTY.md`](THIRD_PARTY.md), to
+4. Add it to the lists of apps in other roles:
+   - a server app: its ports to `common_app_ports` in
+     [`roles/common/defaults/main.yml`](roles/common/defaults/main.yml) (the firewall), and its main port
+     to `observability_app_ports` in [`roles/observability/defaults/main.yml`](roles/observability/defaults/main.yml)
+     (monitoring checks that it answers);
+   - a web page: to `uptimekuma_pages` in [`roles/uptimekuma/defaults/main.yml`](roles/uptimekuma/defaults/main.yml);
+   - an admin page: to `authelia_admin_hosts` in [`roles/authelia/defaults/main.yml`](roles/authelia/defaults/main.yml)
+     (if it uses the `admin` login), and to the page list above `admin_allow_from` in `config.example.yml`.
+5. Add it to the Apps table in the [README](README.md#apps), to [`THIRD_PARTY.md`](THIRD_PARTY.md), to
    [`config.example.yml`](config.example.yml), and a check to [`tests/check.py`](tests/check.py).
-5. Test on a fresh server: run `./install.sh` two times (the second run must report `changed=0`),
-   then `.venv/bin/python tests/check.py`.
+6. Test on new servers: run `./install.sh` two times (the second run must report `changed=0`),
+   then `.venv/bin/python tests/check.py`. We test on DigitalOcean droplets and delete them after.
 
 **AI agents.** [`.claude/skills/`](.claude/skills) has skills for Claude Code and other agents
 that read `SKILL.md`: set up `config.yml`, install, add an app, and update versions.

@@ -57,6 +57,7 @@ CASES = [
      or c["apps"].update(garage=["data1", "swarm1"]), "list 1 or 3 servers"),
     ("replica on unknown node", lambda c: c["apps"].update(postgres=["data1", "nowhere"]), "nowhere is not a node name"),
     ("same server twice", lambda c: c["apps"].update(postgres=["data1", "data1"]), "listed twice"),
+    ("ssh port as text", lambda c: c["ssh"].update(port="22"), "ssh.port must be a number"),
     ("allow_from as text, not a list", lambda c: c["ssh"].update(allow_from="203.0.113.0/24"), "must be a list"),
     ("allow_from with a bad IP", lambda c: c["ssh"].update(allow_from=["300.1.1.1"]), "not an IP or range"),
     ("admin_allow_from as text", lambda c: c.update(admin_allow_from="203.0.113.0/24"), "must be a list"),
@@ -190,6 +191,30 @@ for name, change in GOOD:
     failed += code != 0
     print(f"{'PASS' if code == 0 else 'FAIL'}  {name} is accepted" + (f"  ({err})" if code else ""))
 
+# install.sh --ready: example values are refused, but a domain that only ends in "example.com" is fine.
+KEY = os.path.join(HERE, "inventory.py")  # any file that exists, as ssh.key
+READY = [
+    ("example.com domain", {"domain": "example.com"}, "domain is still"),
+    ("sub.example.com domain", {"domain": "apps.example.com"}, "domain is still"),
+    ("example.com email", {"acme_email": "me@example.com"}, "acme_email is still"),
+    ("sub.example.com email", {"acme_email": "me@mail.example.com"}, "acme_email is still"),
+    ("myexample.com domain and email", {"acme_email": "me@myexample.com"}, None),
+]
+for name, change, expected in READY:
+    cfg = copy.deepcopy(BASE)
+    cfg.update(domain="myexample.com", acme_email="ops@myexample.com", ssh={**cfg.get("ssh", {}), "key": KEY})
+    cfg.update(change)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "config.yml")
+        with open(path, "w") as f:
+            yaml.safe_dump(cfg, f)
+        p = subprocess.run([sys.executable, os.path.join(HERE, "inventory.py"), "--list", "--ready"],
+                           capture_output=True, text=True, cwd=HERE, env={**os.environ, "ANSIBRO_CONFIG": path})
+    ok = p.returncode == 0 if expected is None else p.returncode != 0 and expected in p.stderr
+    failed += not ok
+    print(f"{'PASS' if ok else 'FAIL'}  --ready: {name} is {'accepted' if expected is None else 'refused'}"
+          + ("" if ok else f"  (got: {p.stderr.strip() or 'accepted'})"))
+
 # The ready-to-use configs in examples/: accepted online and offline (tls: selfsigned),
 # and every server gets the tier its comment promises.
 TIERS = {
@@ -217,6 +242,6 @@ for path in examples:
         print(f"{'PASS' if ok else 'FAIL'}  examples/{name} ({mode}) is accepted, tiers as described"
               + ("" if ok else f"  ({err or wrong or 'no tiers listed in TIERS'})"))
 
-total = len(CASES) + len(GOOD) + 1 + 2 * len(examples)
+total = len(CASES) + len(GOOD) + len(READY) + 1 + 2 * len(examples)
 print(f"\n{total - failed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

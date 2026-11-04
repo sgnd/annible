@@ -16,6 +16,7 @@
     - { path: "{{ redis_dir }}/sentinel", owner: "999" }
 
 # The primary now: Sentinel knows it after a failover; on a new install it is the first server.
+# (A restore does not bring Sentinel's state back: the backup leaves it out.)
 - name: Ask Sentinel for the Redis primary
   ansible.builtin.command: docker exec redis-sentinel redis-cli -p 26379 SENTINEL get-master-addr-by-name ansibro
   register: redis_sentinel_answers
@@ -40,6 +41,20 @@
     mode: "0644"
   diff: false  # has a password
   register: redis_config
+
+# Which server this one copies from. Its own file: when it changes (after a failover), Redis
+# is not restarted, because Sentinel has already told the running servers. Else a re-run would
+# restart the current primary, and cause one more failover. The file counts when Redis starts again.
+- name: Write Redis replica config
+  ansible.builtin.copy:
+    dest: "{{ redis_dir }}/replica.conf"
+    content: |
+      # The primary when the installer last ran. Made by ansibro; Sentinel changes the running server.
+      {% if node_ip != redis_primary_ip %}
+      replicaof {{ redis_primary_ip }} 6379
+      {% endif %}
+    mode: "0644"
+  when: redis_ha
 
 # Only the first time: Sentinel rewrites this file itself (who the primary is, the other Sentinels).
 - name: Write Sentinel config

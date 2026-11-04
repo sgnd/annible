@@ -39,7 +39,8 @@
   when: mariadb_galera
 
 # Galera: a new cluster is started by the first server alone. "grastate.dat" exists once a
-# server has been in the cluster.
+# server has been in the cluster. Only the other servers count: while none of them has joined yet
+# (for example the first install stopped before they did), the first server keeps starting it.
 - name: Look for Galera state
   ansible.builtin.stat:
     path: "{{ mariadb_dir }}/data/grastate.dat"
@@ -50,7 +51,8 @@
   ansible.builtin.set_fact:
     mariadb_new_cluster: >-
       {{ mariadb_galera and inventory_hostname == apps.mariadb
-      and not (app_nodes.mariadb | map('extract', hostvars, ['mariadb_grastate', 'stat', 'exists']) | select | list) }}
+      and not (app_nodes.mariadb | difference([apps.mariadb])
+      | map('extract', hostvars, ['mariadb_grastate', 'stat', 'exists']) | select | list) }}
 
 - name: Start a new cluster on this server (Galera)
   ansible.builtin.set_fact:
@@ -72,12 +74,59 @@
 
 # Restore (./install.sh -e restore=true): load the dump from the backup into the new, empty database.
 # With Galera before the other servers join, so they get it all with the full copy they make then.
-- name: Load MariaDB backup
-  ansible.builtin.shell: >-
-    docker exec -i mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot'
-    < {{ apps_dir }}/backup/stage/dumps/mariadb.sql
-  when: restore | bool and inventory_hostname == apps.mariadb  # Galera copies it to the others
-  changed_when: true
+# With Galera any server in sync may have made the dump: use the newest one, and bring it to the
+# first server through this machine (the one running the installer) if it is on another server.
+- name: Restore MariaDB
+  when: restore | bool
+  block:
+    - name: Look for the MariaDB dump
+      ansible.builtin.stat:
+        path: "{{ mariadb_dump }}"
+      register: mariadb_dump_here
+
+    - name: Find the server with the newest MariaDB dump
+      ansible.builtin.set_fact:
+        mariadb_dump_node: >-
+          {{ (app_nodes.mariadb | map('extract', hostvars) | selectattr('mariadb_dump_here.stat.exists')
+          | sort(attribute='mariadb_dump_here.stat.mtime') | map(attribute='inventory_hostname') | list)[-1] | default('') }}
+      run_once: true
+
+    - name: Stop if no server has the MariaDB dump
+      ansible.builtin.assert:
+        that: mariadb_dump_node != ''
+        fail_msg: "No MariaDB dump in the backup of {{ app_nodes.mariadb | join(', ') }}."
+      run_once: true
+
+    - name: Get the dump from {{ mariadb_dump_node }}
+      ansible.builtin.fetch:
+        src: "{{ mariadb_dump }}"
+        dest: "{{ playbook_dir }}/state/mariadb-restore.sql"
+        flat: true
+      delegate_to: "{{ mariadb_dump_node | default(inventory_hostname) }}"  # read before "when"
+      run_once: true
+      when: mariadb_dump_node != apps.mariadb
+
+    - name: Copy the dump to the first server
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/state/mariadb-restore.sql"
+        dest: "{{ mariadb_dump }}"
+        mode: "0600"
+      when: inventory_hostname == apps.mariadb and mariadb_dump_node != apps.mariadb
+
+    - name: Delete the dump on this machine
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/state/mariadb-restore.sql"
+        state: absent
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Load MariaDB backup
+      ansible.builtin.shell: >-
+        docker exec -i mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot'
+        < {{ mariadb_dump }}
+      when: inventory_hostname == apps.mariadb  # Galera copies it to the others
+      changed_when: true
 
 # One at a time: each new server copies all the data from a running one.
 - name: Start MariaDB on the other servers
@@ -91,8 +140,18 @@
   when: inventory_hostname != apps.mariadb
 
 # The cluster runs now, so the first server joins it like the others from now on.
-- name: Restart the first server as a normal member
+# Only when another server has joined: alone, the first server could not start again without the flag.
+# (Then it keeps the flag, and the next run tries again.)
+- name: Count the servers in the Galera cluster
+  ansible.builtin.command:
+    cmd: docker exec -i mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" exec mariadb -uroot -N'
+    stdin: "SHOW STATUS LIKE 'wsrep_cluster_size'"
+  register: mariadb_cluster_size
+  changed_when: false
   when: mariadb_new_cluster
+
+- name: Restart the first server as a normal member
+  when: mariadb_new_cluster and (mariadb_cluster_size.stdout.split() | last | default('0') | int) > 1
   block:
     - name: Drop the start flag
       ansible.builtin.set_fact:

@@ -50,6 +50,21 @@
   register: kong_migrations
   changed_when: "'migrated' in kong_migrations.stdout or 'executed' in kong_migrations.stdout"
 
+# Swarm: the admin API (port 8001) answers only requests with the key that Traefik adds.
+# (k3s: a NetworkPolicy lets only Traefik reach Kong.)
+- name: Write Kong admin API check
+  when: orchestrator == 'swarm'
+  ansible.builtin.copy:
+    dest: "{{ kong_dir }}/admin-api.conf"
+    content: |
+      # Made by ansibro. Kong puts this in its admin API server (port 8001).
+      if ($http_x_ansibro_admin_key != "{{ kong_admin_key }}") {
+          return 403;
+      }
+    mode: "0600"
+  register: kong_admin_conf
+  no_log: true
+
 - name: Write Kong stack
   when: orchestrator == 'swarm'
   ansible.builtin.template:
@@ -65,7 +80,7 @@
     tasks_from: deploy
   vars:
     swarm_stack: kong
-    swarm_stack_changed: "{{ kong_stack.changed or kong_env.changed }}"
+    swarm_stack_changed: "{{ kong_stack.changed or kong_env.changed or kong_admin_conf.changed }}"
 
 # k3s: a manifest in k3s's folder; k3s applies it by itself.
 - name: Write Kong for k3s

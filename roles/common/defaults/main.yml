@@ -24,6 +24,8 @@ common_ssh_allow_from: "{{ (ssh.allow_from | default([])) or ['any'] }}"
 common_cluster_ips: "{{ groups['all'] | difference([inventory_hostname]) | map('extract', hostvars, 'node_ip') | sort }}"
 # The real addresses (host) of the other servers, which answer SSH.
 common_cluster_hosts: "{{ groups['all'] | difference([inventory_hostname]) | map('extract', hostvars, 'node_host') | unique | sort }}"
+# SSH is open to these: ssh.allow_from (or anyone), plus the other cluster servers' host.
+common_ssh_from: "{{ common_ssh_allow_from if common_ssh_allow_from == ['any'] else (common_ssh_allow_from + common_cluster_hosts) | unique }}"
 # With wireguard: the real addresses of the other servers, which send WireGuard traffic.
 common_wireguard_hosts: "{{ groups['all'] | difference([inventory_hostname]) | map('extract', hostvars, 'node_host') | sort if wireguard else [] }}"
 
@@ -51,7 +53,7 @@ common_app_ports:
 common_cluster_tcp_ports: >-
   {{ (([registry_port] if inventory_hostname in groups['managers'] else [])
   + (common_swarm_tcp_ports if orchestrator == 'swarm' else common_k3s_tcp_ports)
-  + ([8082] if monitoring_app and 'traefik' in apps and orchestrator == 'swarm' and inventory_hostname in traefik_nodes else [])
+  + ([8082] if monitoring_app and 'traefik' in apps and inventory_hostname in traefik_nodes else [])
   + ([12379, 12380] if postgres_patroni and inventory_hostname in groups['managers'] else [])
   + ([9100, 9280, 9598, 9187, 9104, 9121] if monitoring_app else [])
   + ([45876] if 'beszel' in apps else [])
@@ -68,12 +70,13 @@ common_k3s_tcp_ports: >-
 common_cluster_udp_ports: >-
   {{ [] if inventory_hostname not in groups['swarm']
   else [7946, 4789] if orchestrator == 'swarm' else [8472] }}
-# k3s: its pods and services reach the server's own ports (DNS, apps on the host network).
-common_k3s_cidrs: >-
-  {{ ['10.42.0.0/16', '10.43.0.0/16'] if orchestrator == 'k3s' and inventory_hostname in groups['swarm'] else [] }}
+# k3s: its pods (10.42.0.0/16) reach the server's own ports (DNS, apps on the host network).
+# cni0: pods on this server. flannel.1: the pod network between the servers (flannel's vxlan).
+common_k3s_interfaces: "{{ ['cni0', 'flannel.1'] if orchestrator == 'k3s' and inventory_hostname in groups['swarm'] else [] }}"
 
 # docker0: default bridge. docker_gwbridge: how swarm containers reach the host.
-common_docker_interfaces: [docker0, docker_gwbridge]
+# br+: every Docker Compose network (br-<id>; + matches any name that starts with br).
+common_docker_interfaces: [docker0, docker_gwbridge, br+]
 
 # This server answers on 80 and 443: Traefik runs here (traefik_nodes in group_vars).
 common_web: "{{ 'traefik' in apps and inventory_hostname in traefik_nodes }}"

@@ -118,10 +118,12 @@
 # a server joins. Set them on servers that are already in the cluster too.
 # Also: k3s's load balancer (ServiceLB) opens ports 80 and 443 on every server, past the firewall.
 # When some servers have enablelb=true, it runs only there: the servers Traefik runs on.
+# ansibro-host: the server's host, so a removed server can be reached to stop k3s (roles/cleanup).
 - name: Set node labels from config.yml
   ansible.builtin.command: >-
     k3s kubectl label node {{ inventory_hostname }} --overwrite
     {% for key, value in node_labels.items() %}{{ key }}={{ value }} {% endfor %}
+    ansibro-host={{ node_host }}
     svccontroller.k3s.cattle.io/enablelb={{ 'true' if 'traefik' in apps and inventory_hostname in traefik_nodes else 'false' }}
   register: k3s_labels
   changed_when: "'not labeled' not in k3s_labels.stdout"

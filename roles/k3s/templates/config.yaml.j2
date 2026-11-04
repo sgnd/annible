@@ -2,6 +2,8 @@
 token: "{{ k3s_token }}"
 node-name: {{ inventory_hostname }}
 node-ip: {{ node_ip }}
+# NodePorts (30000-32767) skip the firewall, so they answer only on node_ip, not on a public address.
+kube-proxy-arg: ["nodeport-addresses={{ node_ip }}/32"]
 {% if k3s_flannel_iface %}
 flannel-iface: {{ k3s_flannel_iface }}
 {% endif %}

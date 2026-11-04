@@ -70,6 +70,23 @@
           on a manager: sudo docker node {{ 'promote' if node_role == 'manager' else 'demote' }} {{ inventory_hostname }}
       when: inventory_hostname in groups['swarm'] and swarm_state.LocalNodeState | default('') == 'active'
 
+    # k3s cannot change a server between manager (k3s.service) and worker (k3s-agent.service).
+    # Look for the service of the other role: if it is there, the role in config.yml changed.
+    - name: Look for the k3s service of the other role
+      ansible.builtin.stat:
+        path: "/etc/systemd/system/{{ 'k3s-agent' if node_role == 'manager' else 'k3s' }}.service"
+      register: k3s_other_role
+      when: orchestrator == 'k3s' and inventory_hostname in groups['swarm']
+
+    - name: Check each server's role matches k3s
+      ansible.builtin.assert:
+        that: not k3s_other_role.stat.exists
+        fail_msg: >-
+          {{ inventory_hostname }} is {{ node_role }} in config.yml, but in k3s it is a
+          {{ 'worker' if node_role == 'manager' else 'manager' }}. k3s cannot change this. Take the server out of
+          config.yml, run ./install.sh -e remove_nodes=true, then add it back with its new role and run ./install.sh.
+      when: orchestrator == 'k3s' and inventory_hostname in groups['swarm']
+
     # A restore is for new servers. On a running cluster it would replace the swarm and the data.
     - name: Check a restore goes to new servers
       ansible.builtin.assert:

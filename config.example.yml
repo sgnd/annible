@@ -18,9 +18,10 @@ ssh:
   allow_from: []           # IPs or ranges that may SSH in, e.g. [203.0.113.0/24]. Empty = anyone
 
 # Who may open the admin web pages: Traefik dashboard, Kong Manager, Portainer, Swarmpit,
-# RabbitMQ, RustFS, NATS, Uptime Kuma and Beszel. Example: [203.0.113.0/24]
+# RabbitMQ, RustFS, NATS, Uptime Kuma, Beszel, OpenBao, Grafana, Alertmanager, the metrics and
+# logs pages, and Keycloak's admin console (/admin). Example: [203.0.113.0/24]
 # Empty = anyone, protected only by each page's password.
-# (Keycloak and Authelia are login pages for everyone, so they are not limited.)
+# (The Keycloak and Authelia login pages are for everyone, so they are not limited.)
 admin_allow_from: []
 
 # The installer owns the firewall: it removes rules you add by hand. Open your own ports here,
@@ -98,9 +99,9 @@ nodes:
     role: standalone
 
 # Apps to install and where they run. Apps not listed are not installed.
-#   swarm       = a swarm service: traefik, kong, portainer, swarmpit, keycloak, authelia
+#   swarm       = a cluster app: traefik, kong, portainer, swarmpit, keycloak, authelia
 #   <node name> = runs on that server: databases, caches, storage, queues, monitoring
-#   cluster     = with orchestrator: k3s, for traefik
+#   cluster     = the same as swarm (reads better with orchestrator: k3s). On k3s: all of the above but swarmpit
 # One app per category. All apps are in catalog.yml.
 apps:
   traefik: swarm           # needed by every app with a web page

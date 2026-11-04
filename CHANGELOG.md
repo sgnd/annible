@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased
+
+Fixes from a full review of the project.
+
+Data and backups
+- MariaDB backup: a table row with text like `healthcheck@...` no longer drops the whole table from
+  the dump. Only the image's own user lines are left out.
+- PostgreSQL restore stops on an error instead of saying it worked.
+- A failed database dump no longer stops the backup: the folders are still saved, and the backup
+  ends with an error. With Galera the first server in sync makes the dump (not only the first server).
+- PostgreSQL with Patroni: the name and addresses now really reach Patroni (Spilo ignored them, so a
+  replica could use 127.0.1.1). A new replica that copies a big database no longer fails the install.
+- The installer stops when PostgreSQL changes between 1 and 2+ servers, or the number of Garage
+  servers changes (both would start with new, empty data).
+- Galera: a first install that stopped half way can be run again. Redis/Valkey: a re-run after a
+  failover no longer restarts the primary; a restore no longer brings back an old Sentinel state.
+
+Security
+- Keycloak's admin console (`/admin`) follows `admin_allow_from`.
+- Kong's admin API on Swarm answers only Traefik (a key), not your API services on the kong network.
+- NATS's monitoring page listens only on the cluster address.
+- Swarmpit and Uptime Kuma get their web address only after the installer made their admin user.
+- Traefik on Swarm: apps no longer answer on the metrics port 8082. k3s Traefik sends no usage data.
+- k3s: NodePorts answer only on the server's `ip`; the pod rule is limited to the pod network.
+- With `ssh.allow_from`, the servers can still reach each other over SSH (the installer on the first
+  manager needs it).
+
+Monitoring
+- `CacheNoPrimary` fires (it never could), per cache app.
+- Traefik on k3s is monitored too (web apps down, errors, certificates).
+- Uptime Kuma checks a page that answers without a login, so a down app shows as down. The servers
+  pass `admin_allow_from`, so the checks work with it set.
+
+Other
+- Docker and k3s restarts wait until the server is back before the next one; WireGuard loads new
+  peers without a restart, and k3s starts after WireGuard.
+- k3s: changing a server between manager and worker stops with a clear message; a removed server
+  stops k3s, so it does not join again.
+- Offline bundle: fails if the apt package list is empty; the Ubuntu image is pinned by digest.
+- CI checks that each image tag still points to its digest, checks anchors in links, and Dependabot
+  watches `requirements.txt`. The release job alone may write.
+- Docs and skills: where DNS must point on k3s, steps for a new app, k3s in THIRD_PARTY.md.
+
 ## 1.2.0
 
 Clearer app categories, and one monitoring stack less.

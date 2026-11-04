@@ -1,8 +1,13 @@
 # Opens a pull request when a GitHub Action used in .github/workflows has a new version.
 # It keeps the actions pinned to a commit and updates the version comment.
+# It does the same for the Python packages in requirements.txt (Ansible and what it needs).
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly

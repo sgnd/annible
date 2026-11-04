@@ -26,7 +26,7 @@ Commands that start with `sudo` run on a server: log in first with `ssh <user>@<
 | `config error: ...` | The message says what to fix in `config.yml`. |
 | Locked out of SSH | Check `ssh.allow_from`. Use your provider's console to run `sudo ufw disable`. |
 | `cannot reach ... over WireGuard` | Open UDP 51820 between the servers' `host` addresses in your cloud firewall. `sudo wg show` shows the last handshake. |
-| No HTTPS certificate | DNS must point to the server Traefik runs on (with `tls: letsencrypt`: the first manager), and port 80 must be open. Then, with Docker Swarm, run `sudo docker service update --force traefik_traefik` on the first manager. Let's Encrypt has rate limits. |
+| No HTTPS certificate | DNS must point to the server Traefik runs on (`state/summary.md`, section DNS, names it; with `tls: letsencrypt` on Docker Swarm the first manager, on k3s the first worker), and port 80 must be open there. Then restart Traefik on the first manager. Docker Swarm: `sudo docker service update --force traefik_traefik`. k3s: `sudo k3s kubectl -n kube-system rollout restart deployment traefik`. Let's Encrypt has rate limits. |
 | App not starting | Swarm apps: `sudo docker service ls`, `sudo docker service logs <stack>_<service>`. Server apps: `sudo docker ps`, `sudo docker logs <app>`. |
 | `no such host` or a timeout while downloading | A network problem on the server. Check its internet, then run `./install.sh` again. It is safe to run again: it continues where it stopped. |
 | No alerts arrive | Look at `https://alertmanager.<domain>`: if alerts are there, check `monitoring:` in `config.yml` and the `AlertsNotSent` alert. Logs: `sudo docker logs alertmanager` on the monitoring server. |

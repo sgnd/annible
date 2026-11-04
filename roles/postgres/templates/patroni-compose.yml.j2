@@ -13,14 +13,13 @@ services:
       ETCD3_HOSTS: "{{ postgres_etcd_hosts }}"
       SPILO_PROVIDER: local
       ALLOW_NOSSL: "true"                  # apps may connect without SSL, like the one-server PostgreSQL
-      PATRONI_NAME: {{ inventory_hostname }}
-      PATRONI_POSTGRESQL_CONNECT_ADDRESS: "{{ node_ip }}:5432"
-      PATRONI_RESTAPI_CONNECT_ADDRESS: "{{ node_ip }}:8008"
+      # This server's name and addresses are in SPILO_CONFIGURATION (.env): Spilo ignores PATRONI_* here.
     volumes:
       - ./data:/home/postgres/pgdata
     healthcheck:
-      # Patroni's API answers on every server (primary or replica) when PostgreSQL runs.
-      test: ["CMD", "curl", "-sf", "http://localhost:8008/health"]
+      # Patroni runs. Not "PostgreSQL runs": a new replica first copies the whole database, which can
+      # take long. The installer waits for the primary itself (tasks/find_primary.yml).
+      test: ["CMD", "curl", "-sf", "http://localhost:8008/liveness"]
       interval: 10s
       timeout: 5s
       retries: 30

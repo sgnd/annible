@@ -3,18 +3,25 @@ uptimekuma_dir: "{{ apps_dir }}/uptimekuma"
 # Generated once and saved in state/secrets/ on the installer machine.
 uptimekuma_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/uptimekuma_admin', chars=['ascii_letters', 'digits'], length=24) }}"
 
-# The web page of each app (subdomain and path). The installer adds an Uptime Kuma monitor for each
-# installed one. It calls Traefik directly with the page's name, so it works without DNS too.
+# How to check each app. The installer adds an Uptime Kuma monitor for each installed one.
+# It calls Traefik with the page's name (host), so it works without DNS too; Traefik's admin-ip lets
+# the servers in. Only 200-299 counts as up (redirects are not followed), unless "codes" says more.
+#   path:    a page that answers without a login, so the check reaches the app itself
+#   codes:   other answers that still mean "up"
+#   keyword: text the answer must have
+#   port:    call the app on its server at this port, not through Traefik (its page needs a login)
 uptimekuma_pages:
-  traefik: { host: traefik, path: / }
-  kong: { host: kong-manager, path: / }
-  portainer: { host: portainer, path: / }
+  # The dashboard asks for the admin login: that answer comes from Traefik itself.
+  traefik: { host: traefik, path: /, codes: ["200-299", "302", "401"] }
+  # Kong's proxy: a path with no route gets Kong's own "no Route matched" answer.
+  kong: { host: kong, path: /ansibro-uptime-check, codes: ["404"], keyword: no Route matched }
+  portainer: { host: portainer, path: /api/system/status }
   swarmpit: { host: swarmpit, path: / }
-  keycloak: { host: keycloak, path: / }
-  authelia: { host: authelia, path: / }
+  keycloak: { host: keycloak, path: /realms/master }
+  authelia: { host: authelia, path: /api/health }
   rustfs: { host: rustfs, path: /rustfs/console/ }
   rabbitmq: { host: rabbitmq, path: / }
-  nats: { host: nats, path: / }
-  beszel: { host: beszel, path: / }
-  victoria: { host: grafana, path: /login }
-  openbao: { host: openbao, path: /ui/ }
+  nats: { host: nats, port: 8222, path: /healthz }
+  beszel: { host: beszel, path: /api/health }
+  victoria: { host: grafana, path: /api/health }
+  openbao: { host: openbao, path: "/v1/sys/health?standbyok=true" }

@@ -27,6 +27,7 @@
   notify: Restart wireguard
 
 # After a reboot, Docker must wait for wg0: the swarm listens on the WireGuard address.
+# (k3s does the same: roles/k3s/templates/k3s.service.j2.)
 - name: Create Docker service drop-in folder
   ansible.builtin.file:
     path: /etc/systemd/system/docker.service.d
