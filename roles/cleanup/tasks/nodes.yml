@@ -63,6 +63,7 @@
 # (so the server can join again later, also with another role).
 - name: Stop k3s on removed servers
   ansible.builtin.shell: |
+    set -o pipefail
     for unit in k3s k3s-agent; do
       systemctl disable --now "$unit" 2>/dev/null || true
       rm -f "/etc/systemd/system/$unit.service"
@@ -70,6 +71,14 @@
     systemctl daemon-reload
     # [a]: so pkill does not match this shell itself (its command line has the text too).
     pkill -f '/var/lib/rancher/k3s/dat[a]/' || true
+    # Its pod network too (like k3s-killall.sh): when the server joins again it gets a new pod
+    # range, and old interfaces would leave its pods without a route. The ufw rules stay.
+    for link in cni0 flannel.1 flannel-v6.1 flannel-wg kube-ipvs0; do
+      ip link delete "$link" 2>/dev/null || true
+    done
+    rm -rf /var/lib/cni/
+    iptables-save | grep -v KUBE- | grep -v CNI- | grep -iv flannel | iptables-restore
+    ip6tables-save | grep -v KUBE- | grep -v CNI- | grep -iv flannel | ip6tables-restore
   delegate_to: "{{ item.stdout }}"
   vars:
     ansible_host: "{{ item.stdout }}"
