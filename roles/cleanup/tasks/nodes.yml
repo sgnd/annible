@@ -84,6 +84,8 @@
     rm -rf /var/lib/cni/
     iptables-save | grep -v KUBE- | grep -v CNI- | grep -iv flannel | iptables-restore
     ip6tables-save | grep -v KUBE- | grep -v CNI- | grep -iv flannel | ip6tables-restore
+  args:
+    executable: /bin/bash
   delegate_to: "{{ item.stdout }}"
   vars:  # (delegate_to gives the address; these vars cannot use item)
     ansible_user: "{{ hostvars[inventory_hostname].ansible_user }}"
