@@ -34,7 +34,7 @@
     garage_copies_seen: >-
       {{ app_nodes.garage | map('extract', hostvars) | selectattr('garage_config_now.content', 'defined')
       | map(attribute='garage_config_now.content') | map('b64decode')
-      | map('regex_search', '(?m)^replication_factor = ([0-9]+)', '\\1') | select | map('first') | unique | list }}
+      | map('regex_findall', '(?m)^replication_factor = ([0-9]+)') | select | map('first') | unique | list }}
   run_once: true
 
 - name: Write Garage config
