@@ -38,6 +38,8 @@ Security
 
 Monitoring
 - `CacheNoPrimary` fires (it never could), per cache app.
+- Galera: the health check no longer fails (and fires `SystemdServiceFailed`) when HAProxy closes
+  the connection early.
 - Traefik on k3s is monitored too (web apps down, errors, certificates).
 - Uptime Kuma checks a page that answers without a login, so a down app shows as down. The servers
   pass `admin_allow_from`, so the checks work with it set.
