@@ -9,6 +9,8 @@ Safer servers
 - Automatic security updates from Ubuntu (unattended-upgrades). Docker stays at its pinned version,
   and the server never restarts by itself.
 - `tests/check.py` checks these on every server.
+- Tested on DigitalOcean (k3s, 8 servers, WireGuard, `ssh.allow_from`): install, a second run with
+  `changed=0`, all hardening checks pass, SSH still works after the reload, and no server is banned.
 
 Fixes from a full review of the project.
 
@@ -71,7 +73,7 @@ Tested on DigitalOcean, two clusters with WireGuard, `ssh.allow_from` and `admin
 
 Not tested yet:
 - A Galera first install that stops half way and is run again.
-- SSH hardening, fail2ban and security updates (fresh install and a re-run, online and offline).
+- SSH hardening, fail2ban and security updates with an offline bundle.
 
 ## 1.2.0
 
