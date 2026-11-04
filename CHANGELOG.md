@@ -6,7 +6,8 @@ Fixes from a full review of the project.
 
 Data and backups
 - MariaDB backup: a table row with text like `healthcheck@...` no longer drops the whole table from
-  the dump. Only the image's own user lines are left out.
+  the dump. The app users (for example authelia) are in the dump again: on MariaDB 11 a filter left out
+  every user. Only the image's own users (root, healthcheck, mariadb.sys) are left out.
 - PostgreSQL restore stops on an error instead of saying it worked.
 - A failed database dump no longer stops the backup: the folders are still saved, and the backup
   ends with an error. With Galera the first server in sync makes the dump (not only the first server).

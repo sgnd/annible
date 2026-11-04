@@ -77,16 +77,18 @@ fi
 {% endif %}
 {% if 'mariadb' in node_apps %}
 # Users as CREATE USER and GRANT, not the "mysql" database itself: its tables belong to this
-# server (and to Galera), and loading them on a new server breaks it. Left out: the image's own
-# users (healthcheck, mariadb.sys: they get new passwords on a new server) and the
-# "IF current_user() ... END IF" blocks (default roles, which ansibro does not use).
-# Only the user lines (CREATE USER, GRANT, ...) of those users are left out, never data lines.
+# server (and to Galera), and loading them on a new server breaks it. Left out:
+# - the users the image makes itself on a new server: root, healthcheck, mariadb.sys (root gets the
+#   saved password there; replacing the user that loads the dump would also break the load)
+# - the "IF current_user() ... END IF */|" blocks: they only guard those users
+# Only user lines (DROP USER, CREATE ... USER, GRANT, ...) of those users are left out, never data lines.
+# (A user line looks like: CREATE /*M!100103 OR REPLACE */ USER `root`@`%` ...)
 dump_mariadb() {
   docker exec mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb-dump -uroot --all-databases \
     --ignore-database=mysql --system=users --replace --single-transaction --routines --events \
     --add-drop-database' \
-    | LC_ALL=C awk '/^\/\*M!100101 IF current_user\(\)/ { skip = 1 } !skip { print } /END IF \*\/;/ { skip = 0 }' \
-    | LC_ALL=C grep -a -v -E "^(/\*M?![0-9]* *)?(CREATE (OR REPLACE )?(USER|ROLE)|GRANT|REVOKE|DROP (USER|ROLE)|ALTER USER|SET DEFAULT ROLE) .*[\`']?(healthcheck|mariadb\.sys)[\`']?@" \
+    | LC_ALL=C awk '/^\/\*M!100101 IF current_user\(\)/ { skip = 1 } !skip { print } /^END IF \*\// { skip = 0 }' \
+    | LC_ALL=C grep -a -v -E "^(/\*M?![0-9]* *)?(CREATE|GRANT|REVOKE|DROP|ALTER USER|SET DEFAULT ROLE)[^;]* [\`']?(root|healthcheck|mariadb\.sys)[\`']?@" \
     > "$stage/dumps/mariadb.sql"
 }
 {% if mariadb_galera %}
