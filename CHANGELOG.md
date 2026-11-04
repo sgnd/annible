@@ -45,14 +45,21 @@ Other
 - Docs and skills: where DNS must point on k3s, steps for a new app, k3s in THIRD_PARTY.md.
 - CI: a pinned image whose tag points to a newer build (official images build a version again) is a note.
 
-Not tested yet (only the local checks ran; a DigitalOcean round is next):
-- Patroni with `SPILO_CONFIGURATION` (names, addresses, `/liveness`), failover, and restore with `ON_ERROR_STOP`
-- Galera: backup from the first server in sync, restore of its dump, and a first install run again
-- Redis/Valkey `replica.conf` after a failover
-- Swarmpit and Uptime Kuma first setup (route after the admin user, login check, monitors-done file)
-- Kong admin key, Keycloak `/admin` limit, Uptime Kuma checks with `admin_allow_from`
-- ufw `br+` and k3s pod rules, k3s NetworkPolicy for metrics, `nodeport-addresses`
-- Docker update one server at a time, `wg syncconf`, k3s role check and removing a k3s server
+Tested on DigitalOcean, two clusters with WireGuard, `ssh.allow_from` and `admin_allow_from` set:
+- Swarm (3 managers, 3 data servers: Patroni, Valkey, Garage, Kong, Keycloak, Swarmpit, NATS, victoria,
+  Uptime Kuma): install, `tests/check.py` (all pass apart from the test's fake alert webhook), a second
+  run with `changed=0`, Patroni failover, backup to a rest-server, and a full restore on 6 new servers
+  (`check.py` passes there too, the PostgreSQL data is back on all 3 servers).
+- k3s (3 masters, 2 workers, 3 data servers: Galera, Redis, Authelia, Portainer, victoria, Uptime Kuma):
+  install, `check.py`, `changed=0`, Galera backup (one dump, the users and data load into an empty
+  MariaDB), the role-change stop, removing a worker and adding it back (then `changed=0`, `check.py`
+  passes), and a Redis failover (the re-run changes only `replica.conf` and restarts nothing).
+- Found and fixed by these tests: WireGuard lost its private key on new peers; k3s admin pages refused
+  the servers; the Garage check crashed on re-runs; MariaDB dumps had no users; the PostgreSQL restore
+  stopped on the `postgres` database; removing a k3s server failed, stayed in the inventory, was
+  skipped without its label, and left an old pod network that broke the server when it joined again.
+
+Not tested yet: a Galera first install that stops half way and is run again.
 
 ## 1.2.0
 
