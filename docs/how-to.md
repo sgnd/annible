@@ -100,6 +100,10 @@ last backup and WireGuard. Alerts are sent for:
 The rules are in [`roles/observability/files/alerts.yml`](../roles/observability/files/alerts.yml).
 Grafana has an "Ansibro overview" dashboard. Logs: `https://logs.<domain>/select/vmui`.
 
+While the installer runs, alerts are muted (except `Watchdog`): servers and apps that are not up yet
+would fire alerts for nothing. The mute ends 3 minutes after the install, or after 1 hour if the
+install stops half way. You see it in Alertmanager as a silence by `ansibro`.
+
 ## Who watches the monitoring?
 
 If the monitoring server stops, it cannot send an alert. So there is a

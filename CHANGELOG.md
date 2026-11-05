@@ -73,6 +73,8 @@ Tested on DigitalOcean, two clusters with WireGuard, `ssh.allow_from` and `admin
   stopped on the `postgres` database; removing a k3s server failed, stayed in the inventory, was
   skipped without its label, and left an old pod network that broke the server when it joined again.
 
+- Alerts are muted while the installer runs (except `Watchdog`): a first install no longer sends
+  `NodeDown` for servers whose agent was not installed yet. The mute ends 3 minutes after the install.
 - `AlertRulesFailing` waits 10 minutes: one error while vmalert starts before the metrics database
   no longer fires it.
 
