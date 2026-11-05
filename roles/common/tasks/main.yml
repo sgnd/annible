@@ -72,5 +72,8 @@
     mode: "0644"
   notify: Restart journald
 
+- name: Harden SSH and turn on security updates
+  ansible.builtin.import_tasks: hardening.yml
+
 - name: Configure firewall
   ansible.builtin.import_tasks: firewall.yml

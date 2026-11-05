@@ -8,6 +8,9 @@ common_packages:
   - wireguard-tools  # for wireguard: true (small, so always installed)
   - restic           # for backup:
   - age              # to keep state/ encrypted when the installer runs here (scripts/state.sh)
+  - fail2ban         # bans IPs that keep failing SSH logins (tasks/hardening.yml)
+  - python3-systemd  # lets fail2ban read the SSH log from journald
+  - unattended-upgrades  # automatic security updates
 
 common_sysctl:
   net.ipv4.ip_forward: 1
@@ -18,6 +21,9 @@ common_sysctl:
   fs.inotify.max_user_instances: 1024
 
 common_journald_max_use: 1G
+
+# fail2ban never bans these: the other cluster servers and ssh.allow_from.
+common_fail2ban_ignore: "{{ (common_cluster_hosts + common_cluster_ips + (common_ssh_allow_from | difference(['any']))) | unique }}"
 
 # Firewall inputs (see tasks/firewall.yml).
 common_ssh_allow_from: "{{ (ssh.allow_from | default([])) or ['any'] }}"

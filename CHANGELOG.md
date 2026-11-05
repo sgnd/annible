@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+Safer servers
+- SSH accepts only keys (no passwords), also for root.
+- fail2ban blocks an IP for 10 minutes after 5 failed SSH logins. The other servers and
+  `ssh.allow_from` are never blocked.
+- Automatic security updates from Ubuntu (unattended-upgrades). Docker stays at its pinned version,
+  and the server never restarts by itself.
+- `tests/check.py` checks these on every server.
+- Tested on DigitalOcean with WireGuard and `ssh.allow_from`: k3s (8 servers), Docker Swarm (3 servers),
+  and Docker Swarm offline (bundle built on a server, no internet). Each: install, a second run with
+  `changed=0`, all hardening checks pass, SSH still works after the reload, and no server is banned.
+  Offline, fail2ban came from the bundle.
+
 Fixes from a full review of the project.
 
 Data and backups
