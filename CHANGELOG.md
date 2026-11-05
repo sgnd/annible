@@ -88,10 +88,32 @@ Tested on DigitalOcean, two clusters with WireGuard, `ssh.allow_from` and `admin
   stopped on the `postgres` database; removing a k3s server failed, stayed in the inventory, was
   skipped without its label, and left an old pod network that broke the server when it joined again.
 
+- **k3s: `admin_allow_from` works again.** k3s's load balancer hid the visitor's IP behind a pod address,
+  and that pod range was let in, so the admin pages were open to everyone. Traefik now takes ports 80 and
+  443 of its server itself and sees the real IP.
+- Alerts are muted while the installer runs (except `Watchdog`): a first install no longer sends
+  `NodeDown` for servers whose agent was not installed yet. The mute ends 3 minutes after the install.
+- A removed app no longer shows as a change on every install after it stopped.
+- `tests/check.py` opens `state/` when it is kept encrypted (like `install.sh`), and closes it after.
 - `AlertRulesFailing` waits 10 minutes: one error while vmalert starts before the metrics database
   no longer fires it.
 
-Not tested yet: a Galera first install that stops half way and is run again.
+Tested on DigitalOcean for 1.3.0 (Ubuntu 24.04 and 26.04): swarm-1-server (real Let's Encrypt),
+swarm-2-servers (labels, timezone), swarm-3-servers (Authelia, victoria with a webhook), k3s-4-servers,
+each with a second run at `changed=0` and `tests/check.py` passing. On 24.04 also: swarm-ha with the
+installer on a separate machine, S3 backup and encrypted `state/` (Patroni and Redis failover, an app
+upgrade), and a Swarm variant (Kong, Swarmpit, Keycloak, Valkey with Sentinel, NATS, OpenBao, RustFS,
+Uptime Kuma, `tls: selfsigned`, `ssh.port`, `firewall_allow`, WireGuard, removing an app), and a k3s
+variant (Kong, Keycloak, PostgreSQL on 2 servers, Valkey, RabbitMQ, Garage, OpenBao, `tls: custom`).
+
+Not tested yet (the round stopped here):
+- The k3s Traefik host-port change (`admin_allow_from` on k3s): not run on a server yet
+- A Docker update one server at a time, adding and removing servers and managers (with Patroni),
+  restore on new servers, the stop when a role changes
+- k3s-ha: Galera, including a first install that stops half way and is run again; k3s backup and restore
+- On Ubuntu 26.04: swarm-ha, k3s-ha, the Swarm and k3s variants
+- Offline installs (Swarm and k3s, both Ubuntu versions)
+- `acme_server` (Let's Encrypt staging), backup to a folder and to a rest-server
 
 ## 1.2.0
 

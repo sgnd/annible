@@ -12,6 +12,7 @@ otherwise over SSH with the same settings as the installer.
 Passwords are sent through stdin, so they never show up in a process list.
 """
 
+import atexit
 import datetime
 import hashlib
 import hmac
@@ -28,6 +29,12 @@ sys.path.insert(0, HERE)
 if len(sys.argv) > 1:
     os.environ["ANSIBRO_CONFIG"] = sys.argv[1]
 os.environ.setdefault("ANSIBRO_CONFIG", "config.yml")
+
+# state/ (the passwords) may be kept encrypted: open it like install.sh does, and close it at the end.
+STATE_SH = os.path.join(HERE, "scripts", "state.sh")
+subprocess.run([STATE_SH, "open"], check=True)
+atexit.register(subprocess.run, [STATE_SH, "close"], check=True)
+
 import inventory  # noqa: E402
 
 inv = inventory.build(*inventory.load_config())
