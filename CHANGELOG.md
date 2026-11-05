@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.0
 
 Safer servers
 - SSH accepts only keys (no passwords), also for root.
