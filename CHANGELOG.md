@@ -73,6 +73,9 @@ Tested on DigitalOcean, two clusters with WireGuard, `ssh.allow_from` and `admin
   stopped on the `postgres` database; removing a k3s server failed, stayed in the inventory, was
   skipped without its label, and left an old pod network that broke the server when it joined again.
 
+- **k3s: `admin_allow_from` works again.** k3s's load balancer hid the visitor's IP behind a pod address,
+  and that pod range was let in, so the admin pages were open to everyone. Traefik now takes ports 80 and
+  443 of its server itself and sees the real IP.
 - Alerts are muted while the installer runs (except `Watchdog`): a first install no longer sends
   `NodeDown` for servers whose agent was not installed yet. The mute ends 3 minutes after the install.
 - A removed app no longer shows as a change on every install after it stopped.
