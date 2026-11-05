@@ -75,6 +75,8 @@ Tested on DigitalOcean, two clusters with WireGuard, `ssh.allow_from` and `admin
 
 - Alerts are muted while the installer runs (except `Watchdog`): a first install no longer sends
   `NodeDown` for servers whose agent was not installed yet. The mute ends 3 minutes after the install.
+- A removed app no longer shows as a change on every install after it stopped.
+- `tests/check.py` opens `state/` when it is kept encrypted (like `install.sh`), and closes it after.
 - `AlertRulesFailing` waits 10 minutes: one error while vmalert starts before the metrics database
   no longer fires it.
 
