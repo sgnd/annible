@@ -12,4 +12,7 @@ if [ "$state" = 4 ]; then
   printf 'HTTP/1.0 200 OK\r\nContent-Length: 7\r\n\r\nsynced\n'
 else
   printf 'HTTP/1.0 503 Service Unavailable\r\nContent-Length: 11\r\n\r\nnot synced\n'
-fi
+fi 2>/dev/null
+# A client that closed the connection early (Broken pipe) is not a failure: else the systemd unit
+# fails, and the SystemdServiceFailed alert fires.
+exit 0

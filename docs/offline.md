@@ -13,7 +13,11 @@ sha256sum -c ansibro-24.04.tar.gz.sha256   # on a Mac: shasum -a 256 -c ...
 Or build one yourself: **on a machine with internet and Docker**, build a bundle for the Ubuntu version
 of your servers. A Mac (Docker Desktop or OrbStack) works too. On a Mac or Linux machine with an ARM CPU,
 building needs QEMU, which lets it run Intel/AMD programs.
-This command installs it: `docker run --privileged --rm tonistiigi/binfmt --install all`.
+This command installs it (the image is pinned, like in `versions.yml`):
+
+```bash
+docker run --privileged --rm tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0 --install amd64
+```
 
 ```bash
 ./build-bundle.sh          # Ubuntu 24.04

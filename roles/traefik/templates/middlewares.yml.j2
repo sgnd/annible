@@ -1,5 +1,5 @@
 # Use in app labels:
-#   admin-ip@file  only allow admin_allow_from
+#   admin-ip@file  only allow admin_allow_from and the servers (traefik_admin_allow_from)
 #   admin@file     admin-ip plus a login: Authelia or Keycloak (both with a second factor) when
 #                  installed (admin_sso), else the dashboard password
 #   authelia@file  Authelia login (only when Authelia is installed)
@@ -8,8 +8,7 @@ http:
     admin-ip:
       ipAllowList:
         sourceRange:
-{# Empty admin_allow_from = allow everyone. #}
-{% for cidr in (admin_allow_from | default([])) or ['0.0.0.0/0', '::/0'] %}
+{% for cidr in traefik_admin_allow_from %}
           - "{{ cidr }}"
 {% endfor %}
     admin-auth:

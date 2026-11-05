@@ -27,16 +27,6 @@
     allow_downgrade: true
   when: "'docker-ce' not in ansible_facts.packages"
 
-# Changing a version restarts Docker. One server at a time, so the swarm keeps running.
-- name: Install Docker packages (server that has Docker)
-  ansible.builtin.apt:
-    name: "{{ docker_packages }}"
-    update_cache: true
-    allow_change_held_packages: true
-    allow_downgrade: true
-  when: "'docker-ce' in ansible_facts.packages"
-  throttle: 1
-
 # Hold = "apt upgrade" will not change the Docker version.
 - name: Hold Docker packages
   ansible.builtin.dpkg_selections:
@@ -49,7 +39,17 @@
     src: daemon.json.j2
     dest: /etc/docker/daemon.json
     mode: "0644"
-  notify: Restart docker
+  register: docker_config
+
+# A new Docker version or daemon.json restarts Docker. One server at a time, and each one must be
+# back in the swarm before the next one starts, so the swarm keeps running.
+# (The loop runs update.yml for one server after the other.)
+- name: Update and restart Docker, one server at a time
+  ansible.builtin.include_tasks: update.yml
+  loop: "{{ ansible_play_hosts }}"
+  loop_control:
+    loop_var: docker_host
+  when: docker_host == inventory_hostname
 
 - name: Start Docker
   ansible.builtin.service:

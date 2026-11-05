@@ -5,5 +5,8 @@ kong_replicas: 2
 
 # Generated once and saved in state/secrets/ on the installer machine.
 kong_db_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/kong_db', chars=['ascii_letters', 'digits'], length=24) }}"
+# Swarm: Traefik adds this key to admin API requests; Kong refuses requests without it.
+# So your API services on the kong network cannot use the admin API (it has no login).
+kong_admin_key: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/kong_admin_key', chars=['ascii_letters', 'digits'], length=32) }}"
 # Database changes run on this server, straight to the PostgreSQL primary.
 kong_pg_primary: "{{ hostvars[postgres_primary_node | default(apps.postgres)].node_ip }}"

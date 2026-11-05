@@ -9,6 +9,24 @@
     state: directory
     mode: "0700"
 
+# One server and Patroni keep their data in different ways (data/18 or data/pgroot). With the other
+# kind found here, PostgreSQL would start with a new, empty database. Stop instead.
+- name: Look for PostgreSQL data of the other kind
+  ansible.builtin.find:
+    paths: "{{ postgres_dir }}/data"
+    file_type: directory
+    patterns: "{{ ['[0-9]*'] if postgres_patroni else ['pgroot'] }}"
+  register: postgres_other_data
+
+- name: Stop if PostgreSQL changed between one server and more servers
+  ansible.builtin.assert:
+    that: postgres_other_data.matched == 0
+    fail_msg: >-
+      {{ inventory_hostname }} has PostgreSQL data from {{ 'one server' if postgres_patroni else 'Patroni (2 or more servers)' }},
+      but config.yml now has postgres on {{ app_nodes.postgres | length }} server(s). The installer cannot change this
+      in place. Put postgres in config.yml back as it was. To change it, make a backup (sudo ansibro-backup) and
+      restore it on new servers with the new config.yml (docs/how-to.md, "Back up and restore").
+
 # PostgreSQL in the container runs as user 999 (one server) or 101, group 103 (Spilo, with Patroni).
 - name: Create PostgreSQL data folder
   ansible.builtin.file:
@@ -27,12 +45,21 @@
       PGPASSWORD_STANDBY={{ postgres_replication_password }}
       PGPASSWORD_ADMIN={{ postgres_password }}
       {% if postgres_patroni %}
-      # Patroni's API: reading (health, which server is the primary) is open, changes need this login.
-      # (Spilo starts Patroni without the container's PATRONI_* settings; it adds this to Patroni's config.)
-      SPILO_CONFIGURATION={"restapi": {"authentication": {"username": "patroni", "password": "{{ postgres_patroni_api_password }}"}}}
+      # Spilo starts Patroni without the container's PATRONI_* settings; it adds this to Patroni's config.
+      # - name and addresses: else Spilo uses the host name and its address (can be 127.0.1.1).
+      # - Patroni's API: reading (health, which server is the primary) is open, changes need this login.
+      SPILO_CONFIGURATION={{ postgres_spilo_config | to_json }}
       {% endif %}
     mode: "0600"
   no_log: true
+  vars:
+    postgres_spilo_config:
+      name: "{{ inventory_hostname }}"
+      restapi:
+        connect_address: "{{ node_ip }}:8008"
+        authentication: {username: patroni, password: "{{ postgres_patroni_api_password }}"}
+      postgresql:
+        connect_address: "{{ node_ip }}:5432"
 
 - name: Mirror PostgreSQL image
   ansible.builtin.include_role:
@@ -69,11 +96,11 @@
         path: "{{ postgres_dump }}"
       register: postgres_dump_here
 
-    - name: Find the server with the PostgreSQL dump
+    - name: Find the server with the newest PostgreSQL dump
       ansible.builtin.set_fact:
         postgres_dump_node: >-
-          {{ app_nodes.postgres | map('extract', hostvars) | selectattr('postgres_dump_here.stat.exists')
-          | map(attribute='inventory_hostname') | first | default('') }}
+          {{ (app_nodes.postgres | map('extract', hostvars) | selectattr('postgres_dump_here.stat.exists')
+          | sort(attribute='postgres_dump_here.stat.mtime') | map(attribute='inventory_hostname') | list)[-1] | default('') }}
       run_once: true
 
     - name: Stop if no server has the PostgreSQL dump
@@ -113,9 +140,20 @@
       become: false
       run_once: true
 
+# The dump was made with --clean: it first drops what it creates. Roles that are already here
+# (postgres; with Patroni also Spilo's own) cannot be dropped, so their DROP ROLE and CREATE ROLE
+# lines are left out (their ALTER ROLE lines stay). It also drops and makes again the databases
+# postgres and template1, which Patroni is connected to: WITH (FORCE) closes those connections first.
+# Any other error stops the restore.
 - name: Load PostgreSQL backup
-  ansible.builtin.shell: >-
-    docker exec -i postgres psql -U postgres -q -f -
-    < {{ postgres_dump }}
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      docker exec postgres psql -U postgres -tAc "SELECT quote_ident(rolname) FROM pg_roles" > {{ postgres_dump }}.roles
+      awk 'NR == FNR { skip["CREATE ROLE " $0 ";"]; skip["DROP ROLE IF EXISTS " $0 ";"]; next } !($0 in skip)' \
+        {{ postgres_dump }}.roles {{ postgres_dump }} \
+        | sed -E 's/^(DROP DATABASE( IF EXISTS)? [^;]+);$/\1 WITH (FORCE);/' \
+        | docker exec -i postgres psql -U postgres -q -v ON_ERROR_STOP=1 -f -
+    executable: /bin/bash
   when: restore | bool and inventory_hostname == postgres_primary_node
   changed_when: true

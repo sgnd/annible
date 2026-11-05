@@ -21,7 +21,8 @@ Ask only what you cannot guess. Keep it short.
 3. **Servers** must be Intel/AMD (amd64), not ARM, with **Ubuntu** 24.04 or 26.04.
 4. **Domain** for the web pages, for example `example.com`.
 5. **Internet on the servers?**
-   - Yes: `tls: letsencrypt` and set `acme_email`. DNS must point to the first manager **before** the install.
+   - Yes: `tls: letsencrypt` and set `acme_email`. DNS must point to the server Traefik runs on **before** the install
+     (Swarm: the first manager; k3s: the first worker, or the first manager if there are no workers).
    - No: `tls: selfsigned`, `custom` (their own wildcard cert), or `letsencrypt` with `acme_server`
      set to an ACME server in their network (plus `acme_ca_cert` if its certificate is private).
      Then use the `ansibro-install` skill for the offline bundle.
@@ -52,7 +53,10 @@ If a `bundle/` folder is here, the check treats it as an offline install.
 
 ## Tell the user
 
-- Point DNS for `*.<domain>` to the **public** IP of the first manager, before the install.
+- Point DNS for `*.<domain>` to the **public** IP of the servers Traefik runs on, before the install.
+  Swarm: every manager (with `tls: letsencrypt` the first manager only). k3s: every worker (with
+  `tls: letsencrypt` the first worker only); no workers: the managers. The install prints them at the end
+  (also in `state/summary.md`).
 - The firewall is owned by the installer: other open ports (for example a VPN) must be in `firewall_allow`,
   or they are closed. Server IPs must be outside `10.200.0.0/16` (swarm) and `10.42.0.0/16`, `10.43.0.0/16` (k3s).
 - Keep the first manager first in `nodes`; add new servers after it.
@@ -62,6 +66,6 @@ If a `bundle/` folder is here, the check treats it as an offline install.
 - Suggest `backup:` with storage outside the cluster (S3 or rest-server). The restic password is in
   `state/secrets/restic`: keep `state/` safe outside the cluster. Restore on new servers: `./install.sh -e restore=true`.
 - Suggest monitoring: `victoria` on a server with 2 GB free memory, plus `monitoring:` with at least one of
-  telegram, email or webhook. Or `beszel` for small setups: light, no logs, alerts set in its web page. Put `uptimekuma` on another server and, after the first
-  install, add the "HTTP(s) - Keyword" monitor the install prints, so someone watches the monitoring server.
+  telegram, email or webhook. Or `beszel` for small setups: light, no logs, alerts set in its web page. Put `uptimekuma` on another server: the installer then adds a
+  monitor for the monitoring server (its Watchdog alert), so someone watches the monitoring server.
 - Next step: run the installer (skill `ansibro-install`).

@@ -23,4 +23,4 @@ network, but if you want only up-to-date software, choose Portainer.
 Add `authelia@file` to the app's Traefik middlewares:
 for a swarm app in `roles/<app>/templates/stack.yml.j2` (the `...middlewares` label, comma-separated),
 for a server app with a web page set `traefik_route_middleware: authelia@file` in `roles/<app>/tasks/main.yml`.
-A server app has one middleware, so this replaces its `admin_allow_from` limit.
+A server app has one middleware, so this replaces its `admin_allow_from` limit (on Swarm and k3s).

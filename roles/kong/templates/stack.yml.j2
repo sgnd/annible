@@ -16,13 +16,17 @@ services:
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_ADMIN_ERROR_LOG: /dev/stderr
+      # The admin API answers only requests with Traefik's key (admin-api.conf).
+      KONG_NGINX_ADMIN_INCLUDE: /etc/kong/admin-api.conf
+    configs:
+      - { source: admin-api, target: /etc/kong/admin-api.conf }
     healthcheck:
       test: ["CMD", "kong", "health"]
       interval: 10s
       timeout: 10s
       retries: 5
-    # Only the kong network: other apps cannot reach the admin API (port 8001).
-    # Put your API services on the kong network too, so Kong can reach them.
+    # Only the kong network. Put your API services on it too, so Kong can reach them.
+    # They can reach the admin API (port 8001) too, but it refuses requests without Traefik's key.
     networks:
       - kong
     deploy:
@@ -47,9 +51,16 @@ services:
         # Admin API, only under Kong Manager's address
         traefik.http.routers.kong-admin.rule: Host(`{{ kong_manager_host }}`) && PathPrefix(`/api`)
         traefik.http.routers.kong-admin.service: kong-admin
-        traefik.http.routers.kong-admin.middlewares: admin@file,kong-admin-strip
+        traefik.http.routers.kong-admin.middlewares: admin@file,kong-admin-strip,kong-admin-key
         traefik.http.middlewares.kong-admin-strip.stripprefix.prefixes: /api
+        traefik.http.middlewares.kong-admin-key.headers.customrequestheaders.X-Ansibro-Admin-Key: "{{ kong_admin_key }}"
         traefik.http.services.kong-admin.loadbalancer.server.port: "8001"
+
+configs:
+  # The name changes with the file, so a new key reaches Kong.
+  admin-api:
+    name: kong-admin-api-{{ kong_admin_conf.checksum[:12] }}
+    file: ./admin-api.conf
 
 networks:
   kong:

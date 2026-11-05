@@ -1,5 +1,6 @@
 port: 4222
-http_port: 8222
+# Monitoring page, without a login: only on the cluster address (Traefik adds the login).
+http: "{{ node_ip }}:8222"
 
 jetstream {
   store_dir: /data

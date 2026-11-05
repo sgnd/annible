@@ -39,6 +39,33 @@
   vars:
     docker_compose_app: uptimekuma
 
+- name: Write the Uptime Kuma setup script and monitors
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ uptimekuma_dir }}/data/ansibro-{{ item }}"
+    mode: "0600"
+  loop: [setup.js, monitors.json]
+
+# Makes the admin user and the monitors (until all are added once), from inside the container.
+# Fails if the saved password does not work (someone else made the admin user).
+- name: Make the Uptime Kuma admin user and monitors
+  ansible.builtin.command:
+    cmd: docker exec -i uptimekuma node /app/data/ansibro-setup.js
+    stdin: "{{ {'username': 'admin', 'password': uptimekuma_password} | to_json }}"
+  register: uptimekuma_setup
+  until: uptimekuma_setup.rc == 0 or 'does not work' in uptimekuma_setup.stderr
+  retries: 10
+  delay: 6
+  changed_when: "'created' in uptimekuma_setup.stdout"
+  failed_when: false  # the next task shows the error (no_log hides it here)
+  no_log: true
+
+- name: Check the Uptime Kuma setup
+  ansible.builtin.fail:
+    msg: "{{ uptimekuma_setup.stderr }}"  # never has the password
+  when: uptimekuma_setup.rc != 0
+
+# Only now, with the admin user made: before, anyone who opens the page could make it.
 - name: Add Uptime Kuma to Traefik
   ansible.builtin.include_role:
     name: traefik
@@ -47,22 +74,3 @@
     traefik_route_name: uptimekuma
     traefik_route_port: 3001
     traefik_route_middleware: admin-ip  # Uptime Kuma has its own login
-
-- name: Write the Uptime Kuma setup script and monitors
-  ansible.builtin.template:
-    src: "{{ item }}.j2"
-    dest: "{{ uptimekuma_dir }}/data/ansibro-{{ item }}"
-    mode: "0600"
-  loop: [setup.js, monitors.json]
-
-# Only the first time: when Uptime Kuma has no admin user yet. After that, you own the monitors.
-- name: Make the Uptime Kuma admin user and monitors
-  ansible.builtin.command:
-    cmd: docker exec -i uptimekuma node /app/data/ansibro-setup.js
-    stdin: "{{ {'username': 'admin', 'password': uptimekuma_password} | to_json }}"
-  register: uptimekuma_setup
-  until: uptimekuma_setup.rc == 0
-  retries: 10
-  delay: 6
-  changed_when: "'created' in uptimekuma_setup.stdout"
-  no_log: true

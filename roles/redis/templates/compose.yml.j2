@@ -11,6 +11,9 @@ services:
       REDISCLI_AUTH: "{{ redis_password }}"
     volumes:
       - ./redis.conf:/etc/redis.conf:ro
+{% if redis_ha %}
+      - ./replica.conf:/etc/redis-replica.conf:ro
+{% endif %}
       - ./data:/data
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep PONG"]

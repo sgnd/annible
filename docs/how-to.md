@@ -35,7 +35,9 @@ Add `backup:` to `config.yml` (see [`config.example.yml`](../config.example.yml)
 and run `./install.sh`. Every server then backs up each night with [restic](https://restic.net)
 (encrypted), and the install runs the first backup right away. What is saved:
 
-- databases (PostgreSQL, MariaDB) as a dump (one file with all the data), while they run
+- databases (PostgreSQL, MariaDB) as a dump (one file with all the data), while they run. With
+  Patroni the primary makes it; with Galera the first server that is in sync. If a dump does not work,
+  the folders are still saved, but the backup ends with an error (with victoria the `BackupTooOld` alert follows).
 - every other folder in `/opt/ansibro/`: the app is paused for a moment while its files are copied
 - RustFS and Garage data as it is, while it runs
 - on the first manager: the swarm (your stacks, secrets, configs, networks), `config.yml` and the passwords in `state/secrets/`
@@ -169,6 +171,8 @@ A new Docker version is installed one server at a time, so the swarm keeps runni
 - Needs: etcd, which runs on the managers. With 3 managers one can be down; with 1 manager,
   failover needs that manager.
 - Alerts: `PostgresNoPrimary`, `PostgresReplicaBehind`.
+- Going from 1 server to 2 or more (or back) keeps the data in another way, so the installer stops.
+  Make a backup and restore it on new servers with the new `config.yml`.
 
 **MariaDB**: on 3 servers, `mariadb: [m1, m2, m3]`, it is a [Galera](https://mariadb.com/docs/galera-cluster) cluster.
 - What it does: every server has all the data, and stays up when one server is down.
@@ -189,4 +193,5 @@ A new Docker version is installed one server at a time, so the swarm keeps runni
 ## Garage on 3 servers
 
 `garage: [s1, s2, s3]` keeps every file on all 3 servers, so one can
-go down. Set it on the first install: the number of copies cannot change later.
+go down. Set it on the first install: the number of copies cannot change later (the installer
+stops if the number of Garage servers changes).

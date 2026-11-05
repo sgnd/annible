@@ -42,14 +42,19 @@ copy_app() {
 }
 
 # 1. Databases: a dump is consistent while the database runs.
+# A dump that does not work is reported at the end, but the app folders below are still saved.
+failed=""
 {% if 'postgres' in node_apps %}
+dump_postgres() {
+  docker exec postgres pg_dumpall -U postgres --clean --if-exists > "$stage/dumps/postgres.sql"
+}
 # (Only on the primary. A PostgreSQL replica is a copy of it; with Patroni the primary can move.)
 {% if postgres_patroni %}
 # Find the primary. During a failover there is none for a moment: wait for one (up to 2 minutes).
 primary=""
 for _ in $(seq 24); do
   for ip in {{ app_nodes.postgres | map('extract', hostvars, 'node_ip') | join(' ') }}; do
-    if [ "$(curl -s -o /dev/null -w '%{http_code}' "http://$ip:8008/primary")" = 200 ]; then
+    if [ "$(curl -s -m 5 -o /dev/null -w '%{http_code}' "http://$ip:8008/primary")" = 200 ]; then
       primary=$ip
       break 2
     fi
@@ -58,27 +63,56 @@ for _ in $(seq 24); do
 done
 if [ -z "$primary" ]; then
   echo "error: no PostgreSQL server is the primary, so the database was not saved" >&2
-  exit 1
-fi
-if [ "$primary" = "{{ node_ip }}" ]; then
+  failed="$failed postgres"
+elif [ "$primary" = "{{ node_ip }}" ]; then
 {% else %}
 if docker ps -q --filter name=^postgres$ | grep -q .; then
 {% endif %}
-  docker exec postgres pg_dumpall -U postgres --clean --if-exists > "$stage/dumps/postgres.sql"
+  if ! dump_postgres; then
+    echo "error: the PostgreSQL dump did not work" >&2
+    rm -f "$stage/dumps/postgres.sql"
+    failed="$failed postgres"
+  fi
 fi
 {% endif %}
-{% if apps.mariadb | default('') == inventory_hostname %}
-# (Only on the first server: with Galera every server has the same data.)
-if docker ps -q --filter name=^mariadb$ | grep -q .; then
-  # Users as CREATE USER and GRANT, not the "mysql" database itself: its tables belong to this
-  # server (and to Galera), and loading them on a new server breaks it. Left out: the image's own
-  # users (healthcheck, mariadb.sys: they get new passwords on a new server) and the
-  # "IF current_user() ... END IF" blocks (default roles, which ansibro does not use).
+{% if 'mariadb' in node_apps %}
+# Users as CREATE USER and GRANT, not the "mysql" database itself: its tables belong to this
+# server (and to Galera), and loading them on a new server breaks it. Left out:
+# - the users the image makes itself on a new server: root, healthcheck, mariadb.sys (root gets the
+#   saved password there; replacing the user that loads the dump would also break the load)
+# - the "IF current_user() ... END IF */|" blocks: they only guard those users
+# Only user lines (DROP USER, CREATE ... USER, GRANT, ...) of those users are left out, never data lines.
+# (A user line looks like: CREATE /*M!100103 OR REPLACE */ USER `root`@`%` ...)
+dump_mariadb() {
   docker exec mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb-dump -uroot --all-databases \
     --ignore-database=mysql --system=users --replace --single-transaction --routines --events \
     --add-drop-database' \
-    | LC_ALL=C awk '/^\/\*M!100101 IF current_user\(\)/ { skip = 1 } !skip { print } /END IF \*\/;/ { skip = 0 }' \
-    | LC_ALL=C grep -a -v -E "[\`']?(healthcheck|mariadb\.sys)[\`']?@" > "$stage/dumps/mariadb.sql"
+    | LC_ALL=C awk '/^\/\*M!100101 IF current_user\(\)/ { skip = 1 } !skip { print } /^END IF \*\// { skip = 0 }' \
+    | LC_ALL=C grep -a -v -E "^(/\*M?![0-9]* *)?(CREATE|GRANT|REVOKE|DROP|ALTER USER|SET DEFAULT ROLE)[^;]* [\`']?(root|healthcheck|mariadb\.sys)[\`']?@" \
+    > "$stage/dumps/mariadb.sql"
+}
+{% if mariadb_galera %}
+# (Galera: every server has all the data, so only one server saves it: the first one that is in sync.
+# Each server asks the same check as database-proxy, in the same order, so they pick the same one.)
+dumper=""
+for ip in {{ app_nodes.mariadb | map('extract', hostvars, 'node_ip') | join(' ') }}; do
+  if [ "$(curl -s -m 5 -o /dev/null -w '%{http_code}' "http://$ip:{{ mariadb_check_port }}/")" = 200 ]; then
+    dumper=$ip
+    break
+  fi
+done
+if [ -z "$dumper" ]; then
+  echo "error: no MariaDB server is in sync, so the database was not saved" >&2
+  failed="$failed mariadb"
+elif [ "$dumper" = "{{ node_ip }}" ]; then
+{% else %}
+if docker ps -q --filter name=^mariadb$ | grep -q .; then
+{% endif %}
+  if ! dump_mariadb; then
+    echo "error: the MariaDB dump did not work" >&2
+    rm -f "$stage/dumps/mariadb.sql"
+    failed="$failed mariadb"
+  fi
 fi
 {% endif %}
 
@@ -91,6 +125,7 @@ for dir in {{ apps_dir }}/*/; do
     etcd) ;;                                # Patroni's state: made again from the new database
     postgres | mariadb) ;;                  # saved as a dump above
     rustfs) paths+=("$dir") ;;              # big: saved while it runs
+    redis | valkey) copy_app "$app" sentinel ;;      # Sentinel's state (old primary): made again
     victoria) copy_app "$app" data ;;                # metrics and logs history: not saved
     monitoring-agent) copy_app "$app" vector-data ;;  # logs waiting to be sent: not saved
     garage) copy_app garage data            # settings and metadata paused, data while it runs
@@ -118,5 +153,9 @@ restic forget --quiet --retry-lock 1h --host {{ inventory_hostname }} --prune \
   --keep-daily {{ backup_keep_daily }} --keep-weekly {{ backup_keep_weekly }} --keep-monthly {{ backup_keep_monthly }}
 
 rm -rf "$stage"
+if [ -n "$failed" ]; then
+  echo "error: backup of {{ inventory_hostname }} saved, but without:$failed" >&2
+  exit 1
+fi
 date +%s > {{ backup_dir }}/last-success
 echo "Backup of {{ inventory_hostname }} done."

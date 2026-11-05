@@ -7,6 +7,10 @@ metadata:
   namespace: kube-system
 spec:
   valuesContent: |-
+    # No update checks and no usage data sent out (like Traefik on Swarm).
+    globalArguments:
+      - --global.checknewversion=false
+      - --global.sendanonymoususage=false
     additionalArguments:
       - --entryPoints.web.http.redirections.entryPoint.to=websecure
       - --entryPoints.web.http.redirections.entryPoint.scheme=https
@@ -45,10 +49,49 @@ spec:
       tier: app
 {% endif %}
 {% endif %}
+{% if monitoring_app %}
+    # Metrics on port 8082 of each Traefik server, for the monitoring server
+    # (the NetworkPolicy below lets only the cluster servers in).
+    ports:
+      metrics:
+        port: 8082
+        hostPort: 8082
+    # A host port can be used by one Traefik per server only: stop the old one before the new one starts.
+    updateStrategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxUnavailable: 1
+        maxSurge: 0
+{% endif %}
     # Keeps the real client IP. Only a server that runs Traefik answers.
     service:
       spec:
         externalTrafficPolicy: Local
+{% if monitoring_app %}
+---
+# The metrics port has no login: only the cluster servers may use it. Web ports are open to all.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: traefik-metrics
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: web
+        - port: websecure
+        - port: traefik  # its health check
+    - from:
+{% for host in groups['all'] %}
+        - ipBlock: { cidr: "{{ hostvars[host].node_ip }}/32" }
+{% endfor %}
+      ports:
+        - port: metrics
+{% endif %}
 {% if tls == 'letsencrypt' and acme_ca_cert is defined %}
 ---
 apiVersion: v1
@@ -74,8 +117,7 @@ metadata:
 spec:
   ipAllowList:
     sourceRange:
-{# Empty admin_allow_from = allow everyone. #}
-{% for cidr in (admin_allow_from | default([])) or ['0.0.0.0/0', '::/0'] %}
+{% for cidr in traefik_admin_allow_from %}
       - "{{ cidr }}"
 {% endfor %}
 ---

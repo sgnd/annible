@@ -1,0 +1,37 @@
+# Runs on one server at a time (see main.yml): a new Docker version, or a restart for a new daemon.json.
+# Then it waits until Docker, and on a swarm manager the swarm, works again.
+
+# Changing a version restarts Docker.
+- name: Update Docker packages
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    update_cache: true
+    allow_change_held_packages: true
+    allow_downgrade: true
+  register: docker_update
+
+- name: Restart Docker for the new daemon.json
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+  when: docker_config.changed  # noqa: no-handler (it must run here, on one server at a time)
+
+# Prints for example "active true": in a swarm, and a manager.
+- name: Wait until Docker answers
+  ansible.builtin.command: docker info --format '{% raw %}{{ .Swarm.LocalNodeState }} {{ .Swarm.ControlAvailable }}{% endraw %}'
+  register: docker_swarm
+  until: docker_swarm.rc == 0 and 'pending' not in docker_swarm.stdout
+  retries: 30
+  delay: 5
+  changed_when: false
+  when: docker_update.changed or docker_config.changed
+
+# A manager is back when the swarm sees it as ready and reachable again.
+- name: Wait until this manager is back in the swarm
+  ansible.builtin.command: docker node inspect self --format '{% raw %}{{ .Status.State }} {{ .ManagerStatus.Reachability }}{% endraw %}'
+  register: docker_node
+  until: docker_node.rc == 0 and docker_node.stdout == 'ready reachable'
+  retries: 30
+  delay: 5
+  changed_when: false
+  when: (docker_update.changed or docker_config.changed) and docker_swarm.stdout == 'active true'

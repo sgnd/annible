@@ -187,6 +187,9 @@ def check_settings(cfg, bundle):
              "or set acme_server to an ACME server in your network")
     if cfg.get("acme_ca_cert") and not cfg.get("acme_server"):
         fail("acme_ca_cert is only used with acme_server")
+    port = (cfg.get("ssh") or {}).get("port", 22)
+    if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
+        fail(f"ssh.port must be a number from 1 to 65535, got {port}")
     check_ip_list("ssh.allow_from", (cfg.get("ssh") or {}).get("allow_from"))
     check_ip_list("admin_allow_from", cfg.get("admin_allow_from"))
     check_firewall_allow(cfg.get("firewall_allow"))
@@ -406,9 +409,11 @@ def build(cfg, base_dir):
 
 def check_ready(cfg, base_dir):
     """Values a first install often forgets to change. install.sh checks these before a real run."""
-    if str(cfg.get("domain", "")).endswith("example.com"):
+    domain = str(cfg.get("domain", ""))
+    if domain == "example.com" or domain.endswith(".example.com"):
         fail(f"domain is still {cfg['domain']}. Write your own domain.")
-    if cfg.get("tls", "letsencrypt") == "letsencrypt" and str(cfg.get("acme_email", "")).endswith("example.com"):
+    email = str(cfg.get("acme_email", ""))
+    if cfg.get("tls", "letsencrypt") == "letsencrypt" and (email.endswith("@example.com") or email.endswith(".example.com")):
         fail("acme_email is still an example.com address. Write your own email (Let's Encrypt refuses example.com).")
     key = os.path.normpath(os.path.join(base_dir, os.path.expanduser((cfg.get("ssh") or {}).get("key", "~/.ssh/id_ed25519"))))
     if not os.path.exists(key):

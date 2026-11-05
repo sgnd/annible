@@ -16,6 +16,7 @@
     - { path: "{{ valkey_dir }}/sentinel", owner: "999" }
 
 # The primary now: Sentinel knows it after a failover; on a new install it is the first server.
+# (A restore does not bring Sentinel's state back: the backup leaves it out.)
 - name: Ask Sentinel for the Valkey primary
   ansible.builtin.command: docker exec valkey-sentinel valkey-cli -p 26379 SENTINEL get-master-addr-by-name ansibro
   register: valkey_sentinel_answers
@@ -40,6 +41,20 @@
     mode: "0644"
   diff: false  # has a password
   register: valkey_config
+
+# Which server this one copies from. Its own file: when it changes (after a failover), Valkey
+# is not restarted, because Sentinel has already told the running servers. Else a re-run would
+# restart the current primary, and cause one more failover. The file counts when Valkey starts again.
+- name: Write Valkey replica config
+  ansible.builtin.copy:
+    dest: "{{ valkey_dir }}/replica.conf"
+    content: |
+      # The primary when the installer last ran. Made by ansibro; Sentinel changes the running server.
+      {% if node_ip != valkey_primary_ip %}
+      replicaof {{ valkey_primary_ip }} 6379
+      {% endif %}
+    mode: "0644"
+  when: valkey_ha
 
 # Only the first time: Sentinel rewrites this file itself (who the primary is, the other Sentinels).
 - name: Write Sentinel config

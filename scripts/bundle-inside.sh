@@ -31,7 +31,8 @@ done
 echo "- apt packages"
 # List: base packages from roles/common, Docker packages from versions.yml, and what the installer needs.
 # Docker versions like "5:29.9.2-1*" become the exact version from the repo.
-read -ra packages <<< "$(/tmp/venv/bin/python - <<'EOF'
+# Saved in a variable first, so set -e stops here when the Python part fails.
+package_list=$(/tmp/venv/bin/python - <<'EOF'
 import subprocess, yaml
 versions = yaml.safe_load(open("/src/versions.yml"))
 common = yaml.safe_load(open("/src/roles/common/defaults/main.yml"))
@@ -46,7 +47,12 @@ for spec in versions["docker_packages"]:
     wanted.append(f"{name}={found[0]}")
 print(" ".join(wanted))
 EOF
-)"
+)
+read -ra packages <<< "$package_list"
+if [ "${#packages[@]}" = 0 ]; then
+  echo "error: the list of apt packages is empty" >&2
+  exit 1
+fi
 # An empty package status makes apt download every dependency, even ones this container already has.
 mkdir -p /tmp/debs/partial
 touch /tmp/empty-status

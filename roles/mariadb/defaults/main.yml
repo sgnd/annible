@@ -2,3 +2,5 @@ mariadb_dir: "{{ apps_dir }}/mariadb"
 
 # Generated once and saved in state/secrets/ on the installer machine.
 mariadb_password: "{{ lookup('ansible.builtin.password', secrets_dir ~ '/mariadb', chars=['ascii_letters', 'digits'], length=24) }}"
+# Where a restore finds the database dump (put back from the backup by roles/backup).
+mariadb_dump: "{{ apps_dir }}/backup/stage/dumps/mariadb.sql"

@@ -35,6 +35,12 @@ services:
       labels:
         traefik.enable: "true"
         traefik.http.routers.keycloak.rule: Host(`{{ keycloak_host }}`)
+        traefik.http.routers.keycloak.service: keycloak
+        # The admin console and admin API only from admin_allow_from (the longer rule wins).
+        # The rest (/realms: the logins) stays open, because apps and users log in there.
+        traefik.http.routers.keycloak-admin.rule: Host(`{{ keycloak_host }}`) && PathPrefix(`/admin`)
+        traefik.http.routers.keycloak-admin.service: keycloak
+        traefik.http.routers.keycloak-admin.middlewares: admin-ip@file
         traefik.http.services.keycloak.loadbalancer.server.port: "8080"
 
 {% if admin_sso == 'keycloak' %}

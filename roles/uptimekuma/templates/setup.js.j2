@@ -1,9 +1,14 @@
-// First setup of Uptime Kuma: the admin user and the monitors. Made by ansibro.
+// Setup of Uptime Kuma: the admin user and the monitors. Made by ansibro.
 // The installer runs it inside the container: "docker exec -i uptimekuma node /app/data/ansibro-setup.js".
 // It talks to Uptime Kuma like its web page does (socket.io). The user and password come in through
 // stdin (JSON), so the password is never on a command line; the monitors are in ansibro-monitors.json.
-// When an admin user exists already, it changes nothing.
+// First run: it makes the admin user and the monitors. A run that stopped half way is finished by
+// the next one (it adds only the monitors that are missing, by name). When all are added, it writes
+// ansibro-monitors-done: from then on you own the monitors, and it never adds, changes or removes one.
+// Every run checks the saved password works, else it stops with an error.
 const { io } = require("/app/node_modules/socket.io-client");
+const fs = require("fs");
+const doneFile = "/app/data/ansibro-monitors-done";
 
 let input = "";
 process.stdin.on("data", (chunk) => (input += chunk));
@@ -36,6 +41,8 @@ const defaults = {
 
 async function run(settings) {
   const socket = io("http://localhost:3001", { transports: ["websocket"], reconnection: false });
+  // After the login, Uptime Kuma sends the list of monitors.
+  const monitorList = new Promise((resolve) => socket.on("monitorList", resolve));
   await new Promise((resolve) => {
     socket.on("connect", resolve);
     socket.on("connect_error", (e) => fail("cannot reach Uptime Kuma: " + e.message));
@@ -43,21 +50,32 @@ async function run(settings) {
   // Uptime Kuma sets up its answers a moment after a connection opens; a question sent before is lost.
   await new Promise((resolve) => setTimeout(resolve, 3000));
 
-  if (!(await call(socket, "needSetup"))) {
-    console.log("already set up");
-    process.exit(0);
+  let created = "";
+  if (await call(socket, "needSetup")) {
+    const answer = await call(socket, "setup", settings.username, settings.password);
+    if (!answer.ok) fail("setup: " + answer.msg);
+    created = "created the admin user, ";
+  }
+  let answer = await call(socket, "login", { username: settings.username, password: settings.password, token: "" });
+  if (!answer.ok || answer.tokenRequired) {
+    fail("Uptime Kuma has an admin user, but the saved password (state/secrets/uptimekuma_admin) does not work. "
+      + "Someone else may have set it up first: check it. If you changed the password, put the new one in that file.");
   }
 
-  let answer = await call(socket, "setup", settings.username, settings.password);
-  if (!answer.ok) fail("setup: " + answer.msg);
-  answer = await call(socket, "login", { username: settings.username, password: settings.password, token: "" });
-  if (!answer.ok) fail("login: " + answer.msg);
-
-  const monitors = JSON.parse(require("fs").readFileSync("/app/data/ansibro-monitors.json", "utf8"));
-  for (const monitor of monitors) {
+  if (fs.existsSync(doneFile)) {
+    console.log("nothing to do");
+    process.exit(0);
+  }
+  const timer = setTimeout(() => fail("no list of monitors"), 20000);
+  const existing = Object.values(await monitorList).map((monitor) => monitor.name);
+  clearTimeout(timer);
+  const monitors = JSON.parse(fs.readFileSync("/app/data/ansibro-monitors.json", "utf8"));
+  const missing = monitors.filter((monitor) => !existing.includes(monitor.name));
+  for (const monitor of missing) {
     answer = await call(socket, "add", { ...defaults, ...monitor });
     if (!answer.ok) fail("monitor " + monitor.name + ": " + answer.msg);
   }
-  console.log("created the admin user and " + monitors.length + " monitors");
+  fs.writeFileSync(doneFile, "All monitors were added. Made by ansibro: from now on you own the monitors.\n");
+  console.log(missing.length || created ? created + "created " + missing.length + " monitors" : "nothing to do");
   process.exit(0);
 }

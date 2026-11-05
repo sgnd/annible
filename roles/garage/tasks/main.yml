@@ -13,6 +13,30 @@
     - "{{ garage_dir }}/meta"
     - "{{ garage_dir }}/data"
 
+# Garage keeps one copy of each file per server (replication_factor). It cannot change that later:
+# with more or fewer Garage servers in config.yml, stop before writing the new number.
+- name: Read the Garage config there is now
+  ansible.builtin.slurp:
+    src: "{{ garage_dir }}/garage.toml"
+  register: garage_config_now
+  failed_when: false  # not there on a new server
+  no_log: true  # has a password
+
+- name: Stop if the number of Garage servers changed
+  ansible.builtin.assert:
+    that: garage_copies_seen | difference([app_nodes.garage | length | string]) | length == 0
+    fail_msg: >-
+      Garage keeps {{ garage_copies_seen | join(' or ') }} copies of each file (one per server), but config.yml now
+      has garage on {{ app_nodes.garage | length }} server(s). Garage cannot change this later. Put garage in
+      config.yml back to {{ garage_copies_seen | join(' or ') }} server(s). For another number, set up a new Garage
+      and copy the files over (for example with rclone). See docs/how-to.md, "Garage on 3 servers".
+  vars:
+    garage_copies_seen: >-
+      {{ app_nodes.garage | map('extract', hostvars) | selectattr('garage_config_now.content', 'defined')
+      | map(attribute='garage_config_now.content') | map('b64decode')
+      | map('regex_findall', '(?m)^replication_factor = ([0-9]+)') | select | map('first') | unique | list }}
+  run_once: true
+
 - name: Write Garage config
   ansible.builtin.template:
     src: garage.toml.j2

@@ -3,8 +3,10 @@ global:
   sendAnonymousUsage: false
 
 entryPoints:
+  # asDefault: routers without their own entryPoints use only web and websecure (not metrics).
   web:
     address: ":80"
+    asDefault: true
     http:
       redirections:
         entryPoint:
@@ -12,6 +14,7 @@ entryPoints:
           scheme: https
   websecure:
     address: ":443"
+    asDefault: true
     http:
 {% if tls == 'letsencrypt' %}
       tls:
